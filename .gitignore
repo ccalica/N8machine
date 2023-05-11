@@ -1,2 +1,6 @@
 playground/deps
+*.o
+n8
+#imgui/
+*.ini
 
