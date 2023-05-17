@@ -1,3 +1,4 @@
+.vscode/
 playground/deps
 *.o
 n8
