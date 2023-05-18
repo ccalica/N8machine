@@ -17,10 +17,12 @@
 EXE = n8
 IMGUI_DIR = imgui
 SRC_DIR = src
+BUILD_DIR = build
 SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/utils.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl2.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
-OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
+_OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
+OBJS = $(patsubst %, $(BUILD_DIR)/%, $(_OBJS))
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
@@ -73,16 +75,16 @@ endif
 ## BUILD RULES
 ##---------------------------------------------------------------------
 
-%.o:%.cpp
+$(BUILD_DIR)/%.o:%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-%.o:$(IMGUI_DIR)/%.cpp
+$(BUILD_DIR)/%.o:$(IMGUI_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-%.o:$(IMGUI_DIR)/backends/%.cpp 
+$(BUILD_DIR)/%.o:$(IMGUI_DIR)/backends/%.cpp 
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-%.o:$(SRC_DIR)/%.cpp
+$(BUILD_DIR)/%.o:$(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 all: $(EXE)
