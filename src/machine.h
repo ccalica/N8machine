@@ -1,0 +1,7 @@
+
+//#pragma once
+
+//////////////////////////////////////
+//
+// Machine config
+const int total_memory = 65536;
