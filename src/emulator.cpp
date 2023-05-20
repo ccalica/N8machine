@@ -115,7 +115,6 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
     const int mdb_len = row_count*row_size;
     char* memory_dump_buffer= new char[mdb_len];
 
-
     if(update_mem_dump) {
         strncpy(memory_dump_buffer, "", 255);
         char* cursor = memory_dump_buffer;
@@ -158,9 +157,11 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
     ImGui::InputTextMultiline("##source", memory_dump_buffer, mdb_len, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
     ImGui::End();
 
+    delete memory_dump_buffer;
+
 }
 
-void emulator_show_status_window(bool &show_status_window ) {
+void emulator_show_status_window(bool &show_status_window, float frame_time, float fps ) {
     float val_off=30, lab_off=70;
     ImGui::Begin("CPU Registers", &show_status_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
     ImGui::Text("A:"); 
@@ -177,13 +178,15 @@ void emulator_show_status_window(bool &show_status_window ) {
     ImGui::SameLine(40); ImGui::Text("%2.2x",m6502_s(&cpu));
     ImGui::SameLine(100); ImGui::Text("PC:");
     ImGui::SameLine(140); ImGui::Text("%4.4x",m6502_pc(&cpu));
+    ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", frame_time, fps);
+    ImGui::Text("Ticks: %lu", tick_count);
     // if (ImGui::Button("Close Me"))
     //     show_status_window = false;
     ImGui::End();
 
 }
 
-void emulator_show_console_window(bool &show_console_window, float frame_time, float fps) {
+void emulator_show_console_window(bool &show_console_window) {
     ImGui::Begin("Console");
     ImGui::Text("Console:");
     ImGui::BeginChild("console");
@@ -191,7 +194,6 @@ void emulator_show_console_window(bool &show_console_window, float frame_time, f
         ImGui::Text("LOG:  output ladfadflk\nasdfasdf  %d", n);
     }
     ImGui::EndChild();
-    ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", frame_time, fps);
     ImGui::End();    
 }
 

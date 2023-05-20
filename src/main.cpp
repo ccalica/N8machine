@@ -162,15 +162,18 @@ int main(int, char**)
     {
         static bool run_emulator = false;
         static bool step_emulator = false;
+        uint32_t steps = 0;
         if(run_emulator) {
-            uint32_t timeout = SDL_GetTicks() + 16;
+            uint32_t timeout = SDL_GetTicks() + 13;
             while(!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
                 emulator_step();
+                steps++;
             }
         }
         else if(step_emulator) {
             // call emulator_step;
             emulator_step();
+            steps++;
             step_emulator = false;
         }
         // Poll and handle events (inputs, window resize, etc.)
@@ -205,14 +208,14 @@ int main(int, char**)
 
             if(ImGui::Button(run_emulator?"Pause":" Run ")) {
                 run_emulator = !run_emulator;
-                printf("Run toggle\n");
+                // printf("Run toggle\n");
             }
             ImGui::SameLine(80);
             //if(run_emulator) ImGui::BeginDisabled(run_emulator);
             ImGui::BeginDisabled(run_emulator);
             if(ImGui::Button("Step")) {
                 step_emulator = true;
-                printf("Step\n");
+                // printf("Step\n");
             }
             ImGui::EndDisabled();
             ImGui::SameLine(150);
@@ -220,7 +223,8 @@ int main(int, char**)
                 emulator_reset();
                 printf("Reset\n");
             }
-
+            ImGui::Text("Steps per frame: %d", steps);
+            ImGui::Text("Steps per sec: %f:", io.Framerate * steps);
             ImGui::End();
         }
 
@@ -233,11 +237,11 @@ int main(int, char**)
         // Show CPU register status window
         if (show_status_window)
         {
-            emulator_show_status_window(show_status_window);
+            emulator_show_status_window(show_status_window,1000.0f / io.Framerate,io.Framerate);
         }
 
         if (show_console_window) {
-            emulator_show_console_window(show_console_window,1000.0f / io.Framerate,io.Framerate);
+            emulator_show_console_window(show_console_window);
         }
 
         // Rendering
