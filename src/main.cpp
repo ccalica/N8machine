@@ -13,6 +13,7 @@ using namespace std;
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
 #include <SDL.h>
+#include <SDL_timer.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <SDL_opengles2.h>
 #else
@@ -25,7 +26,7 @@ using namespace std;
 #endif
 
 
-
+#include "emulator.h"
 #include "machine.h"
 #include "utils.h"
 
@@ -138,6 +139,8 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
 
+    emulator_init();
+
     // Our state
     bool show_memmap_window = true;
     bool show_status_window = true;
@@ -148,14 +151,6 @@ int main(int, char**)
     // Main loop
     bool done = false;
 
-    // For memory dump
-    bool update_mem_dump = false;
-    int line_len = 0x10;
-    const int row_size = ((3 * line_len) + 9);
-    const int row_count= (total_memory / line_len) + 1 + 2; // Need 1 but 2 extra for space
-    const int mdb_len = row_count*row_size;
-    char* memory_dump_buffer= new char[mdb_len];
-
 #ifdef __EMSCRIPTEN__
     // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
     // You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
@@ -165,6 +160,19 @@ int main(int, char**)
     while (!done)
 #endif
     {
+        static bool run_emulator = false;
+        static bool step_emulator = false;
+        if(run_emulator) {
+            uint32_t timeout = SDL_GetTicks() + 16;
+            while(!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
+                emulator_step();
+            }
+        }
+        else if(step_emulator) {
+            // call emulator_step;
+            emulator_step();
+            step_emulator = false;
+        }
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
@@ -187,7 +195,6 @@ int main(int, char**)
 
         // Control Window
         {
-            static bool run_emulator = false;
             ImGui::Begin("Emulator Control");                          // Create a window called "Hello, world!" and append into it.
 
             ImGui::Checkbox("CPU", &show_status_window);
@@ -195,6 +202,7 @@ int main(int, char**)
             ImGui::SameLine(260);  ImGui::Checkbox("Console", &show_console_window);
             ImGui::Text("  ");
             ImGui::Text("Status: %s", run_emulator?"Running":"Halted");
+
             if(ImGui::Button(run_emulator?"Pause":" Run ")) {
                 run_emulator = !run_emulator;
                 printf("Run toggle\n");
@@ -203,111 +211,35 @@ int main(int, char**)
             //if(run_emulator) ImGui::BeginDisabled(run_emulator);
             ImGui::BeginDisabled(run_emulator);
             if(ImGui::Button("Step")) {
-                ;;;
+                step_emulator = true;
                 printf("Step\n");
             }
             ImGui::EndDisabled();
             ImGui::SameLine(150);
             if(ImGui::Button("Reset")) {
-                ;;;
+                emulator_reset();
                 printf("Reset\n");
             }
 
-            // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            // ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            // if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-            //     counter++;
-            // ImGui::SameLine();
-            // ImGui::Text("counter = %d", counter);
-
-            
             ImGui::End();
         }
 
         
         // 3. Show Memory dumpo window.
-        if (show_memmap_window)
-        {
-            if(update_mem_dump) {
-                strncpy(memory_dump_buffer, "", 255);
-                char* cursor = memory_dump_buffer;
-                for(int i = 0; i<total_memory; i++) {
-                    char buffer[8];
-                    if(i%line_len==0) {
-                        my_itoa(buffer, i, 4);
-                        buffer[4] = ':';
-                        buffer[5] = ' ';
-                        buffer[6] = 0;
-                        strcat(cursor, buffer);
-                        cursor += 6;
-                    }
-                    {
-                        buffer[0] = ' ';
-                        my_itoa(buffer+1,(i*i)%256,2);
-                        strcat(cursor, buffer);
-                        cursor += 3;
-                    }
-                    if(i%line_len== 7) {
-                        buffer[0]=' ';
-                        buffer[1]=' ';
-                        buffer[2]=0;
-                        strcat(cursor, buffer);
-                        cursor += 2;
-                    }
-                    if(i%line_len==(line_len-1)) {
-                        strcat(cursor,"\n");
-                        cursor++;
-                    }
-                }
-            }
-
-            static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
-
-            ImGui::Begin("Memory Map", &show_memmap_window);
-            
-            // ImGui::CheckboxFlags("ImGuiInputTextFlags_ReadOnly", &flags, ImGuiInputTextFlags_ReadOnly);
-            ImGui::Checkbox("Update", &update_mem_dump);   
-            ImGui::InputTextMultiline("##source", memory_dump_buffer, mdb_len, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
-            ImGui::End();
+        if (show_memmap_window) {
+            emulator_show_memdump_window(show_memmap_window);
         }
 
         // Show CPU register status window
         if (show_status_window)
         {
-            float val_off=30, lab_off=70;
-            ImGui::Begin("CPU Registers", &show_status_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("A:"); 
-            ImGui::SameLine(val_off); ImGui::Text("FE");
-            ImGui::SameLine(lab_off); ImGui::Text("X:");
-            ImGui::SameLine(lab_off+val_off); ImGui::Text("B8");
-            ImGui::SameLine(2.0 * lab_off); ImGui::Text("Y:");
-            ImGui::SameLine(2.0 * lab_off + val_off); ImGui::Text("C0");
-
-            ImGui::Text("SR:");
-            ImGui::SameLine(lab_off); ImGui::Text("1011 1101");
-
-            ImGui::Text("SP:");
-            ImGui::SameLine(40); ImGui::Text("FA");
-            ImGui::SameLine(100); ImGui::Text("PC:");
-            ImGui::SameLine(140); ImGui::Text("C018");
-            // if (ImGui::Button("Close Me"))
-            //     show_status_window = false;
-            ImGui::End();
+            emulator_show_status_window(show_status_window);
         }
 
         if (show_console_window) {
-            ImGui::Begin("Console");
-            ImGui::Text("Console:");
-            ImGui::BeginChild("console");
-            for(int n = 0; n<20; n++) {
-                ImGui::Text("LOG:  output ladfadflk\nasdfasdf  %d", n);
-            }
-            ImGui::EndChild();
-            ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-
+            emulator_show_console_window(show_console_window,1000.0f / io.Framerate,io.Framerate);
         }
+
         // Rendering
         ImGui::Render();
         glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
