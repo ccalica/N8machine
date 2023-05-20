@@ -30,7 +30,7 @@ m6502_desc_t desc;
 uint64_t pins;
 
 void emulator_init() {
-    uint16_t rom_ptr = 0xC000;
+    uint16_t rom_ptr = 0xD000;
     printf("Loading ROM\n");
     FILE *fp = fopen(rom_file, "r");
     while(1) {
