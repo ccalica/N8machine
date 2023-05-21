@@ -1,7 +1,6 @@
 # Makefile N8 firmware
 
 # C and assem files
-# SRC =	main.c acia.s interrupt.s vectors.s
 SRC = main.s init.s interrupt.s vectors.s
 
 # compiler output
