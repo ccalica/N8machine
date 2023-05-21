@@ -45,14 +45,6 @@ void emulator_init() {
     fclose(fp);
     puts("\n\n");
 
-    // Setup RESET Vector
-    mem[0xFFFC] = 0x00;
-    mem[0xFFFD] = 0xC0;
-
-    // // put an LDA #$33 instruction at address 0
-    // mem[0x0200] = 0xA9;
-    // mem[0x0201] = 0x33;
-
     // initialize a 6502 instance:
     //desc.bcd_disabled=false;
     
