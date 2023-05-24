@@ -9,8 +9,6 @@
 
 .include    "devices.inc"
 
-.segment    "DATA"
-four:       .byte 4
 .segment    "CODE"
 
 ; -------------------------------------------------------
