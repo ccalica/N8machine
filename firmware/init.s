@@ -18,6 +18,7 @@
 _init:  LDX     #$FF                 ; Initialize stack pointer to $01FF
         TXS
         CLD                          ; Clear decimal mode
+        CLI                          ; Clear IRQ disable
         JSR    _main
 
 ; Should really terminate gracefully at this point

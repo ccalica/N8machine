@@ -18,7 +18,7 @@ EXE = n8
 IMGUI_DIR = imgui
 SRC_DIR = src
 BUILD_DIR = build
-SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/emulator.cpp
+SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/emulator.cpp $(SRC_DIR)/emu_tty.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl2.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 _OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
@@ -87,11 +87,17 @@ $(BUILD_DIR)/%.o:$(IMGUI_DIR)/backends/%.cpp
 $(BUILD_DIR)/%.o:$(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
+.PHONY: firmware
+
 all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)
 
 $(EXE): $(OBJS)
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
 
+firmware:
+	make -C firmware install
+
 clean:
 	rm -f $(EXE) $(OBJS)
+	make -C firmware clean

@@ -11,7 +11,6 @@ using namespace std;
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
-#include <stdio.h>
 #include <SDL.h>
 #include <SDL_timer.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -25,6 +24,9 @@ using namespace std;
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
+#include <stdio.h>
+#include <chrono>
+#include <thread>
 
 #include "emulator.h"
 #include "machine.h"
@@ -34,6 +36,7 @@ const char* glsl_version;
 SDL_WindowFlags window_flags;
 SDL_Window* window;
 SDL_GLContext gl_context;
+
 
 int SDL_GL_Init() {
     // Setup SDL
@@ -221,7 +224,8 @@ int main(int, char**)
             ImGui::SameLine(150);
             if(ImGui::Button("Reset")) {
                 emulator_reset();
-                printf("Reset\n");
+                printf("Reset\r\n");
+                fflush(stdout);
             }
             ImGui::Text("Steps per frame: %d", steps);
             ImGui::Text("Steps per sec: %f:", io.Framerate * steps);
