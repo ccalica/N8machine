@@ -2,6 +2,7 @@
 playground/deps
 *.o
 n8
+d6502
 #imgui/
 *.ini
-
+N8firmware*
