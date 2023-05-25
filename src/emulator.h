@@ -18,5 +18,3 @@ bool emu_bus_read();
 void emu_set_irq(int);
 void emu_clr_irq(int);
 
-int  emu_is_digit(char);
-int  emu_is_hex(char);

@@ -203,17 +203,6 @@ void emulator_setbp(char * buff) {
 
 }
 
-int emu_is_digit(char c) {
-    if(c >='0' && c <= '9') return c - '0';
-    return -1;
-}
-int emu_is_hex(char c) {
-    if(c >='0' && c <= '9') return c - '0';
-    if(c >='A' && c <= 'F') return c - 'A' + 10;
-    if(c >='a' && c <= 'f') return c - 'a' + 10;
-    return -1;
-}
-
 void emulator_reset() {
     pins = pins | M6502_RES;
     tty_reset();
