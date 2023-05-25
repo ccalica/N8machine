@@ -165,12 +165,16 @@ int main(int, char**)
     {
         static bool run_emulator = false;
         static bool step_emulator = false;
+        static bool bp_enable = false;
+        static char break_points[128] {0};
+
         uint32_t steps = 0;
         if(run_emulator) {
             uint32_t timeout = SDL_GetTicks() + 13;
             while(!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
                 emulator_step();
                 steps++;
+                if(emulator_check_break()) {run_emulator=false; break;}
             }
         }
         else if(step_emulator) {
@@ -224,9 +228,16 @@ int main(int, char**)
             ImGui::SameLine(150);
             if(ImGui::Button("Reset")) {
                 emulator_reset();
-                printf("Reset\r\n");
-                fflush(stdout);
             }
+            ImGui::SameLine(230); 
+            if(ImGui::Checkbox("BP", &bp_enable)) {
+                emulator_enablebp(bp_enable);
+            }
+            ImGui::SameLine(300); 
+            if(ImGui::InputText("BP2", break_points,IM_ARRAYSIZE(break_points))) {
+                emulator_setbp(break_points);
+            }
+
             ImGui::Text("Steps per frame: %d", steps);
             ImGui::Text("Steps per sec: %f:", io.Framerate * steps);
             ImGui::End();

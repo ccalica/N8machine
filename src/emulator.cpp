@@ -5,6 +5,7 @@
 
 #include "emulator.h"
 #include "emu_tty.h"
+#include "gui_console.h"
 #include "utils.h"
 #include "machine.h"
 
@@ -30,6 +31,10 @@ uint8_t frame_buffer[(1<<8)] = { };
 m6502_t cpu;
 m6502_desc_t desc;
 uint64_t pins;
+bool bp_enable;
+bool bp_hit = false;
+bool bp_mask[65536] {false};
+
 
 // these are the same.
 #define BUS_READ (pins & M6502_RW)
@@ -70,6 +75,12 @@ void emulator_init() {
 void emulator_step() {
         pins = m6502_tick(&cpu, pins);
         const uint16_t addr = M6502_GET_ADDR(pins);
+
+        if(bp_enable && bp_mask[addr]) {
+            bp_hit = true;
+            printf("BP hit: %4.4x (%d): ", addr, addr);
+            fflush(stdout);
+        }
         IRQ_CLR();
         // pins = pins & ~M6502_IRQ;
 
@@ -128,6 +139,79 @@ void emulator_step() {
         
         tick_count++;
 
+}
+
+bool emulator_check_break() {
+    if(bp_enable && bp_hit) {
+        bp_hit = false;
+        return true;
+    }
+    return false;
+}
+void emulator_enablebp(bool en) {
+    bp_enable = en;
+}
+void emulator_setbp(char * buff) {
+    char *cur = buff;
+    int8_t type = 0;  // Format of current token  0=DEC  1=HEX
+    int digit;
+    int bp;
+    
+    // Clear the mask
+    for(int i = 0; i<65536; i++) bp_mask[i] = false;
+
+    while(*cur) {
+        bp = 0;
+        
+        if(*cur == '$')  {
+            type = 1;
+            cur++;
+        }
+        else if(*cur == '0' && *(cur+1) == 'x')  {
+            type = 1;
+            cur++; cur++;
+        }
+        else if(emu_is_digit(*cur) >= 0) {
+            type = 0;
+        }
+        else { // not start of number
+            type = -1;
+            cur++;
+        }
+
+        if(type == 0) { // DEC
+            while( *cur && (digit = emu_is_digit(*cur) ) >=0) {
+                bp = 10 * bp + digit;            
+                cur++;
+            }
+        }
+        else if (type == 1) { // HEX
+            while( *cur && (digit = emu_is_hex(*cur) ) >=0) {
+                bp = 16 * bp + digit;       
+                cur++;     
+            }
+        }
+        if(type >= 0) {
+            // bp should contain full address
+            uint16_t addr = (uint16_t) bp;
+            bp_mask[addr] = true;
+            printf("PARSED type %d BREAK POINT: %4.4x (%d)\r\n",type , bp, bp);
+            fflush(stdout);
+        }
+
+    }
+
+}
+
+int emu_is_digit(char c) {
+    if(c >='0' && c <= '9') return c - '0';
+    return -1;
+}
+int emu_is_hex(char c) {
+    if(c >='0' && c <= '9') return c - '0';
+    if(c >='A' && c <= 'F') return c - 'A' + 10;
+    if(c >='a' && c <= 'f') return c - 'a' + 10;
+    return -1;
 }
 
 void emulator_reset() {
@@ -206,10 +290,8 @@ void emulator_show_status_window(bool &show_status_window, float frame_time, flo
     ImGui::SameLine(lab_off); ImGui::Text("N%d V%d -%d B%d D%d I%d Z%d C%d",sr_bit(7),sr_bit(6),sr_bit(5),sr_bit(4), \
                                                     sr_bit(3),sr_bit(2),sr_bit(1),sr_bit(0));
 
-    ImGui::Text("SP:");
-    ImGui::SameLine(40); ImGui::Text("%2.2x",m6502_s(&cpu));
-    ImGui::SameLine(100); ImGui::Text("PC:");
-    ImGui::SameLine(140); ImGui::Text("%4.4x",m6502_pc(&cpu));
+    ImGui::Text("Data: %2.2x     Addr: %4.4x", M6502_GET_DATA(pins), M6502_GET_ADDR(pins));
+    ImGui::Text("  SP: %2.2x       PC: %4.4x",m6502_s(&cpu),m6502_pc(&cpu));
     ImGui::Text("IRQ: %d %d", (pins & M6502_IRQ) == M6502_IRQ, mem[0x00FF] == 0);
     ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", frame_time, fps);
     ImGui::Text("Ticks: %lu", tick_count);
@@ -220,14 +302,7 @@ void emulator_show_status_window(bool &show_status_window, float frame_time, flo
 }
 
 void emulator_show_console_window(bool &show_console_window) {
-    ImGui::Begin("Console");
-    ImGui::Text("Console:");
-    ImGui::BeginChild("console");
-    for(int n = 0; n<20; n++) {
-        ImGui::Text("LOG:  output ladfadflk\nasdfasdf  %d", n);
-    }
-    ImGui::EndChild();
-    ImGui::End();    
+    gui_show_console_window(show_console_window);
 }
 
 
