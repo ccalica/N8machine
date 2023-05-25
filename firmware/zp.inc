@@ -3,8 +3,12 @@
 ; Zero Page locations
 ; ---------------------------------------------------------------------------
 
-.define ZP_A_PTR    $F7 ; And 0xF8
-.define ZP_B_PTR    $F9 ; And 0xFA
-.define ZP_C_PTR    $FB ; And 0xFC
-.define ZP_D_PTR    $FD ; And 0xFE
+.define ZP_A_PTR    $E0 ; And 0xE1
+.define ZP_B_PTR    $E2 ; And 0xE3
+.define ZP_C_PTR    $E4 ; And 0xE5
+.define ZP_D_PTR    $E6 ; And 0xE7
+
+
+
+
 .define ZP_IRQ      $FF
