@@ -1,2 +1,4 @@
-N8firmware.bin
-N8firmware.bin.map
+N8firmware
+N8firmware.map
+N8firmware.sym
+
