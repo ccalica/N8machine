@@ -21,7 +21,7 @@
 #define IRQ_CLR() mem[0x00FF] = 0x00;
 #define IRQ_SET(bit) mem[0x00FF] = (mem[0x00FF] | 0x01 << bit)
 
-const char *rom_file = "N8firmware.bin";
+const char *rom_file = "N8firmware";
 uint64_t tick_count = 0;
 // 64 KB zero-initialized memory
 uint8_t mem[(1<<16)] = { };
