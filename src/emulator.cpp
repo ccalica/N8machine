@@ -153,6 +153,8 @@ void emulator_enablebp(bool en) {
 }
 void emulator_setbp(char * buff) {
     char *cur = buff;
+    char debug_msg[256] {0};
+
     int8_t type = 0;  // Format of current token  0=DEC  1=HEX
     int digit;
     int bp;
@@ -195,8 +197,8 @@ void emulator_setbp(char * buff) {
             // bp should contain full address
             uint16_t addr = (uint16_t) bp;
             bp_mask[addr] = true;
-            printf("PARSED type %d BREAK POINT: %4.4x (%d)\r\n",type , bp, bp);
-            fflush(stdout);
+            snprintf(debug_msg, 256, "PARSED type %d BREAK POINT: %4.4x (%d)\r\n",type , bp, bp);
+            gui_con_printmsg(debug_msg);
         }
 
     }
