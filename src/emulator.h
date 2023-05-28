@@ -1,13 +1,17 @@
 
 #pragma once
 
-#include "m6502.h"
+#include <cstdint>
 
+// #include "m6502.h"
+
+extern uint8_t mem[];
 
 void emulator_init();
 void emulator_step();
 void emulator_reset();
 void emulator_enablebp(bool);
+void emulator_logbp();
 void emulator_setbp(char*);
 bool emulator_check_break();
 

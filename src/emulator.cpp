@@ -24,6 +24,7 @@
 
 const char *rom_file = "N8firmware";
 uint64_t tick_count = 0;
+
 // 64 KB zero-initialized memory
 uint8_t mem[(1<<16)] = { };
 uint8_t frame_buffer[(1<<8)] = { };
@@ -34,6 +35,8 @@ uint64_t pins;
 bool bp_enable;
 bool bp_hit = false;
 bool bp_mask[65536] {false};
+bool pc_mask[65536] {false};
+bool label_mask[65536] {false};  // TODO: init via .sym file
 
 
 // these are the same.
@@ -151,7 +154,44 @@ bool emulator_check_break() {
 void emulator_enablebp(bool en) {
     bp_enable = en;
 }
+
+void emulator_logbp() {
+    char debug_msg[256] {0};
+
+    int addr = 0;
+    while(addr < 65536) {
+        if(bp_mask[addr]) {
+            snprintf(debug_msg, 256, "  BP: %4.4x (%d)", addr, addr);
+            gui_con_printmsg(debug_msg);
+        }
+        addr++;
+    }
+}
 void emulator_setbp(char * buff) {
+    char *cur = buff;
+    char debug_msg[256] {0};
+
+    uint32_t bp;
+    
+    // // Clear the mask
+    // for(int i = 0; i<65536; i++) bp_mask[i] = false;
+
+    while(*cur) {
+        bp = 0;
+
+        int offset = my_get_uint(cur, bp);
+        if(offset == 0) return;
+        cur += offset;
+
+        uint16_t addr = (uint16_t) bp;
+        bp_mask[addr] = true;
+
+        snprintf(debug_msg, 256, "Set BP: %4.4x (%d)\r\n", bp, bp);
+        gui_con_printmsg(debug_msg);
+    }
+
+}
+void emulator_setbp_old(char * buff) {
     char *cur = buff;
     char debug_msg[256] {0};
 
@@ -216,48 +256,54 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
     const int row_size = ((3 * line_len) + 9);
     const int row_count= (total_memory / line_len) + 1 + 2; // Need 1 but 2 extra for space
     const int mdb_len = row_count*row_size;
-    char* memory_dump_buffer= new char[mdb_len];
+    char* memory_dump_buffer= new char[row_size];
+    static char mem_range[1024];
 
-    if(update_mem_dump) {
-        strncpy(memory_dump_buffer, "", 255);
-        char* cursor = memory_dump_buffer;
-        for(int i = 0; i<total_memory; i++) {
-            char buffer[8];
-            if(i%line_len==0) {
-                my_itoa(buffer, i, 4);
-                buffer[4] = ':';
-                buffer[5] = ' ';
-                buffer[6] = 0;
-                strcat(cursor, buffer);
-                cursor += 6;
-            }
-            {
-                buffer[0] = ' ';
-                my_itoa(buffer+1,mem[i],2);
-                strcat(cursor, buffer);
-                cursor += 3;
-            }
-            if(i%line_len== 7) {
-                buffer[0]=' ';
-                buffer[1]=' ';
-                buffer[2]=0;
-                strcat(cursor, buffer);
-                cursor += 2;
-            }
-            if(i%line_len==(line_len-1)) {
-                strcat(cursor,"\n");
-                cursor++;
-            }
-        }
-    }
 
+    char *cur;
+    uint32_t start_addr=0, end_addr = 0;
     static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
 
     ImGui::Begin("Memory Map", &show_memmap_window);
 
     // ImGui::CheckboxFlags("ImGuiInputTextFlags_ReadOnly", &flags, ImGuiInputTextFlags_ReadOnly);
     ImGui::Checkbox("Update", &update_mem_dump);   
-    ImGui::InputTextMultiline("##source", memory_dump_buffer, mdb_len, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+    ImGui::SameLine(); 
+    if(ImGui::InputText("Range",mem_range,1024)) {
+        // process mem_range
+    }
+    ImGui::BeginChild("mem",ImVec2(0,-25.0));
+
+    if(update_mem_dump) {
+        cur = mem_range;
+
+        while(*cur) {
+            start_addr = 0;
+            end_addr = 0;
+
+            int offset = range_helper(cur, start_addr, end_addr);
+            if(offset == 0) { return;}
+            cur += offset;
+
+            while(start_addr<=end_addr) {
+                char line[64] {0};
+                char buff[8] {0};
+                char* line_cur = line;
+
+                for(int i = 0; i<line_len && start_addr+i <= end_addr; i++) {
+                    my_itoa(line_cur, mem[start_addr+i],2);
+                    line_cur++;line_cur++;
+                    *line_cur = ' ';
+                    line_cur++;
+                }                
+                *line_cur = 0;
+                ImGui::Text("0x%4.4x: %s", start_addr, line);
+                start_addr = start_addr + line_len;
+            }
+        }
+
+    }
+    ImGui::EndChild();
     ImGui::End();
 
     delete memory_dump_buffer;
