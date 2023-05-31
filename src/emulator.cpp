@@ -254,8 +254,8 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
     static bool update_mem_dump = false;
     int line_len = 0x10;
     const int row_size = ((3 * line_len) + 9);
-    const int row_count= (total_memory / line_len) + 1 + 2; // Need 1 but 2 extra for space
-    const int mdb_len = row_count*row_size;
+    // const int row_count= (total_memory / line_len) + 1 + 2; // Need 1 but 2 extra for space
+    // const int mdb_len = row_count*row_size;
     char* memory_dump_buffer= new char[row_size];
     static char mem_range[1024];
 
@@ -282,12 +282,12 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
             end_addr = 0;
 
             int offset = range_helper(cur, start_addr, end_addr);
-            if(offset == 0) { return;}
+            if(offset == 0) { break;}
             cur += offset;
 
             while(start_addr<=end_addr) {
                 char line[64] {0};
-                char buff[8] {0};
+                // char buff[8] {0};
                 char* line_cur = line;
 
                 for(int i = 0; i<line_len && start_addr+i <= end_addr; i++) {

@@ -1,6 +1,6 @@
 #include "m6502.h"
 
-#include "imgui.h"
+#include "../imgui/imgui.h"
 
 #include "emulator.h"
 #include "emu_dis6502.h"

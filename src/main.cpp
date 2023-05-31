@@ -29,6 +29,7 @@ using namespace std;
 #include <thread>
 
 #include "emulator.h"
+#include "emu_dis6502.h"
 #include "machine.h"
 #include "utils.h"
 
@@ -166,6 +167,7 @@ int main(int, char**)
         static bool run_emulator = false;
         static bool step_emulator = false;
         static bool bp_enable = false;
+        static bool show_disasm_window = false;
         static char break_points[128] {0};
 
         uint32_t steps = 0;
@@ -208,8 +210,9 @@ int main(int, char**)
             ImGui::Begin("Emulator Control");                          // Create a window called "Hello, world!" and append into it.
 
             ImGui::Checkbox("CPU", &show_status_window);
-            ImGui::SameLine(100);  ImGui::Checkbox("Memory Dump", &show_memmap_window);
-            ImGui::SameLine(260);  ImGui::Checkbox("Console", &show_console_window);
+            ImGui::SameLine();  ImGui::Checkbox("Disasm", &show_disasm_window);
+            ImGui::SameLine();  ImGui::Checkbox("Memory", &show_memmap_window);
+            ImGui::SameLine();  ImGui::Checkbox("Console", &show_console_window);
             ImGui::Text("  ");
             ImGui::Text("Status: %s", run_emulator?"Running":"Halted");
 
@@ -255,6 +258,9 @@ int main(int, char**)
             emulator_show_status_window(show_status_window,1000.0f / io.Framerate,io.Framerate);
         }
 
+        if (show_disasm_window) {
+            emu_dis6502_window(show_disasm_window);
+        }
         if (show_console_window) {
             emulator_show_console_window(show_console_window);
         }

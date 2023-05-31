@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "../imgui/imgui.h"
+
 using namespace std;
 
 // Padding for 1,2 & 3 byte instructions
@@ -50,7 +52,7 @@ const int opcode_props[256][3] = {
 // 
 int emu_dis6502_decode(int addr,char *menomic, int m_len) { 
     int inst_len, addrmode;
-    const char *opcode, *pre, *post, *pad;
+    const char *opcode, *pre, *post;// *pad;
     // char output[512] {0};
     char address[8] {0};
 
@@ -59,7 +61,7 @@ int emu_dis6502_decode(int addr,char *menomic, int m_len) {
     addrmode = opcode_props[mem[addr]][2];                //Get info required to display addressing mode
     pre = modes[addrmode][0];                               //Look up pre-operand formatting text
     post = modes[addrmode][1];                              //Look up post-operand formatting text
-    pad = padding[(inst_len - 1)];                        //Calculate correct padding for output alignment
+    // pad = padding[(inst_len - 1)];                        //Calculate correct padding for output alignment
 
             // printf(" %s %s %s", pad, opcode, pre);                  //Pad text, display instruction name and pre-operand chars
             // if(!strcmp (pad,"    " )) {                             //Check if single operand instruction
@@ -133,3 +135,56 @@ void emu_dis6502_init() {
     ;;;
 }
 
+void emu_dis6502_window(bool show_window) {
+    static char mem_range[1024] {0};
+
+    uint32_t start_addr, end_addr;
+    char decode[256] {0};
+    char mem_dump[16] {0};  // should only need 9
+    char *cur;
+
+
+    ImGui::Begin("Disassembly", &show_window);
+
+    // ImGui::Checkbox("Update", &update_mem_dump);   
+    // ImGui::SameLine(); 
+    if(ImGui::InputText("Range",mem_range,1024)) {
+        // process mem_range
+    }
+    ImGui::BeginChild("dis",ImVec2(0,-25.0));
+
+    cur = mem_range;
+
+    while(*cur) {
+        start_addr = 0;
+        end_addr = 0;
+
+        int offset = range_helper(cur, start_addr, end_addr);
+        if(offset == 0) { break;}
+        cur += offset;
+
+        while(start_addr<=end_addr) {
+            int len = emu_dis6502_decode(start_addr, decode, 256);
+            switch(len) {
+                case 1:
+                    snprintf(mem_dump, 16, "%2.2x ", mem[start_addr]);
+                    break;
+                case 2:
+                    snprintf(mem_dump, 16, "%2.2x %2.2x", mem[start_addr], mem[start_addr+1]);
+                    break;
+                case 3:
+                    snprintf(mem_dump, 16, "%2.2x %2.2x %2.2x ", mem[start_addr], mem[start_addr+1], mem[start_addr+2]);
+                    break;
+                default:
+                    break;
+            }
+            ImGui::Text("%4.4x: %-12s  %s", start_addr, mem_dump, decode);
+            // snprintf(console_msg, 1256, "%4.4x: %-12s  %s", start_addr, mem_dump, decode);
+            // gui_con_printmsg(console_msg);
+            start_addr += len;
+       }
+    }
+    ImGui::EndChild();
+    ImGui::End();
+
+}
