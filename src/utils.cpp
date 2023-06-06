@@ -109,3 +109,12 @@ int my_get_uint(char *numbers,  uint32_t& dest) {
     dest = num;
     return(cur-numbers);
 }
+
+int htoi(char * cur) {
+    int num = 0, digit =0;
+    while( *cur && (digit = emu_is_hex(*cur) ) >=0) {
+        num = 16 * num + digit;       
+        cur++;     
+    }
+    return num;
+}

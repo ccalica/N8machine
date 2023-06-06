@@ -5,6 +5,7 @@
 
 #include "emulator.h"
 #include "emu_tty.h"
+#include "emu_labels.h"
 #include "gui_console.h"
 #include "utils.h"
 #include "machine.h"
@@ -37,7 +38,7 @@ bool bp_hit = false;
 bool bp_mask[65536] {false};
 bool pc_mask[65536] {false};
 bool label_mask[65536] {false};  // TODO: init via .sym file
-
+uint16_t cur_instruction = 0x00;
 
 // these are the same.
 #define BUS_READ (pins & M6502_RW)
@@ -51,24 +52,21 @@ void emu_clr_irq(int bit) {
     mem[0x00FF] = (mem[0x00FF] & ~(0x01 << bit) );
 }
 
-void emulator_init() {
+void emulator_loadrom() {
     uint16_t rom_ptr = 0xD000;
-    printf("Loading ROM\n");
+    printf("Loading ROM\r\n");fflush(stdout);
     FILE *fp = fopen(rom_file, "r");
     while(1) {
         uint8_t c = fgetc(fp);
         if(feof(fp)) break;
         mem[rom_ptr] = c;
-        if(rom_ptr % 16 == 0) printf("%04X:", rom_ptr);
-        printf(" %02X", mem[rom_ptr]);   
-        if(rom_ptr % 16 == 15) printf("\n");
         rom_ptr++;  
     }
     fclose(fp);
-    puts("\n\n");
-
-    // initialize a 6502 instance:
-    //desc.bcd_disabled=false;
+}
+void emulator_init() {
+    emulator_loadrom();
+    emu_labels_init();
     
     pins = m6502_init(&cpu, &desc);
     tty_init();
@@ -76,13 +74,20 @@ void emulator_init() {
 }
 
 void emulator_step() {
+        char debug_msg[256];
         pins = m6502_tick(&cpu, pins);
         const uint16_t addr = M6502_GET_ADDR(pins);
 
+        if(addr == m6502_pc(&cpu)) {
+            // printf("ci_next\r\n");fflush(stdout);
+            cur_instruction = m6502_pc(&cpu);
+        }
+
         if(bp_enable && bp_mask[addr]) {
             bp_hit = true;
-            printf("BP hit: %4.4x (%d): ", addr, addr);
-            fflush(stdout);
+            snprintf(debug_msg, 256, "BP Hit: %4.4x (%d)\r\n", addr, addr);
+            gui_con_printmsg(debug_msg);
+
         }
         IRQ_CLR();
         // pins = pins & ~M6502_IRQ;
@@ -142,6 +147,12 @@ void emulator_step() {
         
         tick_count++;
 
+}
+uint16_t emulator_getci() {
+    return cur_instruction;
+}
+uint16_t emulator_getpc() {
+    return m6502_pc(&cpu);
 }
 
 bool emulator_check_break() {
@@ -248,6 +259,9 @@ void emulator_setbp_old(char * buff) {
 void emulator_reset() {
     pins = pins | M6502_RES;
     tty_reset();
+    emulator_loadrom();
+    emu_labels_init();
+
 }
 
 void emulator_show_memdump_window(bool &show_memmap_window) {
@@ -257,7 +271,7 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
     // const int row_count= (total_memory / line_len) + 1 + 2; // Need 1 but 2 extra for space
     // const int mdb_len = row_count*row_size;
     char* memory_dump_buffer= new char[row_size];
-    static char mem_range[1024];
+    static char mem_range[1024] = "$022d+$25,$0+$10";
 
 
     char *cur;
@@ -327,9 +341,10 @@ void emulator_show_status_window(bool &show_status_window, float frame_time, flo
     ImGui::SameLine(lab_off); ImGui::Text("N%d V%d -%d B%d D%d I%d Z%d C%d",sr_bit(7),sr_bit(6),sr_bit(5),sr_bit(4), \
                                                     sr_bit(3),sr_bit(2),sr_bit(1),sr_bit(0));
 
-    ImGui::Text("Data: %2.2x     Addr: %4.4x", M6502_GET_DATA(pins), M6502_GET_ADDR(pins));
-    ImGui::Text("  SP: %2.2x       PC: %4.4x",m6502_s(&cpu),m6502_pc(&cpu));
-    ImGui::Text("IRQ: %d %d", (pins & M6502_IRQ) == M6502_IRQ, mem[0x00FF] == 0);
+    ImGui::Text("Data: %2.2x     Bu Addr: %4.4x", M6502_GET_DATA(pins), M6502_GET_ADDR(pins));
+    ImGui::Text("  SP: %2.2x        PC: %4.4x",m6502_s(&cpu),m6502_pc(&cpu));
+    // ImGui::Text(" IRQ: %2d %2d ", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[0x00FF] != 0));
+    ImGui::Text(" IRQ: %2d %2d Last PC: %4.4x", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[0x00FF] != 0), cur_instruction);
     ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", frame_time, fps);
     ImGui::Text("Ticks: %lu", tick_count);
     // if (ImGui::Button("Close Me"))

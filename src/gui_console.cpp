@@ -2,9 +2,10 @@
 
 #include "../imgui/imgui.h"
 
+#include "gui_console.h"
 #include "emulator.h"
 #include "emu_dis6502.h"
-#include "gui_console.h"
+#include "emu_labels.h"
 #include "utils.h"
 #include "machine.h"
 
@@ -63,6 +64,11 @@ void gui_show_console_window(bool &show_console_window) {
                 if(strncmp(args, "bp", 2) == 0) {
                     emulator_logbp();
                 }
+                else
+                if(strncmp(args, "l", 2) == 0) {
+                    emu_labels_console_list();
+                }
+                
             default:
                 break;
         }

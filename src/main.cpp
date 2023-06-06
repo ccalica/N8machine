@@ -167,7 +167,7 @@ int main(int, char**)
         static bool run_emulator = false;
         static bool step_emulator = false;
         static bool bp_enable = false;
-        static bool show_disasm_window = false;
+        static bool show_disasm_window = true;
         static char break_points[128] {0};
 
         uint32_t steps = 0;

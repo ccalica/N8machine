@@ -1,11 +1,14 @@
 
+#include "emu_dis6502.h"
 #include "emulator.h"
 #include "emu_tty.h"
+#include "emu_labels.h"
 #include "gui_console.h"
 #include "utils.h"
 #include "machine.h"
 
 #include <string>
+#include <list>
 
 #include "../imgui/imgui.h"
 
@@ -54,37 +57,40 @@ int emu_dis6502_decode(int addr,char *menomic, int m_len) {
     int inst_len, addrmode;
     const char *opcode, *pre, *post;// *pad;
     // char output[512] {0};
-    char address[8] {0};
+    char address[16] {0};
 
     inst_len = opcode_props[mem[addr]][0];              //Get instruction length
     opcode = instruction[opcode_props[mem[addr]][1]];     //Get opcode name
     addrmode = opcode_props[mem[addr]][2];                //Get info required to display addressing mode
     pre = modes[addrmode][0];                               //Look up pre-operand formatting text
     post = modes[addrmode][1];                              //Look up post-operand formatting text
-    // pad = padding[(inst_len - 1)];                        //Calculate correct padding for output alignment
-
-            // printf(" %s %s %s", pad, opcode, pre);                  //Pad text, display instruction name and pre-operand chars
-            // if(!strcmp (pad,"    " )) {                             //Check if single operand instruction
-            //     if (addrmode != 8) {                                //If not using relative addressing ...
-            //         printf("$%02X", currentbyte);                   //...display operand
-            //     } else {                                            //Addressing mode is relative...
-            //         printf("$%04X", (address + ((currentbyte < 128) ? currentbyte : currentbyte - 256))); //...display relative address.
-            //     }
-            // }
-            // if(!strcmp (pad,"" ))                                   //Check if two operand instruction and if so...
-            //     printf("$%02X%02X", currentbyte, previousbyte);     //...display operand
-            // printf("%s\n", post);                                   //Display post-operand chars
 
     if(inst_len == 2) { // Single byte operand
         if(addrmode != 8) {
             snprintf(address,8, "$%02X", mem[addr+1]);
         }
         else {   // relative addressing
-            snprintf(address,8, "$%04X", (addr + ((mem[addr+1] < 128) ? mem[addr+1] : mem[addr+1] - 256)));
+            int8_t rel_jmp = (int8_t) mem[addr+1];
+            list<string> labels = emu_labels_get( (uint16_t) addr+2+rel_jmp);
+            if(labels.size() > 0) {
+                snprintf(address,16, "%s $%04X", labels.front().c_str(), addr+2+rel_jmp);
+            }
+            else {
+                snprintf(address,8, "$%04X", (addr + 2 + rel_jmp));
+            }
         }
     } 
     if(inst_len == 3) {
-        snprintf(address,8,"$%02X%02X", mem[addr+2], mem[addr+1]);
+        uint16_t label_addr = (mem[addr+2] << 8) | mem[addr+1];
+        list<string> labels = emu_labels_get( label_addr );
+        if(labels.size() > 0) {
+            snprintf(address,16, "%s $%04X", labels.front().c_str(), label_addr);
+        }
+        else {
+            snprintf(address,8,"$%04X", label_addr);
+            // snprintf(address,8,"$%02X%02X", mem[addr+2], mem[addr+1]);
+        }
+        
     }
     snprintf(menomic, m_len,"%s %s%s%s", opcode, pre, address, post);
 
@@ -123,6 +129,15 @@ void emu_dis6502_log(char * args) {
                 default:
                     break;
             }
+            for(int i = 0; i < len; i++) {
+                list<string> labels = emu_labels_get( (uint16_t) address1+i);
+                if(labels.size() > 0) {
+                    for(auto label : labels) {
+                        snprintf(console_msg, 256, "%s:", label.c_str());
+                        gui_con_printmsg(console_msg);
+                    }
+                }
+            }
             snprintf(console_msg, 1256, "%4.4x: %-12s  %s", address1, mem_dump, decode);
             gui_con_printmsg(console_msg);
             address1 += len;
@@ -136,13 +151,19 @@ void emu_dis6502_init() {
 }
 
 void emu_dis6502_window(bool show_window) {
-    static char mem_range[1024] {0};
+    static char mem_range[1024] = "$d075+$180";
+    static bool follow_ci = false;
+    static uint16_t last_ci = 0;
 
     uint32_t start_addr, end_addr;
     char decode[256] {0};
     char mem_dump[16] {0};  // should only need 9
     char *cur;
 
+    uint16_t ci = emulator_getci();
+    if(last_ci != ci) last_ci = ci;
+
+    int ci_line=0, cur_line = 0;
 
     ImGui::Begin("Disassembly", &show_window);
 
@@ -151,6 +172,9 @@ void emu_dis6502_window(bool show_window) {
     if(ImGui::InputText("Range",mem_range,1024)) {
         // process mem_range
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("Follow CI",&follow_ci);
+
     ImGui::BeginChild("dis",ImVec2(0,-25.0));
 
     cur = mem_range;
@@ -178,11 +202,31 @@ void emu_dis6502_window(bool show_window) {
                 default:
                     break;
             }
-            ImGui::Text("%4.4x: %-12s  %s", start_addr, mem_dump, decode);
-            // snprintf(console_msg, 1256, "%4.4x: %-12s  %s", start_addr, mem_dump, decode);
-            // gui_con_printmsg(console_msg);
+            for(int i = 0; i < len; i++) {
+                list<string> labels = emu_labels_get( (uint16_t) start_addr+i);
+                if(labels.size() > 0) {
+                    for(auto label : labels) {
+                        ImGui::Text("%s:", label.c_str());
+                    }
+                }
+            }
+            char buff[256] {0};
+            snprintf(buff,256, "%4.4x:",start_addr);
+            if(ImGui::Checkbox(buff, &bp_mask[start_addr])){;;}
+            ImGui::SameLine();
+            if( last_ci >= start_addr && last_ci < (start_addr+len)) { // current instruction
+                ImGui::TextColored(ImVec4(0.0f,1.0f,0.0f,1.0f),"  %-12s  %s", mem_dump, decode);
+                ci_line=cur_line;
+            }
+            else {
+                ImGui::Text("  %-12s  %s", mem_dump, decode);
+            }
             start_addr += len;
+            cur_line++;
        }
+    }
+    if(follow_ci && ci_line) {
+        ImGui::SetScrollY(ImGui::GetScrollMaxY()* ci_line / (1.0f * cur_line));
     }
     ImGui::EndChild();
     ImGui::End();
