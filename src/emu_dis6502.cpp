@@ -207,6 +207,7 @@ void emu_dis6502_window(bool show_window) {
                 if(labels.size() > 0) {
                     for(auto label : labels) {
                         ImGui::Text("%s:", label.c_str());
+                        cur_line++;
                     }
                 }
             }

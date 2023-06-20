@@ -36,7 +36,7 @@ void gui_show_console_window(bool &show_console_window) {
     ImGui::Text("Console:");
     ImGui::BeginChild("console",ImVec2(0,-25.0));
     
-    for(int n = 0; n<console_buffer.size(); n++) {
+    for(std::size_t n = 0; n<console_buffer.size(); n++) {
         
         ImGui::Text(console_buffer[n].c_str());
     }
