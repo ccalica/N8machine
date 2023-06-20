@@ -53,12 +53,13 @@ _tty_peekc: LDA rb_end
 _tty_getc:  LDY rb_start
             CPY rb_end
             BEQ @nodata
-            LDA rb_base,Y
+            LDX rb_base,Y
             INY
             CPY rb_len
             BNE @cont
             LDY #$00
 @cont:      STY rb_start
+            TXA
             RTS
 @nodata:    LDA #$00
             RTS
