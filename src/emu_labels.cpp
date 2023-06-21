@@ -15,6 +15,7 @@ std::list<std::string> labels[65536];
 
 const char *label_file = "N8firmware.sym";
 void emu_labels_add(uint16_t addr, char * label) {
+    labels[addr].remove(label);
     labels[addr].emplace_back(label);
 }
 
