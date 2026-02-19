@@ -82,8 +82,10 @@ void tty_decode(uint64_t &pins, uint8_t dev_reg) {
                 // fflush(stdout);
                 break;
             case 0x03: // In Data
-                // printf("Read TTY Reg\n\r");
-                // fflush(stdout);
+                if(tty_buff.size() == 0) {
+                    data_bus = 0x00;
+                    break;
+                }
                 data_bus = tty_buff.front();
                 tty_buff.pop();
                 if(tty_buff.size()== 0) {

@@ -19,7 +19,7 @@ IMGUI_DIR = imgui
 SRC_DIR = src
 BUILD_DIR = build
 SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/emulator.cpp $(SRC_DIR)/emu_tty.cpp $(SRC_DIR)/emu_dis6502.cpp
-SOURCES +=$(SRC_DIR)/emu_labels.cpp $(SRC_DIR)/gui_console.cpp $(SRC_DIR)/utils.cpp
+SOURCES +=$(SRC_DIR)/emu_labels.cpp $(SRC_DIR)/gui_console.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/gdb_stub.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl2.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 _OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
@@ -28,7 +28,7 @@ UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
 CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
-CXXFLAGS += -g -Wall -Wformat
+CXXFLAGS += -g -Wall -Wformat -pthread
 LIBS =
 
 ##---------------------------------------------------------------------
@@ -111,10 +111,10 @@ TEST_DIR = test
 TEST_BUILD_DIR = build/test
 TEST_EXE = n8_test
 
-# Production source objects reused by test binary
+# Production source objects reused by test binary (gdb_stub.o compiled separately with test flags)
 TEST_SRC_OBJS = $(BUILD_DIR)/emulator.o $(BUILD_DIR)/emu_tty.o \
                 $(BUILD_DIR)/emu_dis6502.o $(BUILD_DIR)/emu_labels.o \
-                $(BUILD_DIR)/utils.o
+                $(BUILD_DIR)/utils.o $(TEST_BUILD_DIR)/gdb_stub.o
 
 # Test source files
 TEST_SOURCES = $(wildcard $(TEST_DIR)/*.cpp)
@@ -122,10 +122,14 @@ _TEST_OBJS = $(addsuffix .o, $(basename $(notdir $(TEST_SOURCES))))
 TEST_OBJS = $(patsubst %, $(TEST_BUILD_DIR)/%, $(_TEST_OBJS))
 
 # Test compiler flags: same C++ standard, add test/ and src/ to include path
-TEST_CXXFLAGS = -std=c++11 -g -Wall -Wformat -I$(SRC_DIR) -I$(TEST_DIR)
+TEST_CXXFLAGS = -std=c++11 -g -Wall -Wformat -I$(SRC_DIR) -I$(TEST_DIR) -DGDB_STUB_TESTING
 
 $(TEST_BUILD_DIR):
 	mkdir -p $(TEST_BUILD_DIR)
+
+# gdb_stub compiled with test flags (GDB_STUB_TESTING is in TEST_CXXFLAGS)
+$(TEST_BUILD_DIR)/gdb_stub.o: $(SRC_DIR)/gdb_stub.cpp | $(TEST_BUILD_DIR)
+	$(CXX) $(TEST_CXXFLAGS) -c -o $@ $<
 
 $(TEST_BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp | $(TEST_BUILD_DIR)
 	$(CXX) $(TEST_CXXFLAGS) -c -o $@ $<
