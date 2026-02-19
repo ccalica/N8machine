@@ -102,3 +102,41 @@ firmware:
 clean:
 	rm -f $(EXE) $(OBJS)
 	make -C firmware clean
+
+##---------------------------------------------------------------------
+## TEST BUILD
+##---------------------------------------------------------------------
+
+TEST_DIR = test
+TEST_BUILD_DIR = build/test
+TEST_EXE = n8_test
+
+# Production source objects reused by test binary
+TEST_SRC_OBJS = $(BUILD_DIR)/emulator.o $(BUILD_DIR)/emu_tty.o \
+                $(BUILD_DIR)/emu_dis6502.o $(BUILD_DIR)/emu_labels.o \
+                $(BUILD_DIR)/utils.o
+
+# Test source files
+TEST_SOURCES = $(wildcard $(TEST_DIR)/*.cpp)
+_TEST_OBJS = $(addsuffix .o, $(basename $(notdir $(TEST_SOURCES))))
+TEST_OBJS = $(patsubst %, $(TEST_BUILD_DIR)/%, $(_TEST_OBJS))
+
+# Test compiler flags: same C++ standard, add test/ and src/ to include path
+TEST_CXXFLAGS = -std=c++11 -g -Wall -Wformat -I$(SRC_DIR) -I$(TEST_DIR)
+
+$(TEST_BUILD_DIR):
+	mkdir -p $(TEST_BUILD_DIR)
+
+$(TEST_BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp | $(TEST_BUILD_DIR)
+	$(CXX) $(TEST_CXXFLAGS) -c -o $@ $<
+
+.PHONY: test clean-test
+
+test: $(TEST_EXE)
+	./$(TEST_EXE) < /dev/null
+
+$(TEST_EXE): $(TEST_SRC_OBJS) $(TEST_OBJS)
+	$(CXX) -o $@ $^
+
+clean-test:
+	rm -f $(TEST_EXE) $(TEST_BUILD_DIR)/*.o

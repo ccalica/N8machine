@@ -116,6 +116,13 @@ void tty_decode(uint64_t &pins, uint8_t dev_reg) {
 
 }
 
+void tty_inject_char(uint8_t c) {
+    tty_buff.push(c);
+}
+int tty_buff_count() {
+    return (int)tty_buff.size();
+}
+
 void tty_reset() {
     while( !tty_buff.empty()) {
         tty_buff.pop();
