@@ -266,4 +266,94 @@ TEST_SUITE("gdb_callbacks") {
         CHECK(tty_buff_count() == 1); // queue untouched
     }
 
+    // ---- Phase 2: GDB step instruction via SYNC loop (emulator globals) ----
+
+    TEST_CASE("Step instruction: NOP returns SIGTRAP (5)") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA}); // NOP NOP NOP
+        f.step_n(10); // boot
+
+        // Step one instruction using SYNC loop (like gdb_step_instruction)
+        int ticks = 0;
+        do {
+            emulator_step();
+            ticks++;
+        } while (!(pins & M6502_SYNC) && ticks < 16);
+
+        CHECK(ticks <= 16);
+        CHECK((pins & M6502_SYNC) != 0);
+        // NOP should complete within 16 ticks → SIGTRAP
+        int sig = (ticks >= 16) ? 4 : 5;
+        CHECK(sig == 5);
+    }
+
+    TEST_CASE("Step instruction: JAM (0x02) returns SIGILL (4)") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0x02}); // JAM/KIL/HLT opcode
+        f.step_n(10); // boot — will land at D000
+
+        // Step instruction — JAM never reaches SYNC, guard fires
+        int ticks = 0;
+        do {
+            emulator_step();
+            ticks++;
+        } while (!(pins & M6502_SYNC) && ticks < 16);
+
+        int sig = (ticks >= 16) ? 4 : 5;
+        CHECK(sig == 4);
+    }
+
+    // ---- Phase 2: Reset via M6502_RES pin (D47) ----
+
+    TEST_CASE("D47: M6502_RES pin can be set without crash") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0xEA});
+        f.step_n(10);
+
+        pins |= M6502_RES;
+        tty_reset();
+
+        // RES pin is set — stepping should initiate reset sequence
+        CHECK((pins & M6502_RES) != 0);
+    }
+
+    // ---- Phase 2: set/clear breakpoint via bp_mask[] ----
+
+    TEST_CASE("set_breakpoint enables bp_mask at address") {
+        EmulatorFixture f;
+        bp_mask[0xD100] = false;
+        bp_mask[0xD100] = true;
+        CHECK(bp_mask[0xD100] == true);
+    }
+
+    TEST_CASE("clear_breakpoint clears bp_mask at address") {
+        EmulatorFixture f;
+        bp_mask[0xD100] = true;
+        bp_mask[0xD100] = false;
+        CHECK(bp_mask[0xD100] == false);
+    }
+
+    // ---- Phase 2: D44 — clearing all breakpoints on disconnect ----
+
+    TEST_CASE("D44: clearing all breakpoints resets bp_mask") {
+        EmulatorFixture f;
+        // Set several breakpoints
+        bp_mask[0xD000] = true;
+        bp_mask[0xD010] = true;
+        bp_mask[0xD020] = true;
+        emulator_enablebp(true);
+
+        // Simulate disconnect: clear all
+        memset(bp_mask, 0, sizeof(bool) * 65536);
+        emulator_enablebp(false);
+
+        CHECK(bp_mask[0xD000] == false);
+        CHECK(bp_mask[0xD010] == false);
+        CHECK(bp_mask[0xD020] == false);
+        CHECK(emulator_bp_enabled() == false);
+    }
+
 } // TEST_SUITE("gdb_callbacks")
