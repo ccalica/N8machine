@@ -320,7 +320,7 @@ void emulator_show_memdump_window(bool &show_memmap_window) {
     ImGui::EndChild();
     ImGui::End();
 
-    delete memory_dump_buffer;
+    delete[] memory_dump_buffer;
 
 }
 
