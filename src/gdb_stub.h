@@ -19,6 +19,8 @@ typedef struct {
     uint16_t (*get_pc)(void);
     int      (*get_stop_reason)(void);       // returns last signal number
     void     (*reset)(void);
+    void     (*continue_exec)(void);    // resume free-running
+    void     (*halt)(void);             // stop execution
 } gdb_stub_callbacks_t;
 
 typedef struct {
@@ -44,6 +46,7 @@ static inline gdb_poll_result_t gdb_stub_poll(void) { return GDB_POLL_NONE; }
 static inline bool gdb_stub_is_connected(void) { return false; }
 static inline bool gdb_stub_is_halted(void) { return false; }
 static inline void gdb_stub_notify_stop(int) {}
+static inline bool gdb_interrupt_requested(void) { return false; }
 
 #else
 
@@ -54,6 +57,7 @@ gdb_poll_result_t gdb_stub_poll(void);
 bool gdb_stub_is_connected(void);
 bool gdb_stub_is_halted(void);
 void gdb_stub_notify_stop(int signal);
+bool gdb_interrupt_requested(void);
 
 #endif // ENABLE_GDB_STUB
 
