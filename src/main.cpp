@@ -137,6 +137,10 @@ static void gdb_clear_watchpoint(uint16_t addr, int type) {
         wp_write_mask[addr] = false;
         wp_read_mask[addr] = false;
     }
+    // Disable WP scanning if no watchpoints remain
+    bool any = false;
+    for (int i = 0; i < 65536 && !any; i++) any = wp_write_mask[i] || wp_read_mask[i];
+    if (!any) emulator_enablewp(false);
 }
 
 static void gdb_continue_exec(void) {
