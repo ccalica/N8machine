@@ -381,7 +381,8 @@ static std::string handle_Z(const char* data) {
     if (strlen(data) < 3) return "E03";
 
     char kind = data[0];
-    if (kind != '0' && kind != '1') return "";  // unsupported Z type → empty
+    if (kind != '0' && kind != '1' && kind != '2' && kind != '3' && kind != '4')
+        return "";  // unsupported Z type → empty
 
     if (data[1] != ',') return "E03";
     const char* addr_start = data + 2;
@@ -392,7 +393,12 @@ static std::string handle_Z(const char* data) {
     if (addr == -1) return "E03";
     if (addr == -2) return "E01";
 
-    cb->set_breakpoint((uint16_t)addr);
+    if (kind == '0' || kind == '1') {
+        cb->set_breakpoint((uint16_t)addr);
+    } else {
+        if (!cb->set_watchpoint) return "";  // no callback = unsupported
+        cb->set_watchpoint((uint16_t)addr, kind - '0');
+    }
     return "OK";
 }
 
@@ -401,7 +407,8 @@ static std::string handle_z(const char* data) {
     if (strlen(data) < 3) return "E03";
 
     char kind = data[0];
-    if (kind != '0' && kind != '1') return "";  // unsupported z type → empty
+    if (kind != '0' && kind != '1' && kind != '2' && kind != '3' && kind != '4')
+        return "";  // unsupported z type → empty
 
     if (data[1] != ',') return "E03";
     const char* addr_start = data + 2;
@@ -412,7 +419,12 @@ static std::string handle_z(const char* data) {
     if (addr == -1) return "E03";
     if (addr == -2) return "E01";
 
-    cb->clear_breakpoint((uint16_t)addr);
+    if (kind == '0' || kind == '1') {
+        cb->clear_breakpoint((uint16_t)addr);
+    } else {
+        if (!cb->clear_watchpoint) return "";  // no callback = unsupported
+        cb->clear_watchpoint((uint16_t)addr, kind - '0');
+    }
     return "OK";
 }
 
@@ -479,7 +491,23 @@ static std::string handle_Q(const char* data) {
 
 static std::string handle_v(const char* data) {
     if (strcmp(data, "MustReplyEmpty") == 0) return "";
-    if (strncmp(data, "Cont?", 5) == 0) return "";
+    if (strcmp(data, "Cont?") == 0) return "vCont;c;s;t";
+    if (strncmp(data, "Cont;", 5) == 0) {
+        char action = data[5];
+        const char* rest = data + 6;
+        // Skip optional :thread-id
+        if (*rest == ':') {
+            while (*rest && *rest != ';') rest++;
+        }
+        if (action == 'c') return handle_continue(rest);
+        if (action == 's') return handle_step(rest);
+        if (action == 't') {
+            halted = true;
+            last_stop_signal = 2;
+            return "T02thread:01;";
+        }
+        return "";
+    }
     return "";
 }
 
@@ -992,7 +1020,13 @@ gdb_poll_result_t gdb_stub_poll(void) {
         } else if (!cmd.empty()) {
             char first = cmd[0];
 
-            if (first == 'c') {
+            bool is_continue = (first == 'c') ||
+                               (cmd.compare(0, 7, "vCont;c") == 0);
+            bool is_step = (first == 's') ||
+                           (cmd.compare(0, 7, "vCont;s") == 0);
+            bool is_vcont_t = (cmd.compare(0, 7, "vCont;t") == 0);
+
+            if (is_continue) {
                 // Continue: dispatch for side effects (optional PC set)
                 dispatch_command(cmd.c_str());
                 {
@@ -1001,6 +1035,15 @@ gdb_poll_result_t gdb_stub_poll(void) {
                 }
                 resp_cv.notify_one();
                 r = GDB_POLL_RESUMED;
+            } else if (is_vcont_t) {
+                // vCont;t — halt (same as interrupt)
+                dispatch_command(cmd.c_str());
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push("T02thread:01;");
+                }
+                resp_cv.notify_one();
+                r = GDB_POLL_HALTED;
             } else if (first == 'D') {
                 std::string resp = dispatch_command(cmd.c_str());
                 {
@@ -1027,7 +1070,7 @@ gdb_poll_result_t gdb_stub_poll(void) {
                     resp_queue.push(resp);
                 }
                 resp_cv.notify_one();
-                if (first == 's') r = GDB_POLL_STEPPED;
+                if (is_step) r = GDB_POLL_STEPPED;
             }
         }
 
@@ -1053,6 +1096,26 @@ void gdb_stub_notify_stop(int signal) {
 
 bool gdb_interrupt_requested(void) {
     return interrupt_requested_flag.exchange(false);
+}
+
+int gdb_stub_get_step_guard(void) {
+    return (config.step_guard > 0) ? config.step_guard : 16;
+}
+
+void gdb_stub_notify_watchpoint(uint16_t addr, int type) {
+    last_stop_signal = 5;  // SIGTRAP
+    halted = true;
+    const char* wp_type_str = (type == 2) ? "watch" :
+                              (type == 3) ? "rwatch" : "awatch";
+    char addr_hex[8];
+    snprintf(addr_hex, sizeof(addr_hex), "%x", addr);
+    std::string stop_reply = "T05" + std::string(wp_type_str) + ":" +
+                             addr_hex + ";thread:01;";
+    {
+        std::lock_guard<std::mutex> lk(resp_mutex);
+        resp_queue.push(stop_reply);
+    }
+    resp_cv.notify_one();
 }
 
 #endif // ENABLE_GDB_STUB

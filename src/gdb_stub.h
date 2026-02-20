@@ -16,6 +16,8 @@ typedef struct {
     int      (*step_instruction)(void);      // returns stop signal (5=SIGTRAP, 4=SIGILL)
     void     (*set_breakpoint)(uint16_t addr);
     void     (*clear_breakpoint)(uint16_t addr);
+    void     (*set_watchpoint)(uint16_t addr, int type);   // type: 2=write, 3=read, 4=access
+    void     (*clear_watchpoint)(uint16_t addr, int type);
     uint16_t (*get_pc)(void);
     int      (*get_stop_reason)(void);       // returns last signal number
     void     (*reset)(void);
@@ -26,6 +28,7 @@ typedef struct {
 typedef struct {
     int  port;
     bool enabled;
+    int  step_guard;  // max ticks per step instruction, 0 = default (16)
 } gdb_stub_config_t;
 
 typedef enum {
@@ -46,6 +49,8 @@ static inline gdb_poll_result_t gdb_stub_poll(void) { return GDB_POLL_NONE; }
 static inline bool gdb_stub_is_connected(void) { return false; }
 static inline bool gdb_stub_is_halted(void) { return false; }
 static inline void gdb_stub_notify_stop(int) {}
+static inline void gdb_stub_notify_watchpoint(uint16_t, int) {}
+static inline int  gdb_stub_get_step_guard(void) { return 16; }
 static inline bool gdb_interrupt_requested(void) { return false; }
 
 #else
@@ -57,6 +62,8 @@ gdb_poll_result_t gdb_stub_poll(void);
 bool gdb_stub_is_connected(void);
 bool gdb_stub_is_halted(void);
 void gdb_stub_notify_stop(int signal);
+void gdb_stub_notify_watchpoint(uint16_t addr, int type);
+int  gdb_stub_get_step_guard(void);
 bool gdb_interrupt_requested(void);
 
 #endif // ENABLE_GDB_STUB
