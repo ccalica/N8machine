@@ -495,9 +495,11 @@ static std::string handle_v(const char* data) {
     if (strncmp(data, "Cont;", 5) == 0) {
         char action = data[5];
         const char* rest = data + 6;
-        // Skip optional :thread-id
+        // Skip optional :thread-id (and trailing ; separator)
         if (*rest == ':') {
-            while (*rest && *rest != ';') rest++;
+            rest++; // skip ':'
+            while (*rest && *rest != ';') rest++; // skip thread-id
+            if (*rest == ';') rest++; // skip action separator
         }
         if (action == 'c') return handle_continue(rest);
         if (action == 's') return handle_step(rest);
@@ -1107,10 +1109,8 @@ void gdb_stub_notify_watchpoint(uint16_t addr, int type) {
     halted = true;
     const char* wp_type_str = (type == 2) ? "watch" :
                               (type == 3) ? "rwatch" : "awatch";
-    char addr_hex[8];
-    snprintf(addr_hex, sizeof(addr_hex), "%x", addr);
     std::string stop_reply = "T05" + std::string(wp_type_str) + ":" +
-                             addr_hex + ";thread:01;";
+                             to_hex_le16(addr) + ";thread:01;";
     {
         std::lock_guard<std::mutex> lk(resp_mutex);
         resp_queue.push(stop_reply);
