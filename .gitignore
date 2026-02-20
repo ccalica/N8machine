@@ -1,8 +1,11 @@
 .vscode/
 playground/deps
 *.o
+*.d
 n8
+n8_test
 d6502
+build/test/
 #imgui/
 *.ini
 N8firmware*
