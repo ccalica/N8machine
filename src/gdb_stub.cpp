@@ -68,6 +68,7 @@ static std::string to_hex_le16(uint16_t v) {
 // Parse hex string, return -1 on non-hex chars, -2 on overflow > max_val
 static int64_t parse_hex(const char* str, size_t len, uint32_t max_val) {
     if (len == 0) return -1;
+    if (len > 8) return -2;  // max 32-bit value = 8 hex nibbles
     uint64_t val = 0;
     for (size_t i = 0; i < len; i++) {
         int h = hex_char_val(str[i]);
