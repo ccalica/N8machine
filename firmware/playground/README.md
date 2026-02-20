@@ -2,17 +2,27 @@
 
 Firmware experiments for the N8machine emulator. Each program is a standalone bare-metal 6502 binary, debuggable with `n8gdb`.
 
+## Programs
+
+| Program | Description | Status |
+|---------|-------------|--------|
+| mon1 | Line parser — reads input, splits command + remainder, echoes parse | Working |
+| mon2 | Memory monitor — hex dump, write, fill, go, help | Working |
+| mon3 | Extended monitor — mon2 + copy/cmp/search/calc/cls/ascii | **Buggy** |
+
 ## Quick Start
 
 1. Start the N8machine emulator
 2. Build and load a program:
 
 ```
-make test_name
-n8gdb repl --sym test_name.sym
-n8> load test_name 0xD000
-n8> reset
+make mon2
+n8gdb load mon2 0xD000
+n8gdb reset
+n8gdb run
 ```
+
+Then type in the emulator's terminal. Type `?` for help (mon2/mon3).
 
 ## Build
 

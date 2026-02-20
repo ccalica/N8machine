@@ -1,0 +1,8 @@
+# Build artifacts
+*.o
+*.map
+*.sym
+*.dbg
+mon1
+mon2
+mon3
