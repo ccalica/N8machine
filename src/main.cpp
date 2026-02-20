@@ -92,12 +92,12 @@ static void gdb_write_mem(uint16_t addr, uint8_t val) {
 }
 
 static int gdb_step_instruction(void) {
-    // Step until SYNC (next instruction boundary), guard=16 ticks
+    int guard = gdb_stub_get_step_guard();
     int ticks = 0;
     do {
         emulator_step();
         ticks++;
-        if (ticks >= 16) return 4; // SIGILL — likely jammed
+        if (ticks >= guard) return 4; // SIGILL — likely jammed
     } while (!(pins & M6502_SYNC));
     return 5; // SIGTRAP
 }
@@ -110,6 +110,29 @@ static void gdb_set_breakpoint(uint16_t addr) {
 
 static void gdb_clear_breakpoint(uint16_t addr) {
     bp_mask[addr] = false;
+}
+
+static void gdb_set_watchpoint(uint16_t addr, int type) {
+    if (type == 2) {          // write watchpoint
+        wp_write_mask[addr] = true;
+    } else if (type == 3) {   // read watchpoint
+        wp_read_mask[addr] = true;
+    } else if (type == 4) {   // access watchpoint
+        wp_write_mask[addr] = true;
+        wp_read_mask[addr] = true;
+    }
+    emulator_enablewp(true);
+}
+
+static void gdb_clear_watchpoint(uint16_t addr, int type) {
+    if (type == 2) {
+        wp_write_mask[addr] = false;
+    } else if (type == 3) {
+        wp_read_mask[addr] = false;
+    } else if (type == 4) {
+        wp_write_mask[addr] = false;
+        wp_read_mask[addr] = false;
+    }
 }
 
 static void gdb_continue_exec(void) {
@@ -248,10 +271,11 @@ int main(int, char**)
         gdb_read_mem, gdb_write_mem,
         gdb_step_instruction,
         gdb_set_breakpoint, gdb_clear_breakpoint,
+        gdb_set_watchpoint, gdb_clear_watchpoint,
         gdb_get_pc, gdb_get_stop_reason,
         gdb_reset, gdb_continue_exec, gdb_halt
     };
-    static gdb_stub_config_t gdb_cfg = { 3333, true };
+    static gdb_stub_config_t gdb_cfg = { 3333, true, 16 };
     gdb_stub_init(&gdb_cb, &gdb_cfg);
 
     // Our state
@@ -294,10 +318,13 @@ int main(int, char**)
                 break;
             case GDB_POLL_DETACHED:
                 gdb_halted = false;
-                // D44: clear all GDB breakpoints on disconnect
+                // D44: clear all GDB breakpoints and watchpoints on disconnect
                 memset(bp_mask, 0, sizeof(bool) * 65536);
+                memset(wp_write_mask, 0, sizeof(bool) * 65536);
+                memset(wp_read_mask, 0, sizeof(bool) * 65536);
                 bp_enable = false;
                 emulator_enablebp(false);
+                emulator_enablewp(false);
                 break;
             case GDB_POLL_KILL:
                 gdb_halted = false;
@@ -319,6 +346,17 @@ int main(int, char**)
                     if (gdb_stub_is_connected()) {
                         gdb_halted = true;
                         gdb_stub_notify_stop(5);
+                    }
+                    break;
+                }
+                if (emulator_wp_hit()) {
+                    run_emulator = false;
+                    uint16_t wa = emulator_wp_hit_addr();
+                    int wt = emulator_wp_hit_type();
+                    emulator_clear_wp_hit();
+                    if (gdb_stub_is_connected()) {
+                        gdb_halted = true;
+                        gdb_stub_notify_watchpoint(wa, wt);
                     }
                     break;
                 }

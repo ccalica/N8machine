@@ -356,4 +356,92 @@ TEST_SUITE("gdb_callbacks") {
         CHECK(emulator_bp_enabled() == false);
     }
 
+    // ---- Phase 3: Watchpoint tests ----
+
+    TEST_CASE("Write watchpoint fires on STA") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        // LDA #$42; STA $0200; NOP
+        f.load_at(0xD000, {0xA9, 0x42, 0x8D, 0x00, 0x02, 0xEA});
+        wp_write_mask[0x0200] = true;
+        emulator_enablewp(true);
+
+        f.step_n(20); // boot + execute LDA + STA
+
+        CHECK(emulator_wp_hit() == true);
+        CHECK(emulator_wp_hit_addr() == 0x0200);
+        CHECK(emulator_wp_hit_type() == 2); // write
+    }
+
+    TEST_CASE("Read watchpoint fires on LDA abs") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        // LDA $0200; NOP
+        f.load_at(0xD000, {0xAD, 0x00, 0x02, 0xEA});
+        mem[0x0200] = 0x42;
+        wp_read_mask[0x0200] = true;
+        emulator_enablewp(true);
+
+        f.step_n(20);
+
+        CHECK(emulator_wp_hit() == true);
+        CHECK(emulator_wp_hit_addr() == 0x0200);
+        CHECK(emulator_wp_hit_type() == 3); // read
+    }
+
+    TEST_CASE("Read watchpoint does NOT fire on opcode fetch (SYNC)") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA}); // NOP NOP NOP
+        f.step_n(10); // boot without watchpoint enabled
+
+        // Position CPU at known address
+        emulator_write_pc(0xD000);
+
+        // Set read watchpoint at opcode address and clear residual state
+        wp_read_mask[0xD000] = true;
+        emulator_enablewp(true);
+        emulator_clear_wp_hit();
+
+        // Execute one NOP (2 ticks): fetch D000 (SYNC), dummy read D001 (no SYNC)
+        f.step_n(2);
+
+        // D000 was only accessed via SYNC fetch — read watchpoint should NOT fire
+        CHECK(emulator_wp_hit() == false);
+    }
+
+    TEST_CASE("wp_hit / clear_wp_hit / wp_enabled accessors") {
+        EmulatorFixture f;
+        CHECK(emulator_wp_enabled() == false);
+        emulator_enablewp(true);
+        CHECK(emulator_wp_enabled() == true);
+        CHECK(emulator_wp_hit() == false); // no hit yet
+
+        // Trigger a write watchpoint
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0x8D, 0x00, 0x03, 0xEA}); // STA $0300; NOP
+        wp_write_mask[0x0300] = true;
+        f.step_n(20);
+
+        CHECK(emulator_wp_hit() == true);
+        emulator_clear_wp_hit();
+        CHECK(emulator_wp_hit() == false);
+    }
+
+    TEST_CASE("D44 extension: disconnect clears watchpoint masks") {
+        EmulatorFixture f;
+        wp_write_mask[0x0200] = true;
+        wp_read_mask[0x0300] = true;
+        emulator_enablewp(true);
+
+        // Simulate disconnect
+        memset(wp_write_mask, 0, sizeof(bool) * 65536);
+        memset(wp_read_mask, 0, sizeof(bool) * 65536);
+        emulator_enablewp(false);
+
+        CHECK(wp_write_mask[0x0200] == false);
+        CHECK(wp_read_mask[0x0300] == false);
+        CHECK(emulator_wp_enabled() == false);
+    }
+
 } // TEST_SUITE("gdb_callbacks")

@@ -8,6 +8,8 @@
 
 extern uint8_t mem[];
 extern bool bp_mask[];
+extern bool wp_write_mask[];
+extern bool wp_read_mask[];
 
 void emulator_init();
 void emulator_step();
@@ -41,4 +43,12 @@ void emulator_write_pc(uint16_t addr);
 bool emulator_bp_hit();
 void emulator_clear_bp_hit();
 bool emulator_bp_enabled();
+
+// Watchpoint accessors
+void emulator_enablewp(bool en);
+bool emulator_wp_enabled();
+bool emulator_wp_hit();
+void emulator_clear_wp_hit();
+uint16_t emulator_wp_hit_addr();
+int emulator_wp_hit_type();   // returns 2=write, 3=read
 

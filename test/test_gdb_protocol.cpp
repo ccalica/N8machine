@@ -9,6 +9,8 @@ static uint8_t mock_regs[5];     // A, X, Y, S, P
 static uint16_t mock_pc;
 static uint8_t mock_mem[65536];
 static bool mock_bp[65536];
+static bool mock_wp_write[65536];
+static bool mock_wp_read[65536];
 static int mock_step_signal;
 static int mock_stop_reason;
 static bool mock_reset_called;
@@ -51,6 +53,18 @@ static void mock_clear_breakpoint(uint16_t addr) {
     mock_bp[addr] = false;
 }
 
+static void mock_set_watchpoint(uint16_t addr, int type) {
+    if (type == 2) mock_wp_write[addr] = true;
+    else if (type == 3) mock_wp_read[addr] = true;
+    else if (type == 4) { mock_wp_write[addr] = true; mock_wp_read[addr] = true; }
+}
+
+static void mock_clear_watchpoint(uint16_t addr, int type) {
+    if (type == 2) mock_wp_write[addr] = false;
+    else if (type == 3) mock_wp_read[addr] = false;
+    else if (type == 4) { mock_wp_write[addr] = false; mock_wp_read[addr] = false; }
+}
+
 static uint16_t mock_get_pc() {
     return mock_pc;
 }
@@ -73,6 +87,8 @@ static const gdb_stub_callbacks_t mock_cb = {
     mock_step_instruction,
     mock_set_breakpoint,
     mock_clear_breakpoint,
+    mock_set_watchpoint,
+    mock_clear_watchpoint,
     mock_get_pc,
     mock_get_stop_reason,
     mock_reset
@@ -86,6 +102,8 @@ struct GdbProtocolFixture {
         mock_pc = 0;
         memset(mock_mem, 0, sizeof(mock_mem));
         memset(mock_bp, 0, sizeof(mock_bp));
+        memset(mock_wp_write, 0, sizeof(mock_wp_write));
+        memset(mock_wp_read, 0, sizeof(mock_wp_read));
         mock_step_signal = 5; // SIGTRAP
         mock_stop_reason = 5;
         mock_reset_called = false;
@@ -396,11 +414,52 @@ TEST_SUITE("gdb_protocol") {
         CHECK(mock_bp[0xD010] == true);
     }
 
-    TEST_CASE("T33: Z2-Z4 return empty (unsupported)") {
+    TEST_CASE("T33: Z2 sets write watchpoint") {
         GdbProtocolFixture f;
-        CHECK(gdb_stub_process_packet("Z2,d000,1") == "");
-        CHECK(gdb_stub_process_packet("Z3,d000,1") == "");
-        CHECK(gdb_stub_process_packet("Z4,d000,1") == "");
+        std::string result = gdb_stub_process_packet("Z2,200,1");
+        CHECK(result == "OK");
+        CHECK(mock_wp_write[0x0200] == true);
+    }
+
+    TEST_CASE("T33a: z2 clears write watchpoint") {
+        GdbProtocolFixture f;
+        mock_wp_write[0x0200] = true;
+        std::string result = gdb_stub_process_packet("z2,200,1");
+        CHECK(result == "OK");
+        CHECK(mock_wp_write[0x0200] == false);
+    }
+
+    TEST_CASE("T33b: Z3 sets read watchpoint") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("Z3,300,1");
+        CHECK(result == "OK");
+        CHECK(mock_wp_read[0x0300] == true);
+    }
+
+    TEST_CASE("T33c: z3 clears read watchpoint") {
+        GdbProtocolFixture f;
+        mock_wp_read[0x0300] = true;
+        std::string result = gdb_stub_process_packet("z3,300,1");
+        CHECK(result == "OK");
+        CHECK(mock_wp_read[0x0300] == false);
+    }
+
+    TEST_CASE("T33d: Z4 sets access watchpoint (both masks)") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("Z4,400,1");
+        CHECK(result == "OK");
+        CHECK(mock_wp_write[0x0400] == true);
+        CHECK(mock_wp_read[0x0400] == true);
+    }
+
+    TEST_CASE("T33e: z4 clears access watchpoint (both masks)") {
+        GdbProtocolFixture f;
+        mock_wp_write[0x0400] = true;
+        mock_wp_read[0x0400] = true;
+        std::string result = gdb_stub_process_packet("z4,400,1");
+        CHECK(result == "OK");
+        CHECK(mock_wp_write[0x0400] == false);
+        CHECK(mock_wp_read[0x0400] == false);
     }
 
     TEST_CASE("T76: Z0 at boundary addresses") {
@@ -592,9 +651,35 @@ TEST_SUITE("gdb_protocol") {
         CHECK(gdb_stub_process_packet("vMustReplyEmpty") == "");
     }
 
-    TEST_CASE("vCont? returns empty (not supported in Phase 1)") {
+    TEST_CASE("vCont? returns supported actions") {
         GdbProtocolFixture f;
-        CHECK(gdb_stub_process_packet("vCont?") == "");
+        CHECK(gdb_stub_process_packet("vCont?") == "vCont;c;s;t");
+    }
+
+    TEST_CASE("vCont;c returns empty (async continue)") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("vCont;c");
+        CHECK(result == "");
+    }
+
+    TEST_CASE("vCont;s returns SIGTRAP stop reply") {
+        GdbProtocolFixture f;
+        mock_step_signal = 5;
+        std::string result = gdb_stub_process_packet("vCont;s");
+        CHECK(result == "T05thread:01;");
+    }
+
+    TEST_CASE("vCont;s:1 with thread ID works same as vCont;s") {
+        GdbProtocolFixture f;
+        mock_step_signal = 5;
+        std::string result = gdb_stub_process_packet("vCont;s:1");
+        CHECK(result == "T05thread:01;");
+    }
+
+    TEST_CASE("vCont;c:1 with thread ID works same as vCont;c") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("vCont;c:1");
+        CHECK(result == "");
     }
 
     TEST_CASE("P with invalid register returns E02") {
