@@ -41,7 +41,7 @@ bool wp_read_mask[65536] {false};
 static bool wp_enable = false;
 static bool wp_hit_flag = false;
 static uint16_t wp_addr = 0;
-static int wp_type = 0;  // 2=write, 3=read
+static int wp_type = 0;  // 2=write, 3=read, 4=access
 bool pc_mask[65536] {false};
 bool label_mask[65536] {false};  // TODO: init via .sym file
 uint16_t cur_instruction = 0x00;
@@ -99,9 +99,13 @@ void emulator_step() {
             bool is_write = !(pins & M6502_RW);
             if ((wp_write_mask[addr] && is_write) ||
                 (wp_read_mask[addr] && (pins & M6502_RW) && !(pins & M6502_SYNC))) {
-                wp_hit_flag = true;
-                wp_addr = addr;
-                wp_type = is_write ? 2 : 3;
+                if (!wp_hit_flag) {
+                    wp_hit_flag = true;
+                    wp_addr = addr;
+                    wp_type = is_write ? 2 : 3;
+                    // If both masks set at this addr, this is an access watchpoint (Z4)
+                    if (wp_write_mask[addr] && wp_read_mask[addr]) wp_type = 4;
+                }
             }
         }
         IRQ_CLR();
