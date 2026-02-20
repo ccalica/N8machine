@@ -149,9 +149,13 @@ struct EmulatorFixture {
         memset(mem, 0, sizeof(uint8_t) * 65536);
         memset(frame_buffer, 0, 256);
         memset(bp_mask, 0, sizeof(bool) * 65536);
+        memset(wp_write_mask, 0, sizeof(bool) * 65536);
+        memset(wp_read_mask, 0, sizeof(bool) * 65536);
         memset(&desc, 0, sizeof(desc));
         tick_count = 0;
         emulator_enablebp(false);
+        emulator_enablewp(false);
+        emulator_clear_wp_hit();
         emu_labels_clear();
         tty_reset();
         pins = m6502_init(&cpu, &desc);
