@@ -77,6 +77,8 @@ function parseAddr(str) {
   // Hex with prefix
   if (str.startsWith('0x') || str.startsWith('0X')) return parseInt(str.slice(2), 16);
   if (str.startsWith('$')) return parseInt(str.slice(1), 16);
+  // If it contains non-hex chars (without a prefix), it's likely a mistyped label
+  if (/[g-zG-Z_]/.test(str)) return NaN;
   // Bare hex
   return parseInt(str, 16);
 }
@@ -148,6 +150,9 @@ async function cmdWrite(client, args) {
     data = readFileSync(src.slice(1));
   } else {
     const clean = src.replace(/[\s,]/g, '');
+    if (clean.length === 0) { console.error('Error: empty hex string'); return; }
+    if (clean.length % 2 !== 0) { console.error('Error: hex string must have even number of digits'); return; }
+    if (!/^[0-9a-fA-F]+$/.test(clean)) { console.error('Error: invalid hex characters'); return; }
     data = Buffer.from(clean, 'hex');
   }
   await client.writeMemory(addr, data);
