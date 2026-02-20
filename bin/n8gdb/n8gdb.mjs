@@ -132,7 +132,7 @@ async function cmdRegs(client) {
 
 async function cmdRead(client, args) {
   const addr = parseAddr(args[0]);
-  const len = args[1] ? parseAddr(args[1]) : 16;
+  const len = args[1] ? parseInt(args[1], 10) : 16;
   if (isNaN(addr)) { console.error('Usage: read <addr> [len]'); return; }
   const buf = await client.readMemory(addr, len);
   console.log(hexdump(buf, addr));
@@ -227,7 +227,7 @@ async function cmdReset(client) {
   await cmdRegs(client);
 }
 
-const REG_NAMES = { a: 0, x: 1, y: 2, s: 3, sp: 3, p: 4, sr: 4, pc: 5 };
+const REG_NAMES = { a: 0, x: 1, y: 2, s: 3, sp: 3, pc: 4, p: 5, sr: 5 };
 
 async function cmdWreg(client, args) {
   const name = args[0]?.toLowerCase();
@@ -238,7 +238,7 @@ async function cmdWreg(client, args) {
   }
   const id = REG_NAMES[name];
   await client.writeRegister(id, val);
-  const width = id === 5 ? 4 : 2;
+  const width = id === 4 ? 4 : 2;
   console.log(`${name.toUpperCase()} = $${val.toString(16).padStart(width, '0')}`);
   await cmdRegs(client);
 }
