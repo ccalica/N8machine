@@ -1,0 +1,12 @@
+# Build artifacts
+*.o
+*.map
+*.sym
+*.dbg
+test_regs
+test_breakpoints
+test_memory
+test_stack
+test_counter
+test_zeropage
+test_tty
