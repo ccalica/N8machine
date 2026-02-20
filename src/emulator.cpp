@@ -279,7 +279,7 @@ void emulator_write_s(uint8_t v) { m6502_set_s(&cpu, v); }
 void emulator_write_p(uint8_t v) { m6502_set_p(&cpu, v); }
 
 void emulator_write_pc(uint16_t addr) {
-    pins = (pins & (M6502_IRQ | M6502_NMI)) | M6502_SYNC | M6502_RW;
+    pins = (pins & (M6502_IRQ | M6502_NMI | M6502_RES | M6502_RDY)) | M6502_SYNC | M6502_RW;
     M6502_SET_ADDR(pins, addr);
     M6502_SET_DATA(pins, mem[addr]);
     m6502_set_pc(&cpu, addr);

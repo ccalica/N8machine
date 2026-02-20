@@ -143,13 +143,42 @@ TEST_SUITE("gdb_protocol") {
         CHECK(resp == "-");
     }
 
-    TEST_CASE("T03: Escape sequence decodes correctly") {
+    TEST_CASE("T03: Escape sequence decodes correctly via framing") {
         GdbProtocolFixture f;
-        // '}' 0x03 should decode to 0x03 ^ 0x20 = 0x23 = '#'
-        // We'll test by sending escaped data in a memory write
-        // For simplicity, test process_packet directly with the decoded payload
-        std::string result = gdb_stub_process_packet("m0,1");
-        CHECK(result.size() == 2); // one byte = 2 hex chars
+        // Test escape decoding through the actual framing state machine.
+        // '}' (0x7d) followed by 0x03 should decode to 0x03 ^ 0x20 = 0x23 = '#'
+        // We'll construct a memory read "m0,1" but with the '0' after 'm'
+        // escaped: '0' = 0x30, escaped = '}' (0x7d) + 0x10 (0x30 ^ 0x20)
+        //
+        // Payload bytes on wire: m } 0x10 , 1
+        // Checksum covers raw bytes: 'm' + '}' + 0x10 + ',' + '1'
+        uint8_t raw[] = { 'm', '}', 0x10, ',', '1' };
+        uint8_t cksum = 0;
+        for (size_t i = 0; i < sizeof(raw); i++) cksum += raw[i];
+
+        // Feed: $ <raw bytes> # <checksum hex>
+        gdb_stub_feed_byte('$');
+        for (size_t i = 0; i < sizeof(raw); i++) {
+            gdb_stub_feed_byte(raw[i]);
+        }
+        gdb_stub_feed_byte('#');
+        char hex_hi[] = "0123456789abcdef";
+        gdb_stub_feed_byte((uint8_t)hex_hi[(cksum >> 4) & 0x0F]);
+        gdb_stub_feed_byte((uint8_t)hex_hi[cksum & 0x0F]);
+
+        std::string resp = gdb_stub_get_response();
+        // Should ACK and return a valid memory read response (2 hex chars)
+        CHECK(resp[0] == '+');
+        std::string payload = extract_payload(resp);
+        CHECK(payload.size() == 2);
+    }
+
+    TEST_CASE("T03a: Invalid hex in checksum produces NACK") {
+        GdbProtocolFixture f;
+        // Feed a packet with non-hex checksum bytes "?#ZZ"
+        feed_packet("$?#ZZ");
+        std::string resp = gdb_stub_get_response();
+        CHECK(resp == "-");
     }
 
     TEST_CASE("T04: Ctrl-C (0x03) in IDLE sets interrupt flag") {

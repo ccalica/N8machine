@@ -377,7 +377,7 @@ static std::string handle_continue(const char* data) {
 
 static std::string handle_Z(const char* data) {
     if (!cb) return "E01";
-    if (strlen(data) < 1) return "E03";
+    if (strlen(data) < 3) return "E03";
 
     char kind = data[0];
     if (kind != '0' && kind != '1') return "";  // unsupported Z type → empty
@@ -397,7 +397,7 @@ static std::string handle_Z(const char* data) {
 
 static std::string handle_z(const char* data) {
     if (!cb) return "E01";
-    if (strlen(data) < 1) return "E03";
+    if (strlen(data) < 3) return "E03";
 
     char kind = data[0];
     if (kind != '0' && kind != '1') return "";  // unsupported z type → empty
@@ -576,14 +576,24 @@ static void feed_byte_impl(uint8_t byte) {
 
         case FRAME_CHECKSUM_1: {
             int h = hex_char_val((char)byte);
-            if (h >= 0) recv_checksum = (uint8_t)(h << 4);
+            if (h < 0) {
+                frame_state = FRAME_IDLE;
+                if (!noack) last_response = "-";
+                break;
+            }
+            recv_checksum = (uint8_t)(h << 4);
             frame_state = FRAME_CHECKSUM_2;
             break;
         }
 
         case FRAME_CHECKSUM_2: {
             int h = hex_char_val((char)byte);
-            if (h >= 0) recv_checksum |= (uint8_t)h;
+            if (h < 0) {
+                frame_state = FRAME_IDLE;
+                if (!noack) last_response = "-";
+                break;
+            }
+            recv_checksum |= (uint8_t)h;
             process_complete_packet();
             frame_state = FRAME_IDLE;
             break;
