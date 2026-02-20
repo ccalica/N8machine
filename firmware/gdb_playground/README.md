@@ -1,6 +1,6 @@
 # gdb_playground
 
-Test programs for exercising the GDB RSP stub and `n8gdb` helper script. Each program is a standalone bare-metal 6502 binary targeting the N8machine emulator.
+Test programs used to validate the GDB RSP stub and `n8gdb` client during development. For new firmware experiments, use [`../playground/`](../playground/) instead.
 
 ## Build
 
