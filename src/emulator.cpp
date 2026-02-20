@@ -83,7 +83,7 @@ void emulator_step() {
             cur_instruction = m6502_pc(&cpu);
         }
 
-        if(bp_enable && bp_mask[addr]) {
+        if(bp_enable && bp_mask[addr] && (pins & M6502_SYNC)) {
             bp_hit = true;
             snprintf(debug_msg, 256, "BP Hit: %4.4x (%d)\r\n", addr, addr);
             gui_con_printmsg(debug_msg);
@@ -263,6 +263,31 @@ void emulator_reset() {
     emu_labels_init();
 
 }
+
+// ---- GDB stub accessor functions ----
+
+uint8_t emulator_read_a()  { return m6502_a(&cpu); }
+uint8_t emulator_read_x()  { return m6502_x(&cpu); }
+uint8_t emulator_read_y()  { return m6502_y(&cpu); }
+uint8_t emulator_read_s()  { return m6502_s(&cpu); }
+uint8_t emulator_read_p()  { return m6502_p(&cpu); }
+
+void emulator_write_a(uint8_t v) { m6502_set_a(&cpu, v); }
+void emulator_write_x(uint8_t v) { m6502_set_x(&cpu, v); }
+void emulator_write_y(uint8_t v) { m6502_set_y(&cpu, v); }
+void emulator_write_s(uint8_t v) { m6502_set_s(&cpu, v); }
+void emulator_write_p(uint8_t v) { m6502_set_p(&cpu, v); }
+
+void emulator_write_pc(uint16_t addr) {
+    pins = (pins & (M6502_IRQ | M6502_NMI | M6502_RES | M6502_RDY)) | M6502_SYNC | M6502_RW;
+    M6502_SET_ADDR(pins, addr);
+    M6502_SET_DATA(pins, mem[addr]);
+    m6502_set_pc(&cpu, addr);
+}
+
+bool emulator_bp_hit()      { return bp_enable && bp_hit; }
+void emulator_clear_bp_hit() { bp_hit = false; }
+bool emulator_bp_enabled()   { return bp_enable; }
 
 void emulator_show_memdump_window(bool &show_memmap_window) {
     static bool update_mem_dump = false;

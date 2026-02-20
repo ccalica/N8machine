@@ -26,3 +26,19 @@ bool emu_bus_read();
 void emu_set_irq(int);
 void emu_clr_irq(int);
 
+// GDB stub accessor functions
+uint8_t emulator_read_a();
+uint8_t emulator_read_x();
+uint8_t emulator_read_y();
+uint8_t emulator_read_s();
+uint8_t emulator_read_p();
+void emulator_write_a(uint8_t v);
+void emulator_write_x(uint8_t v);
+void emulator_write_y(uint8_t v);
+void emulator_write_s(uint8_t v);
+void emulator_write_p(uint8_t v);
+void emulator_write_pc(uint16_t addr);
+bool emulator_bp_hit();
+void emulator_clear_bp_hit();
+bool emulator_bp_enabled();
+
