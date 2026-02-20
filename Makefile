@@ -29,6 +29,7 @@ LINUX_GL_LIBS = -lGL
 
 CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
 CXXFLAGS += -g -Wall -Wformat -pthread -DENABLE_GDB_STUB=1
+DEPFLAGS = -MMD -MP
 LIBS =
 
 ##---------------------------------------------------------------------
@@ -77,16 +78,16 @@ endif
 ##---------------------------------------------------------------------
 
 $(BUILD_DIR)/%.o:%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o:$(IMGUI_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/%.o:$(IMGUI_DIR)/backends/%.cpp 
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o:$(IMGUI_DIR)/backends/%.cpp
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o:$(SRC_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 .PHONY: firmware
 
@@ -99,8 +100,10 @@ $(EXE): $(OBJS)
 firmware:
 	make -C firmware install
 
+-include $(OBJS:.o=.d)
+
 clean:
-	rm -f $(EXE) $(OBJS)
+	rm -f $(EXE) $(OBJS) $(OBJS:.o=.d)
 	make -C firmware clean
 
 ##---------------------------------------------------------------------
@@ -129,10 +132,10 @@ $(TEST_BUILD_DIR):
 
 # gdb_stub compiled with test flags (GDB_STUB_TESTING is in TEST_CXXFLAGS)
 $(TEST_BUILD_DIR)/gdb_stub.o: $(SRC_DIR)/gdb_stub.cpp | $(TEST_BUILD_DIR)
-	$(CXX) $(TEST_CXXFLAGS) -c -o $@ $<
+	$(CXX) $(TEST_CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 $(TEST_BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp | $(TEST_BUILD_DIR)
-	$(CXX) $(TEST_CXXFLAGS) -c -o $@ $<
+	$(CXX) $(TEST_CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 .PHONY: test clean-test
 
@@ -142,5 +145,8 @@ test: $(TEST_EXE)
 $(TEST_EXE): $(TEST_SRC_OBJS) $(TEST_OBJS)
 	$(CXX) -o $@ $^
 
+-include $(TEST_BUILD_DIR)/gdb_stub.d
+-include $(TEST_OBJS:.o=.d)
+
 clean-test:
-	rm -f $(TEST_EXE) $(TEST_BUILD_DIR)/*.o
+	rm -f $(TEST_EXE) $(TEST_BUILD_DIR)/*.o $(TEST_BUILD_DIR)/*.d
