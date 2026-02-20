@@ -861,6 +861,11 @@ static void tcp_thread_func(int port) {
                                         std::string framed = format_response(resp);
                                         send(local_client_fd, framed.c_str(), framed.size(), MSG_NOSIGNAL);
                                     }
+                                } else {
+                                    lk.unlock();
+                                    fprintf(stderr, "[gdb_stub] response timeout, sending empty reply\n");
+                                    std::string framed = format_response("");
+                                    send(local_client_fd, framed.c_str(), framed.size(), MSG_NOSIGNAL);
                                 }
                             }
                         }
@@ -971,6 +976,7 @@ gdb_poll_result_t gdb_stub_poll(void) {
                 halted = false;
                 r = GDB_POLL_DETACHED;
             } else if (cmd == SENT_INTERRUPT) {
+                interrupt_requested_flag.store(false);
                 halted = true;
                 last_stop_signal = 2;
                 // Push stop reply for TCP thread
