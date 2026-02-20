@@ -18,6 +18,8 @@ export class RspClient {
   #running = false;
   /** @type {string|null} */
   #pendingStop = null;
+  /** @type {string} */
+  #lastPacket = '';
 
   /**
    * @param {object} [opts]
@@ -89,19 +91,23 @@ export class RspClient {
   async readRegisters() {
     const reply = await this.#sendCommand('g');
     if (reply.length < 14) throw new Error(`Register reply too short: ${reply}`);
+    // 6502 g-packet: A(2) X(2) Y(2) SP(2) PC_LE(4) P(2) = 14 hex chars
+    // PC is little-endian: low byte at offset 8, high byte at offset 10
+    const pcLo = parseInt(reply.slice(8, 10), 16);
+    const pcHi = parseInt(reply.slice(10, 12), 16);
     return {
       a:  parseInt(reply.slice(0, 2), 16),
       x:  parseInt(reply.slice(2, 4), 16),
       y:  parseInt(reply.slice(4, 6), 16),
       s:  parseInt(reply.slice(6, 8), 16),
-      p:  parseInt(reply.slice(8, 10), 16),
-      pc: parseInt(reply.slice(10, 14), 16),
+      pc: (pcHi << 8) | pcLo,
+      p:  parseInt(reply.slice(12, 14), 16),
     };
   }
 
   /**
    * Read a single register by GDB index.
-   * 6502: 0=A, 1=X, 2=Y, 3=S, 4=P, 5=PC
+   * 6502: 0=A, 1=X, 2=Y, 3=S, 4=PC, 5=P
    * @param {number} id
    * @returns {Promise<number>}
    */
@@ -116,8 +122,15 @@ export class RspClient {
    * @param {number} value
    */
   async writeRegister(id, value) {
-    const width = id === 5 ? 4 : 2;  // PC is 16-bit
-    const hex = (value & (id === 5 ? 0xFFFF : 0xFF)).toString(16).padStart(width, '0');
+    let hex;
+    if (id === 4) {
+      // PC is 16-bit little-endian
+      const v = value & 0xFFFF;
+      hex = (v & 0xFF).toString(16).padStart(2, '0') +
+            ((v >> 8) & 0xFF).toString(16).padStart(2, '0');
+    } else {
+      hex = (value & 0xFF).toString(16).padStart(2, '0');
+    }
     const reply = await this.#sendCommand(`P${id.toString(16)}=${hex}`);
     if (reply !== 'OK') throw new Error(`Register write failed: ${reply}`);
   }
@@ -246,7 +259,12 @@ export class RspClient {
 
     while (this.#pendingData.length > 0) {
       if (this.#pendingData[0] === '+') { this.#pendingData = this.#pendingData.slice(1); continue; }
-      if (this.#pendingData[0] === '-') { this.#log('NACK received'); this.#pendingData = this.#pendingData.slice(1); continue; }
+      if (this.#pendingData[0] === '-') {
+        this.#log('NACK received, retransmitting');
+        if (this.#lastPacket) this.#write(this.#lastPacket);
+        this.#pendingData = this.#pendingData.slice(1);
+        continue;
+      }
 
       const dollar = this.#pendingData.indexOf('$');
       if (dollar === -1) { this.#pendingData = ''; break; }
@@ -268,30 +286,31 @@ export class RspClient {
       }
       if (!this.#noAckMode) this.#write('+');
 
-      this.#log(`<< ${payload.slice(0, 120)}${payload.length > 120 ? '...' : ''}`);
+      const decoded = this.#unescape(payload);
+      this.#log(`<< ${decoded.slice(0, 120)}${decoded.length > 120 ? '...' : ''}`);
 
       // O packets — server console output (but NOT 'OK' which is an ack)
-      if (payload.startsWith('O') && payload !== 'OK') {
-        try { console.error(`[server] ${Buffer.from(payload.slice(1), 'hex').toString('utf8').trim()}`); }
-        catch { this.#log(`Server output: ${payload.slice(1, 50)}`); }
+      if (decoded.startsWith('O') && decoded !== 'OK') {
+        try { console.error(`[server] ${Buffer.from(decoded.slice(1), 'hex').toString('utf8').trim()}`); }
+        catch { this.#log(`Server output: ${decoded.slice(1, 50)}`); }
         continue;
       }
 
       // Async stop replies
-      if ((payload.startsWith('S') || payload.startsWith('T')) && this.#resolvers.length === 0) {
-        this.#pendingStop = payload;
+      if ((decoded.startsWith('S') || decoded.startsWith('T')) && this.#resolvers.length === 0) {
+        this.#pendingStop = decoded;
         this.#running = false;
-        this.#log(`Async stop: ${payload}`);
+        this.#log(`Async stop: ${decoded}`);
         continue;
       }
 
       const resolver = this.#resolvers.shift();
       if (resolver) {
         clearTimeout(resolver.timer);
-        if (payload.startsWith('S') || payload.startsWith('T')) this.#running = false;
-        resolver.resolve(payload);
+        if (decoded.startsWith('S') || decoded.startsWith('T')) this.#running = false;
+        resolver.resolve(decoded);
       } else {
-        this.#log(`Unsolicited: ${payload.slice(0, 50)}`);
+        this.#log(`Unsolicited: ${decoded.slice(0, 50)}`);
       }
     }
   }
@@ -303,10 +322,40 @@ export class RspClient {
     return sum & 0xFF;
   }
 
+  /** RSP escape: encode }, #, $, * as } followed by char XOR 0x20. */
+  #escape(data) {
+    let out = '';
+    for (let i = 0; i < data.length; i++) {
+      const c = data.charCodeAt(i);
+      if (c === 0x7d || c === 0x23 || c === 0x24 || c === 0x2a) {
+        out += '}' + String.fromCharCode(c ^ 0x20);
+      } else {
+        out += data[i];
+      }
+    }
+    return out;
+  }
+
+  /** RSP unescape: decode } sequences. */
+  #unescape(data) {
+    let out = '';
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] === '}' && i + 1 < data.length) {
+        out += String.fromCharCode(data.charCodeAt(i + 1) ^ 0x20);
+        i++;
+      } else {
+        out += data[i];
+      }
+    }
+    return out;
+  }
+
   /** @param {string} data */
   #sendPacket(data) {
-    const ck = this.#checksum(data).toString(16).padStart(2, '0');
-    const pkt = `$${data}#${ck}`;
+    const escaped = this.#escape(data);
+    const ck = this.#checksum(escaped).toString(16).padStart(2, '0');
+    const pkt = `$${escaped}#${ck}`;
+    this.#lastPacket = pkt;
     this.#log(`>> ${data.slice(0, 120)}${data.length > 120 ? '...' : ''}`);
     this.#write(pkt);
   }

@@ -118,13 +118,13 @@ async function testConnect() {
 
 async function testReadRegisters() {
   console.log('test: read registers');
-  // 6502 registers: A=42, X=10, Y=20, S=FF, P=30, PC=D000
-  // Hex: 42 0a 14 ff 30 d000
+  // 6502 g-packet: A(2) X(2) Y(2) SP(2) PC_LE(4) P(2)
+  // A=42, X=0a, Y=14, S=ff, PC=d000 (LE: 00d0), P=30
   const mock = await createMockServer(new Map([
     ['qSupported', 'PacketSize=4000'],
     ['QStartNoAckMode', ''],
     ['?', 'S05'],
-    ['g', '420a14ff30d000'],
+    ['g', '420a14ff00d030'],
   ]));
 
   const client = new RspClient();
@@ -256,9 +256,9 @@ async function testWriteRegister() {
   const client = new RspClient();
   await client.connect('127.0.0.1', mock.port);
 
-  // Write PC (reg 5, 16-bit)
-  await client.writeRegister(5, 0xD000);
-  assert(mock.received.some(r => r === 'P5=d000'), 'should send P5=d000');
+  // Write PC (reg 4, 16-bit little-endian)
+  await client.writeRegister(4, 0xD000);
+  assert(mock.received.some(r => r === 'P4=00d0'), 'should send P4=00d0 (LE)');
 
   // Write A (reg 0, 8-bit)
   await client.writeRegister(0, 0x42);
@@ -353,9 +353,9 @@ async function testWriteRegisterByName() {
   const client = new RspClient();
   await client.connect('127.0.0.1', mock.port);
 
-  // wreg pc d000 → should send P5=d000 (PC is reg 5, 16-bit)
-  await client.writeRegister(5, 0xD000);
-  assert(mock.received.some(r => r === 'P5=d000'), 'wreg pc should send P5=d000');
+  // wreg pc d000 → should send P4=00d0 (PC is reg 4, 16-bit LE)
+  await client.writeRegister(4, 0xD000);
+  assert(mock.received.some(r => r === 'P4=00d0'), 'wreg pc should send P4=00d0');
 
   // wreg a 42 → should send P0=42 (A is reg 0, 8-bit)
   await client.writeRegister(0, 0x42);
@@ -382,15 +382,15 @@ async function testSetPc() {
     ['QStartNoAckMode', ''],
     ['?', 'S05'],
     ['P', 'OK'],
-    ['g', '000000ff30d000'],
+    ['g', '000000ff00d000'],
   ]));
 
   const client = new RspClient();
   await client.connect('127.0.0.1', mock.port);
 
   // pc d100 → write PC register then read regs
-  await client.writeRegister(5, 0xD100);
-  assert(mock.received.some(r => r === 'P5=d100'), 'pc should send P5=d100');
+  await client.writeRegister(4, 0xD100);
+  assert(mock.received.some(r => r === 'P4=00d1'), 'pc should send P4=00d1');
 
   const regs = await client.readRegisters();
   assertEq(regs.pc, 0xd000, 'readRegisters after pc set');
@@ -407,15 +407,15 @@ async function testGoto() {
     ['?', 'S05'],
     ['P', 'OK'],
     ['c', 'T05thread:01;'],
-    ['g', '000000ff30d100'],
+    ['g', '000000ff00d100'],
   ]));
 
   const client = new RspClient();
   await client.connect('127.0.0.1', mock.port);
 
   // goto sets PC then continues
-  await client.writeRegister(5, 0xD100);
-  assert(mock.received.some(r => r === 'P5=d100'), 'goto should set PC first');
+  await client.writeRegister(4, 0xD100);
+  assert(mock.received.some(r => r === 'P4=00d1'), 'goto should set PC first');
 
   const reply = await client.continue();
   assert(reply.startsWith('T05'), 'goto should return stop reply from continue');
