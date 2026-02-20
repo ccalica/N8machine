@@ -222,7 +222,7 @@ async function cmdReset(client) {
   // The N8machine stub doesn't have a reset command, so read reset vector and set PC
   const vec = await client.readMemory(0xFFFC, 2);
   const resetAddr = vec[0] | (vec[1] << 8);
-  await client.writeRegister(5, resetAddr);
+  await client.writeRegister(4, resetAddr);
   console.log(`Reset: PC set to $${hex16(resetAddr)} (from reset vector)`);
   await cmdRegs(client);
 }
@@ -246,7 +246,7 @@ async function cmdWreg(client, args) {
 async function cmdPc(client, args) {
   const addr = parseAddr(args[0]);
   if (isNaN(addr)) { console.error('Usage: pc <addr|label>'); return; }
-  await client.writeRegister(5, addr);
+  await client.writeRegister(4, addr);
   const label = addrLabels.has(addr) ? ` (${addrLabels.get(addr).join(', ')})` : '';
   console.log(`PC set to $${hex16(addr)}${label}`);
   await cmdRegs(client);
@@ -255,7 +255,7 @@ async function cmdPc(client, args) {
 async function cmdGoto(client, args) {
   const addr = parseAddr(args[0]);
   if (isNaN(addr)) { console.error('Usage: goto <addr|label>'); return; }
-  await client.writeRegister(5, addr);
+  await client.writeRegister(4, addr);
   const label = addrLabels.has(addr) ? ` (${addrLabels.get(addr).join(', ')})` : '';
   console.log(`PC set to $${hex16(addr)}${label}, continuing...`);
   let timeout = 30000;
