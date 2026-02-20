@@ -113,6 +113,12 @@ export class RspClient {
    */
   async readRegister(id) {
     const reply = await this.#sendCommand(`p${id.toString(16)}`);
+    if (id === 4) {
+      // PC: 4 hex chars, little-endian
+      const lo = parseInt(reply.slice(0, 2), 16);
+      const hi = parseInt(reply.slice(2, 4), 16);
+      return (hi << 8) | lo;
+    }
     return parseInt(reply, 16);
   }
 
