@@ -703,7 +703,7 @@ static void tcp_thread_func(int port) {
             return;
         }
 
-        printf("GDB stub: listening on port %d\n", port);
+        fprintf(stderr, "GDB stub: listening on port %d\n", port);
 
         // Accept loop
         while (!gdb_shutdown.load()) {
@@ -731,7 +731,7 @@ static void tcp_thread_func(int port) {
                 cmd_queue.push(SENT_CONNECT);
             }
 
-            printf("GDB stub: client connected\n");
+            fprintf(stderr, "GDB stub: client connected\n");
 
             // Local framing state for this connection
             enum { IDLE, DATA, CKSUM1, CKSUM2 } fstate = IDLE;
@@ -916,7 +916,7 @@ static void tcp_thread_func(int port) {
             close(local_client_fd);
             local_client_fd = -1;
             client_connected_flag.store(false);
-            printf("GDB stub: client disconnected\n");
+            fprintf(stderr, "GDB stub: client disconnected\n");
         } // accept loop
 
     } catch (...) {
