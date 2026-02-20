@@ -36,6 +36,12 @@ uint64_t pins;
 bool bp_enable;
 bool bp_hit = false;
 bool bp_mask[65536] {false};
+bool wp_write_mask[65536] {false};
+bool wp_read_mask[65536] {false};
+static bool wp_enable = false;
+static bool wp_hit_flag = false;
+static uint16_t wp_addr = 0;
+static int wp_type = 0;  // 2=write, 3=read, 4=access
 bool pc_mask[65536] {false};
 bool label_mask[65536] {false};  // TODO: init via .sym file
 uint16_t cur_instruction = 0x00;
@@ -88,6 +94,19 @@ void emulator_step() {
             snprintf(debug_msg, 256, "BP Hit: %4.4x (%d)\r\n", addr, addr);
             gui_con_printmsg(debug_msg);
 
+        }
+        if (wp_enable) {
+            bool is_write = !(pins & M6502_RW);
+            if ((wp_write_mask[addr] && is_write) ||
+                (wp_read_mask[addr] && (pins & M6502_RW) && !(pins & M6502_SYNC))) {
+                if (!wp_hit_flag) {
+                    wp_hit_flag = true;
+                    wp_addr = addr;
+                    wp_type = is_write ? 2 : 3;
+                    // If both masks set at this addr, this is an access watchpoint (Z4)
+                    if (wp_write_mask[addr] && wp_read_mask[addr]) wp_type = 4;
+                }
+            }
         }
         IRQ_CLR();
         // pins = pins & ~M6502_IRQ;
@@ -288,6 +307,13 @@ void emulator_write_pc(uint16_t addr) {
 bool emulator_bp_hit()      { return bp_enable && bp_hit; }
 void emulator_clear_bp_hit() { bp_hit = false; }
 bool emulator_bp_enabled()   { return bp_enable; }
+
+void emulator_enablewp(bool en) { wp_enable = en; }
+bool emulator_wp_enabled()      { return wp_enable; }
+bool emulator_wp_hit()          { return wp_enable && wp_hit_flag; }
+void emulator_clear_wp_hit()    { wp_hit_flag = false; }
+uint16_t emulator_wp_hit_addr() { return wp_addr; }
+int emulator_wp_hit_type()      { return wp_type; }
 
 void emulator_show_memdump_window(bool &show_memmap_window) {
     static bool update_mem_dump = false;

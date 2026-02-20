@@ -32,11 +32,138 @@ using namespace std;
 #include "emu_dis6502.h"
 #include "machine.h"
 #include "utils.h"
+#include "gdb_stub.h"
+#include "m6502.h"
+#include "emu_tty.h"
 
 const char* glsl_version;
 SDL_WindowFlags window_flags;
 SDL_Window* window;
 SDL_GLContext gl_context;
+
+// ---- Emulator state (file scope for GDB callback access) ----
+static bool run_emulator = false;
+static bool step_emulator = false;
+static bool gdb_halted = false;
+static bool bp_enable = false;
+
+// Externs from emulator.cpp needed by GDB callbacks
+extern m6502_t cpu;
+extern uint64_t pins;
+
+// ---- GDB stub callbacks ----
+
+static uint8_t gdb_read_reg8(int reg_id) {
+    switch (reg_id) {
+        case 0: return emulator_read_a();
+        case 1: return emulator_read_x();
+        case 2: return emulator_read_y();
+        case 3: return emulator_read_s();
+        case 4: return emulator_read_p();
+        default: return 0;
+    }
+}
+
+static uint16_t gdb_read_reg16(int reg_id) {
+    if (reg_id == 5) return emulator_getpc();
+    return 0;
+}
+
+static void gdb_write_reg8(int reg_id, uint8_t val) {
+    switch (reg_id) {
+        case 0: emulator_write_a(val); break;
+        case 1: emulator_write_x(val); break;
+        case 2: emulator_write_y(val); break;
+        case 3: emulator_write_s(val); break;
+        case 4: emulator_write_p(val); break;
+    }
+}
+
+static void gdb_write_reg16(int reg_id, uint16_t val) {
+    if (reg_id == 5) emulator_write_pc(val);
+}
+
+static uint8_t gdb_read_mem(uint16_t addr) {
+    return mem[addr];
+}
+
+static void gdb_write_mem(uint16_t addr, uint8_t val) {
+    mem[addr] = val;
+}
+
+static int gdb_step_instruction(void) {
+    int guard = gdb_stub_get_step_guard();
+    int ticks = 0;
+    do {
+        emulator_step();
+        ticks++;
+        if (ticks >= guard) return 4; // SIGILL — likely jammed
+    } while (!(pins & M6502_SYNC));
+    return 5; // SIGTRAP
+}
+
+static void gdb_set_breakpoint(uint16_t addr) {
+    bp_mask[addr] = true;
+    bp_enable = true;
+    emulator_enablebp(true);
+}
+
+static void gdb_clear_breakpoint(uint16_t addr) {
+    bp_mask[addr] = false;
+    // Disable BP scanning if no breakpoints remain
+    bool any = false;
+    for (int i = 0; i < 65536 && !any; i++) any = bp_mask[i];
+    if (!any) { bp_enable = false; emulator_enablebp(false); }
+}
+
+static void gdb_set_watchpoint(uint16_t addr, int type) {
+    if (type == 2) {          // write watchpoint
+        wp_write_mask[addr] = true;
+    } else if (type == 3) {   // read watchpoint
+        wp_read_mask[addr] = true;
+    } else if (type == 4) {   // access watchpoint
+        wp_write_mask[addr] = true;
+        wp_read_mask[addr] = true;
+    }
+    emulator_enablewp(true);
+}
+
+static void gdb_clear_watchpoint(uint16_t addr, int type) {
+    if (type == 2) {
+        wp_write_mask[addr] = false;
+    } else if (type == 3) {
+        wp_read_mask[addr] = false;
+    } else if (type == 4) {
+        wp_write_mask[addr] = false;
+        wp_read_mask[addr] = false;
+    }
+    // Disable WP scanning if no watchpoints remain
+    bool any = false;
+    for (int i = 0; i < 65536 && !any; i++) any = wp_write_mask[i] || wp_read_mask[i];
+    if (!any) emulator_enablewp(false);
+}
+
+static void gdb_continue_exec(void) {
+    run_emulator = true;
+}
+
+static void gdb_halt(void) {
+    run_emulator = false;
+}
+
+static uint16_t gdb_get_pc(void) {
+    return emulator_getpc();
+}
+
+static int gdb_get_stop_reason(void) {
+    return 5; // SIGTRAP default
+}
+
+static void gdb_reset(void) {
+    // D47: Use M6502_RES pin, NOT emulator_reset()
+    pins |= M6502_RES;
+    tty_reset();
+}
 
 
 int SDL_GL_Init() {
@@ -145,6 +272,20 @@ int main(int, char**)
 
     emulator_init();
 
+    // GDB stub init
+    static gdb_stub_callbacks_t gdb_cb = {
+        gdb_read_reg8, gdb_read_reg16,
+        gdb_write_reg8, gdb_write_reg16,
+        gdb_read_mem, gdb_write_mem,
+        gdb_step_instruction,
+        gdb_set_breakpoint, gdb_clear_breakpoint,
+        gdb_set_watchpoint, gdb_clear_watchpoint,
+        gdb_get_pc, gdb_get_stop_reason,
+        gdb_reset, gdb_continue_exec, gdb_halt
+    };
+    static gdb_stub_config_t gdb_cfg = { 3333, true, 16 };
+    gdb_stub_init(&gdb_cb, &gdb_cfg);
+
     // Our state
     bool show_memmap_window = true;
     bool show_status_window = true;
@@ -164,23 +305,71 @@ int main(int, char**)
     while (!done)
 #endif
     {
-        static bool run_emulator = false;
-        static bool step_emulator = false;
-        static bool bp_enable = false;
         static bool show_disasm_window = true;
         static char break_points[128] {0};
 
+        // GDB stub poll
+        switch (gdb_stub_poll()) {
+            case GDB_POLL_HALTED:
+                run_emulator = false;
+                gdb_halted = true;
+                bp_enable = true;
+                emulator_enablebp(true);
+                break;
+            case GDB_POLL_RESUMED:
+                gdb_halted = false;
+                run_emulator = true;
+                break;
+            case GDB_POLL_STEPPED:
+                gdb_halted = true;
+                run_emulator = false;
+                break;
+            case GDB_POLL_DETACHED:
+                gdb_halted = false;
+                // D44: clear all GDB breakpoints and watchpoints on disconnect
+                memset(bp_mask, 0, sizeof(bool) * 65536);
+                memset(wp_write_mask, 0, sizeof(bool) * 65536);
+                memset(wp_read_mask, 0, sizeof(bool) * 65536);
+                bp_enable = false;
+                emulator_enablebp(false);
+                emulator_enablewp(false);
+                break;
+            case GDB_POLL_KILL:
+                gdb_halted = false;
+                run_emulator = true;
+                break;
+            case GDB_POLL_NONE:
+                break;
+        }
+
         uint32_t steps = 0;
-        if(run_emulator) {
+        if (run_emulator && !gdb_halted) {
             uint32_t timeout = SDL_GetTicks() + 13;
-            while(!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
+            while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout)) {
                 emulator_step();
                 steps++;
-                if(emulator_check_break()) {run_emulator=false; break;}
+                if (emulator_bp_hit()) {
+                    run_emulator = false;
+                    emulator_clear_bp_hit();
+                    if (gdb_stub_is_connected()) {
+                        gdb_halted = true;
+                        gdb_stub_notify_stop(5);
+                    }
+                    break;
+                }
+                if (emulator_wp_hit()) {
+                    run_emulator = false;
+                    uint16_t wa = emulator_wp_hit_addr();
+                    int wt = emulator_wp_hit_type();
+                    emulator_clear_wp_hit();
+                    if (gdb_stub_is_connected()) {
+                        gdb_halted = true;
+                        gdb_stub_notify_watchpoint(wa, wt);
+                    }
+                    break;
+                }
             }
-        }
-        else if(step_emulator) {
-            // call emulator_step;
+        } else if (step_emulator && !gdb_halted) {
             emulator_step();
             steps++;
             step_emulator = false;
@@ -214,29 +403,38 @@ int main(int, char**)
             ImGui::SameLine();  ImGui::Checkbox("Memory", &show_memmap_window);
             ImGui::SameLine();  ImGui::Checkbox("Console", &show_console_window);
             ImGui::Text("  ");
-            ImGui::Text("Status: %s", run_emulator?"Running":"Halted");
+            if (gdb_halted && gdb_stub_is_connected())
+                ImGui::Text("Status: Halted (GDB)");
+            else
+                ImGui::Text("Status: %s", run_emulator ? "Running" : "Halted");
 
+            if (gdb_stub_is_connected())
+                ImGui::Text("GDB: Connected (port 3333)");
+            else
+                ImGui::Text("GDB: Listening");
+
+            ImGui::BeginDisabled(gdb_halted);
             if(ImGui::Button(run_emulator?"Pause":" Run ")) {
                 run_emulator = !run_emulator;
-                // printf("Run toggle\n");
             }
             ImGui::SameLine(80);
-            //if(run_emulator) ImGui::BeginDisabled(run_emulator);
             ImGui::BeginDisabled(run_emulator);
             if(ImGui::Button("Step")) {
                 step_emulator = true;
-                // printf("Step\n");
             }
             ImGui::EndDisabled();
+            ImGui::EndDisabled(); // gdb_halted
             ImGui::SameLine(150);
             if(ImGui::Button("Reset")) {
                 emulator_reset();
             }
-            ImGui::SameLine(230); 
+            ImGui::SameLine(230);
+            ImGui::BeginDisabled(gdb_stub_is_connected());
             if(ImGui::Checkbox("BP", &bp_enable)) {
                 emulator_enablebp(bp_enable);
             }
-            ImGui::SameLine(300); 
+            ImGui::EndDisabled();
+            ImGui::SameLine(300);
             if(ImGui::InputText("BP2", break_points,IM_ARRAYSIZE(break_points))) {
                 emulator_setbp(break_points);
             }
@@ -291,6 +489,7 @@ int main(int, char**)
 #endif
 
     // Cleanup
+    gdb_stub_shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();

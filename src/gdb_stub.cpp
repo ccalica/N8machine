@@ -381,7 +381,8 @@ static std::string handle_Z(const char* data) {
     if (strlen(data) < 3) return "E03";
 
     char kind = data[0];
-    if (kind != '0' && kind != '1') return "";  // unsupported Z type → empty
+    if (kind != '0' && kind != '1' && kind != '2' && kind != '3' && kind != '4')
+        return "";  // unsupported Z type → empty
 
     if (data[1] != ',') return "E03";
     const char* addr_start = data + 2;
@@ -392,7 +393,12 @@ static std::string handle_Z(const char* data) {
     if (addr == -1) return "E03";
     if (addr == -2) return "E01";
 
-    cb->set_breakpoint((uint16_t)addr);
+    if (kind == '0' || kind == '1') {
+        cb->set_breakpoint((uint16_t)addr);
+    } else {
+        if (!cb->set_watchpoint) return "";  // no callback = unsupported
+        cb->set_watchpoint((uint16_t)addr, kind - '0');
+    }
     return "OK";
 }
 
@@ -401,7 +407,8 @@ static std::string handle_z(const char* data) {
     if (strlen(data) < 3) return "E03";
 
     char kind = data[0];
-    if (kind != '0' && kind != '1') return "";  // unsupported z type → empty
+    if (kind != '0' && kind != '1' && kind != '2' && kind != '3' && kind != '4')
+        return "";  // unsupported z type → empty
 
     if (data[1] != ',') return "E03";
     const char* addr_start = data + 2;
@@ -412,7 +419,12 @@ static std::string handle_z(const char* data) {
     if (addr == -1) return "E03";
     if (addr == -2) return "E01";
 
-    cb->clear_breakpoint((uint16_t)addr);
+    if (kind == '0' || kind == '1') {
+        cb->clear_breakpoint((uint16_t)addr);
+    } else {
+        if (!cb->clear_watchpoint) return "";  // no callback = unsupported
+        cb->clear_watchpoint((uint16_t)addr, kind - '0');
+    }
     return "OK";
 }
 
@@ -479,7 +491,25 @@ static std::string handle_Q(const char* data) {
 
 static std::string handle_v(const char* data) {
     if (strcmp(data, "MustReplyEmpty") == 0) return "";
-    if (strncmp(data, "Cont?", 5) == 0) return "";
+    if (strcmp(data, "Cont?") == 0) return "vCont;c;s;t";
+    if (strncmp(data, "Cont;", 5) == 0) {
+        char action = data[5];
+        const char* rest = data + 6;
+        // Skip optional :thread-id (and trailing ; separator)
+        if (*rest == ':') {
+            rest++; // skip ':'
+            while (*rest && *rest != ';') rest++; // skip thread-id
+            if (*rest == ';') rest++; // skip action separator
+        }
+        if (action == 'c') return handle_continue("");
+        if (action == 's') return handle_step("");
+        if (action == 't') {
+            halted = true;
+            last_stop_signal = 2;
+            return "T02thread:01;";
+        }
+        return "";
+    }
     return "";
 }
 
@@ -602,9 +632,311 @@ static void feed_byte_impl(uint8_t byte) {
     }
 }
 
-// ---- Public API ----
+// ---- Public API (Phase 2 — TCP transport) ----
 
 #if ENABLE_GDB_STUB
+
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <queue>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <poll.h>
+#include <cerrno>
+
+// ---- TCP transport state ----
+
+static std::thread* tcp_thread_ptr = nullptr;
+static std::mutex cmd_mutex;
+static std::queue<std::string> cmd_queue;
+static std::mutex resp_mutex;
+static std::condition_variable resp_cv;
+static std::queue<std::string> resp_queue;
+static std::atomic<bool> gdb_shutdown{false};
+static std::atomic<bool> interrupt_requested_flag{false};
+static std::atomic<bool> client_connected_flag{false};
+static std::atomic<bool> tcp_noack_mode{false};
+static std::atomic<int> server_fd{-1};
+
+// Sentinels (octal \001 prefix distinguishes from GDB packets)
+static const std::string SENT_CONNECT    = "\001CONNECT";
+static const std::string SENT_DISCONNECT = "\001DISCONNECT";
+static const std::string SENT_INTERRUPT  = "\001INTERRUPT";
+static const std::string SENT_CONTINUE   = "\001CONTINUE";
+static const std::string SENT_NOREPLY    = "\001NOREPLY";
+
+static bool is_sentinel(const std::string& s) {
+    return !s.empty() && s[0] == '\001';
+}
+
+// ---- TCP thread ----
+
+static void tcp_thread_func(int port) {
+    int local_client_fd = -1;
+    try {
+        server_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_fd < 0) {
+            fprintf(stderr, "GDB stub: socket() failed: %s\n", strerror(errno));
+            return;
+        }
+
+        int opt = 1;
+        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        addr.sin_port = htons((uint16_t)port);
+
+        if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+            fprintf(stderr, "GDB stub: bind() failed: %s\n", strerror(errno));
+            close(server_fd); server_fd = -1;
+            return;
+        }
+        if (listen(server_fd, 1) < 0) {
+            fprintf(stderr, "GDB stub: listen() failed: %s\n", strerror(errno));
+            close(server_fd); server_fd = -1;
+            return;
+        }
+
+        printf("GDB stub: listening on port %d\n", port);
+
+        // Accept loop
+        while (!gdb_shutdown.load()) {
+            struct pollfd pfd;
+            pfd.fd = server_fd;
+            pfd.events = POLLIN;
+            int ret = poll(&pfd, 1, 200);
+            if (ret <= 0) continue;
+
+            local_client_fd = accept(server_fd, nullptr, nullptr);
+            if (local_client_fd < 0) continue;
+
+            // Set recv timeout 100ms
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 100000;
+            setsockopt(local_client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+            client_connected_flag.store(true);
+            tcp_noack_mode.store(false);
+
+            // Enqueue connect sentinel
+            {
+                std::lock_guard<std::mutex> lk(cmd_mutex);
+                cmd_queue.push(SENT_CONNECT);
+            }
+
+            printf("GDB stub: client connected\n");
+
+            // Local framing state for this connection
+            enum { IDLE, DATA, CKSUM1, CKSUM2 } fstate = IDLE;
+            std::string pktbuf;
+            uint8_t rcksum = 0, ccksum = 0;
+            bool esc = false;
+            bool waiting_async = false;
+
+            // Client loop
+            while (!gdb_shutdown.load() && client_connected_flag.load()) {
+                uint8_t buf[1024];
+                ssize_t n = recv(local_client_fd, buf, sizeof(buf), 0);
+
+                if (n == 0) break; // client disconnected
+
+                if (n < 0) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // Recv timeout — check for async stop reply
+                        if (waiting_async) {
+                            std::unique_lock<std::mutex> lk(resp_mutex);
+                            if (!resp_queue.empty()) {
+                                std::string resp = resp_queue.front();
+                                resp_queue.pop();
+                                lk.unlock();
+                                if (!is_sentinel(resp)) {
+                                    std::string framed = format_response(resp);
+                                    send(local_client_fd, framed.c_str(), framed.size(), MSG_NOSIGNAL);
+                                }
+                                waiting_async = false;
+                            }
+                        }
+                        continue;
+                    }
+                    break; // real error
+                }
+
+                // Process received bytes
+                for (ssize_t i = 0; i < n; i++) {
+                    uint8_t byte = buf[i];
+
+                    switch (fstate) {
+                    case IDLE:
+                        if (byte == '$') {
+                            fstate = DATA;
+                            pktbuf.clear();
+                            ccksum = 0;
+                            esc = false;
+                        } else if (byte == 0x03) {
+                            interrupt_requested_flag.store(true);
+                            {
+                                std::lock_guard<std::mutex> lk(cmd_mutex);
+                                cmd_queue.push(SENT_INTERRUPT);
+                            }
+                            // Enter async wait so recv timeout picks up the stop reply
+                            waiting_async = true;
+                        }
+                        break;
+
+                    case DATA:
+                        if (byte == '$' && !esc) {
+                            pktbuf.clear(); ccksum = 0; esc = false;
+                        } else if (byte == '#' && !esc) {
+                            fstate = CKSUM1; rcksum = 0;
+                        } else if (byte == '}' && !esc) {
+                            ccksum += byte; esc = true;
+                        } else if (pktbuf.size() >= 20000) {
+                            // PacketSize exceeded — discard
+                            fstate = IDLE;
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
+                        } else {
+                            ccksum += byte;
+                            pktbuf += esc ? (char)(byte ^ 0x20) : (char)byte;
+                            esc = false;
+                        }
+                        break;
+
+                    case CKSUM1: {
+                        int h = hex_char_val((char)byte);
+                        if (h < 0) {
+                            fstate = IDLE;
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
+                            break;
+                        }
+                        rcksum = (uint8_t)(h << 4);
+                        fstate = CKSUM2;
+                        break;
+                    }
+
+                    case CKSUM2: {
+                        int h = hex_char_val((char)byte);
+                        if (h < 0) {
+                            fstate = IDLE;
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
+                            break;
+                        }
+                        rcksum |= (uint8_t)h;
+
+                        if (rcksum != ccksum) {
+                            // Bad checksum — NAK
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
+                        } else {
+                            // Good checksum — ACK
+                            if (!tcp_noack_mode.load()) {
+                                char ack = '+';
+                                send(local_client_fd, &ack, 1, MSG_NOSIGNAL);
+                            }
+
+                            // Drain pending async stop reply if needed
+                            if (waiting_async) {
+                                std::unique_lock<std::mutex> lk(resp_mutex);
+                                while (!resp_queue.empty()) {
+                                    std::string pending = resp_queue.front();
+                                    resp_queue.pop();
+                                    if (!is_sentinel(pending)) {
+                                        lk.unlock();
+                                        std::string framed = format_response(pending);
+                                        send(local_client_fd, framed.c_str(), framed.size(), MSG_NOSIGNAL);
+                                        lk.lock();
+                                    }
+                                }
+                                waiting_async = false;
+                            }
+
+                            // Enqueue command for main thread
+                            {
+                                std::lock_guard<std::mutex> lk(cmd_mutex);
+                                cmd_queue.push(pktbuf);
+                            }
+
+                            // Wait for response from main thread
+                            {
+                                std::unique_lock<std::mutex> lk(resp_mutex);
+                                bool got = resp_cv.wait_for(lk,
+                                    std::chrono::milliseconds(500),
+                                    []{ return !resp_queue.empty() || gdb_shutdown.load(); });
+
+                                if (got) {
+                                    if (gdb_shutdown.load()) break;
+                                    std::string resp = resp_queue.front();
+                                    resp_queue.pop();
+                                    lk.unlock();
+
+                                    if (resp == SENT_CONTINUE) {
+                                        waiting_async = true;
+                                    } else if (!is_sentinel(resp)) {
+                                        std::string framed = format_response(resp);
+                                        send(local_client_fd, framed.c_str(), framed.size(), MSG_NOSIGNAL);
+                                    }
+                                } else {
+                                    lk.unlock();
+                                    fprintf(stderr, "[gdb_stub] response timeout, sending empty reply\n");
+                                    std::string framed = format_response("");
+                                    send(local_client_fd, framed.c_str(), framed.size(), MSG_NOSIGNAL);
+                                }
+                            }
+                        }
+
+                        fstate = IDLE;
+                        break;
+                    }
+                    } // switch
+                } // for each byte
+            } // client loop
+
+            // Client disconnected
+            {
+                std::lock_guard<std::mutex> lk(cmd_mutex);
+                cmd_queue.push(SENT_DISCONNECT);
+            }
+            close(local_client_fd);
+            local_client_fd = -1;
+            client_connected_flag.store(false);
+            printf("GDB stub: client disconnected\n");
+        } // accept loop
+
+    } catch (...) {
+        fprintf(stderr, "GDB stub: TCP thread exception\n");
+    }
+
+    // Cleanup
+    if (local_client_fd >= 0) close(local_client_fd);
+    if (server_fd >= 0) { close(server_fd); server_fd = -1; }
+}
+
+// ---- Priority helper ----
+
+static bool higher_poll_priority(gdb_poll_result_t a, gdb_poll_result_t b) {
+    // KILL > DETACHED > HALTED > STEPPED > RESUMED > NONE
+    static const int prio[] = { 0, 3, 1, 2, 4, 5 };
+    return prio[(int)a] > prio[(int)b];
+}
+
+// ---- Public API ----
 
 void gdb_stub_init(const gdb_stub_callbacks_t* callbacks, const gdb_stub_config_t* cfg) {
     cb = callbacks;
@@ -618,16 +950,136 @@ void gdb_stub_init(const gdb_stub_callbacks_t* callbacks, const gdb_stub_config_
     packet_buf.clear();
     last_response.clear();
     escape_next = false;
+
+    // TCP transport
+    gdb_shutdown.store(false);
+    interrupt_requested_flag.store(false);
+    client_connected_flag.store(false);
+    tcp_noack_mode.store(false);
+    if (config.enabled) {
+        tcp_thread_ptr = new std::thread(tcp_thread_func, config.port);
+    }
 }
 
 void gdb_stub_shutdown(void) {
+    gdb_shutdown.store(true);
+    resp_cv.notify_all();
+    if (tcp_thread_ptr) {
+        if (server_fd >= 0) ::shutdown(server_fd, SHUT_RDWR);
+        tcp_thread_ptr->join();
+        delete tcp_thread_ptr;
+        tcp_thread_ptr = nullptr;
+    }
     connected = false;
     cb = nullptr;
 }
 
 gdb_poll_result_t gdb_stub_poll(void) {
-    // Phase 1: no TCP, just return NONE
-    return GDB_POLL_NONE;
+    gdb_poll_result_t result = GDB_POLL_NONE;
+
+    // Drain command queue (unconditional — SENT_DISCONNECT may arrive after flag clears)
+    std::queue<std::string> local_q;
+    {
+        std::lock_guard<std::mutex> lk(cmd_mutex);
+        std::swap(local_q, cmd_queue);
+    }
+
+    while (!local_q.empty()) {
+        std::string cmd = local_q.front();
+        local_q.pop();
+
+        gdb_poll_result_t r = GDB_POLL_NONE;
+
+        if (is_sentinel(cmd)) {
+            if (cmd == SENT_CONNECT) {
+                connected = true;
+                halted = true;
+                noack = false;
+                tcp_noack_mode.store(false);
+                last_stop_signal = 5;
+                // D23/D49: align to SYNC boundary
+                if (cb && cb->get_pc && cb->write_reg16) {
+                    uint16_t pc = cb->get_pc();
+                    cb->write_reg16(5, pc);
+                }
+                r = GDB_POLL_HALTED;
+            } else if (cmd == SENT_DISCONNECT) {
+                connected = false;
+                halted = false;
+                r = GDB_POLL_DETACHED;
+            } else if (cmd == SENT_INTERRUPT) {
+                interrupt_requested_flag.store(false);
+                halted = true;
+                last_stop_signal = 2;
+                // Push stop reply for TCP thread
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push("T" + to_hex_byte(2) + "thread:01;");
+                }
+                resp_cv.notify_one();
+                r = GDB_POLL_HALTED;
+            }
+        } else if (!cmd.empty()) {
+            char first = cmd[0];
+
+            bool is_continue = (first == 'c') ||
+                               (cmd.compare(0, 7, "vCont;c") == 0);
+            bool is_step = (first == 's') ||
+                           (cmd.compare(0, 7, "vCont;s") == 0);
+            bool is_vcont_t = (cmd.compare(0, 7, "vCont;t") == 0);
+
+            if (is_continue) {
+                // Continue: dispatch for side effects (optional PC set)
+                dispatch_command(cmd.c_str());
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push(SENT_CONTINUE);
+                }
+                resp_cv.notify_one();
+                r = GDB_POLL_RESUMED;
+            } else if (is_vcont_t) {
+                // vCont;t — halt (same as interrupt)
+                dispatch_command(cmd.c_str());
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push("T02thread:01;");
+                }
+                resp_cv.notify_one();
+                r = GDB_POLL_HALTED;
+            } else if (first == 'D') {
+                std::string resp = dispatch_command(cmd.c_str());
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push(resp);
+                }
+                resp_cv.notify_one();
+                r = GDB_POLL_DETACHED;
+            } else if (first == 'k') {
+                connected = false;
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push(SENT_NOREPLY);
+                }
+                resp_cv.notify_one();
+                r = GDB_POLL_KILL;
+            } else {
+                // All other commands (including 's')
+                std::string resp = dispatch_command(cmd.c_str());
+                // Propagate noack mode to TCP thread
+                if (noack) tcp_noack_mode.store(true);
+                {
+                    std::lock_guard<std::mutex> lk(resp_mutex);
+                    resp_queue.push(resp);
+                }
+                resp_cv.notify_one();
+                if (is_step) r = GDB_POLL_STEPPED;
+            }
+        }
+
+        if (higher_poll_priority(r, result)) result = r;
+    }
+
+    return result;
 }
 
 bool gdb_stub_is_connected(void) { return connected; }
@@ -636,6 +1088,34 @@ bool gdb_stub_is_halted(void) { return halted; }
 void gdb_stub_notify_stop(int signal) {
     last_stop_signal = signal;
     halted = true;
+    std::string stop_reply = "T" + to_hex_byte((uint8_t)signal) + "thread:01;";
+    {
+        std::lock_guard<std::mutex> lk(resp_mutex);
+        resp_queue.push(stop_reply);
+    }
+    resp_cv.notify_one();
+}
+
+bool gdb_interrupt_requested(void) {
+    return interrupt_requested_flag.exchange(false);
+}
+
+int gdb_stub_get_step_guard(void) {
+    return (config.step_guard > 0) ? config.step_guard : 16;
+}
+
+void gdb_stub_notify_watchpoint(uint16_t addr, int type) {
+    last_stop_signal = 5;  // SIGTRAP
+    halted = true;
+    const char* wp_type_str = (type == 2) ? "watch" :
+                              (type == 3) ? "rwatch" : "awatch";
+    std::string stop_reply = "T05" + std::string(wp_type_str) + ":" +
+                             to_hex_le16(addr) + ";thread:01;";
+    {
+        std::lock_guard<std::mutex> lk(resp_mutex);
+        resp_queue.push(stop_reply);
+    }
+    resp_cv.notify_one();
 }
 
 #endif // ENABLE_GDB_STUB

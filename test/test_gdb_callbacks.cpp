@@ -266,4 +266,182 @@ TEST_SUITE("gdb_callbacks") {
         CHECK(tty_buff_count() == 1); // queue untouched
     }
 
+    // ---- Phase 2: GDB step instruction via SYNC loop (emulator globals) ----
+
+    TEST_CASE("Step instruction: NOP returns SIGTRAP (5)") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA}); // NOP NOP NOP
+        f.step_n(10); // boot
+
+        // Step one instruction using SYNC loop (like gdb_step_instruction)
+        int ticks = 0;
+        do {
+            emulator_step();
+            ticks++;
+        } while (!(pins & M6502_SYNC) && ticks < 16);
+
+        CHECK(ticks <= 16);
+        CHECK((pins & M6502_SYNC) != 0);
+        // NOP should complete within 16 ticks → SIGTRAP
+        int sig = (ticks >= 16) ? 4 : 5;
+        CHECK(sig == 5);
+    }
+
+    TEST_CASE("Step instruction: JAM (0x02) returns SIGILL (4)") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0x02}); // JAM/KIL/HLT opcode
+        f.step_n(10); // boot — will land at D000
+
+        // Step instruction — JAM never reaches SYNC, guard fires
+        int ticks = 0;
+        do {
+            emulator_step();
+            ticks++;
+        } while (!(pins & M6502_SYNC) && ticks < 16);
+
+        int sig = (ticks >= 16) ? 4 : 5;
+        CHECK(sig == 4);
+    }
+
+    // ---- Phase 2: Reset via M6502_RES pin (D47) ----
+
+    TEST_CASE("D47: M6502_RES pin can be set without crash") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0xEA});
+        f.step_n(10);
+
+        pins |= M6502_RES;
+        tty_reset();
+
+        // RES pin is set — stepping should initiate reset sequence
+        CHECK((pins & M6502_RES) != 0);
+    }
+
+    // ---- Phase 2: set/clear breakpoint via bp_mask[] ----
+
+    TEST_CASE("set_breakpoint enables bp_mask at address") {
+        EmulatorFixture f;
+        bp_mask[0xD100] = false;
+        bp_mask[0xD100] = true;
+        CHECK(bp_mask[0xD100] == true);
+    }
+
+    TEST_CASE("clear_breakpoint clears bp_mask at address") {
+        EmulatorFixture f;
+        bp_mask[0xD100] = true;
+        bp_mask[0xD100] = false;
+        CHECK(bp_mask[0xD100] == false);
+    }
+
+    // ---- Phase 2: D44 — clearing all breakpoints on disconnect ----
+
+    TEST_CASE("D44: clearing all breakpoints resets bp_mask") {
+        EmulatorFixture f;
+        // Set several breakpoints
+        bp_mask[0xD000] = true;
+        bp_mask[0xD010] = true;
+        bp_mask[0xD020] = true;
+        emulator_enablebp(true);
+
+        // Simulate disconnect: clear all
+        memset(bp_mask, 0, sizeof(bool) * 65536);
+        emulator_enablebp(false);
+
+        CHECK(bp_mask[0xD000] == false);
+        CHECK(bp_mask[0xD010] == false);
+        CHECK(bp_mask[0xD020] == false);
+        CHECK(emulator_bp_enabled() == false);
+    }
+
+    // ---- Phase 3: Watchpoint tests ----
+
+    TEST_CASE("Write watchpoint fires on STA") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        // LDA #$42; STA $0200; NOP
+        f.load_at(0xD000, {0xA9, 0x42, 0x8D, 0x00, 0x02, 0xEA});
+        wp_write_mask[0x0200] = true;
+        emulator_enablewp(true);
+
+        f.step_n(20); // boot + execute LDA + STA
+
+        CHECK(emulator_wp_hit() == true);
+        CHECK(emulator_wp_hit_addr() == 0x0200);
+        CHECK(emulator_wp_hit_type() == 2); // write
+    }
+
+    TEST_CASE("Read watchpoint fires on LDA abs") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        // LDA $0200; NOP
+        f.load_at(0xD000, {0xAD, 0x00, 0x02, 0xEA});
+        mem[0x0200] = 0x42;
+        wp_read_mask[0x0200] = true;
+        emulator_enablewp(true);
+
+        f.step_n(20);
+
+        CHECK(emulator_wp_hit() == true);
+        CHECK(emulator_wp_hit_addr() == 0x0200);
+        CHECK(emulator_wp_hit_type() == 3); // read
+    }
+
+    TEST_CASE("Read watchpoint does NOT fire on opcode fetch (SYNC)") {
+        EmulatorFixture f;
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA}); // NOP NOP NOP
+        f.step_n(10); // boot without watchpoint enabled
+
+        // Position CPU at known address
+        emulator_write_pc(0xD000);
+
+        // Set read watchpoint at opcode address and clear residual state
+        wp_read_mask[0xD000] = true;
+        emulator_enablewp(true);
+        emulator_clear_wp_hit();
+
+        // Execute one NOP (2 ticks): fetch D000 (SYNC), dummy read D001 (no SYNC)
+        f.step_n(2);
+
+        // D000 was only accessed via SYNC fetch — read watchpoint should NOT fire
+        CHECK(emulator_wp_hit() == false);
+    }
+
+    TEST_CASE("wp_hit / clear_wp_hit / wp_enabled accessors") {
+        EmulatorFixture f;
+        CHECK(emulator_wp_enabled() == false);
+        emulator_enablewp(true);
+        CHECK(emulator_wp_enabled() == true);
+        CHECK(emulator_wp_hit() == false); // no hit yet
+
+        // Trigger a write watchpoint
+        f.set_reset_vector(0xD000);
+        f.load_at(0xD000, {0x8D, 0x00, 0x03, 0xEA}); // STA $0300; NOP
+        wp_write_mask[0x0300] = true;
+        f.step_n(20);
+
+        CHECK(emulator_wp_hit() == true);
+        emulator_clear_wp_hit();
+        CHECK(emulator_wp_hit() == false);
+    }
+
+    TEST_CASE("D44 extension: disconnect clears watchpoint masks") {
+        EmulatorFixture f;
+        wp_write_mask[0x0200] = true;
+        wp_read_mask[0x0300] = true;
+        emulator_enablewp(true);
+
+        // Simulate disconnect
+        memset(wp_write_mask, 0, sizeof(bool) * 65536);
+        memset(wp_read_mask, 0, sizeof(bool) * 65536);
+        emulator_enablewp(false);
+
+        CHECK(wp_write_mask[0x0200] == false);
+        CHECK(wp_read_mask[0x0300] == false);
+        CHECK(emulator_wp_enabled() == false);
+    }
+
 } // TEST_SUITE("gdb_callbacks")

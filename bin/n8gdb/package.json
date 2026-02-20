@@ -1,0 +1,12 @@
+{
+  "name": "n8gdb",
+  "version": "1.0.0",
+  "description": "GDB RSP client for N8machine 6502 emulator",
+  "type": "module",
+  "bin": {
+    "n8gdb": "./n8gdb.mjs"
+  },
+  "scripts": {
+    "test": "node test.mjs"
+  }
+}
