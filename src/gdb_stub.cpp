@@ -848,9 +848,10 @@ static void tcp_thread_func(int port) {
                                 std::unique_lock<std::mutex> lk(resp_mutex);
                                 bool got = resp_cv.wait_for(lk,
                                     std::chrono::milliseconds(500),
-                                    []{ return !resp_queue.empty(); });
+                                    []{ return !resp_queue.empty() || gdb_shutdown.load(); });
 
                                 if (got) {
+                                    if (gdb_shutdown.load()) break;
                                     std::string resp = resp_queue.front();
                                     resp_queue.pop();
                                     lk.unlock();
@@ -932,6 +933,7 @@ void gdb_stub_init(const gdb_stub_callbacks_t* callbacks, const gdb_stub_config_
 
 void gdb_stub_shutdown(void) {
     gdb_shutdown.store(true);
+    resp_cv.notify_all();
     if (tcp_thread_ptr) {
         if (server_fd >= 0) ::shutdown(server_fd, SHUT_RDWR);
         tcp_thread_ptr->join();

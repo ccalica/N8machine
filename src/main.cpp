@@ -326,12 +326,7 @@ int main(int, char**)
                     }
                     break;
                 }
-                if (gdb_interrupt_requested()) {
-                    run_emulator = false;
-                    gdb_halted = true;
-                    gdb_stub_notify_stop(2);
-                    break;
-                }
+
             }
         } else if (step_emulator && !gdb_halted) {
             emulator_step();
