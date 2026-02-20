@@ -501,8 +501,8 @@ static std::string handle_v(const char* data) {
             while (*rest && *rest != ';') rest++; // skip thread-id
             if (*rest == ';') rest++; // skip action separator
         }
-        if (action == 'c') return handle_continue(rest);
-        if (action == 's') return handle_step(rest);
+        if (action == 'c') return handle_continue("");
+        if (action == 's') return handle_step("");
         if (action == 't') {
             halted = true;
             last_stop_signal = 2;
