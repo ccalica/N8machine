@@ -110,6 +110,10 @@ static void gdb_set_breakpoint(uint16_t addr) {
 
 static void gdb_clear_breakpoint(uint16_t addr) {
     bp_mask[addr] = false;
+    // Disable BP scanning if no breakpoints remain
+    bool any = false;
+    for (int i = 0; i < 65536 && !any; i++) any = bp_mask[i];
+    if (!any) { bp_enable = false; emulator_enablebp(false); }
 }
 
 static void gdb_continue_exec(void) {

@@ -629,7 +629,7 @@ static std::atomic<bool> gdb_shutdown{false};
 static std::atomic<bool> interrupt_requested_flag{false};
 static std::atomic<bool> client_connected_flag{false};
 static std::atomic<bool> tcp_noack_mode{false};
-static int server_fd = -1;
+static std::atomic<int> server_fd{-1};
 
 // Sentinels (octal \001 prefix distinguishes from GDB packets)
 static const std::string SENT_CONNECT    = "\001CONNECT";
@@ -751,8 +751,12 @@ static void tcp_thread_func(int port) {
                             esc = false;
                         } else if (byte == 0x03) {
                             interrupt_requested_flag.store(true);
-                            std::lock_guard<std::mutex> lk(cmd_mutex);
-                            cmd_queue.push(SENT_INTERRUPT);
+                            {
+                                std::lock_guard<std::mutex> lk(cmd_mutex);
+                                cmd_queue.push(SENT_INTERRUPT);
+                            }
+                            // Enter async wait so recv timeout picks up the stop reply
+                            waiting_async = true;
                         }
                         break;
 
@@ -763,6 +767,13 @@ static void tcp_thread_func(int port) {
                             fstate = CKSUM1; rcksum = 0;
                         } else if (byte == '}' && !esc) {
                             ccksum += byte; esc = true;
+                        } else if (pktbuf.size() >= 20000) {
+                            // PacketSize exceeded — discard
+                            fstate = IDLE;
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
                         } else {
                             ccksum += byte;
                             pktbuf += esc ? (char)(byte ^ 0x20) : (char)byte;
@@ -772,14 +783,30 @@ static void tcp_thread_func(int port) {
 
                     case CKSUM1: {
                         int h = hex_char_val((char)byte);
-                        if (h >= 0) rcksum = (uint8_t)(h << 4);
+                        if (h < 0) {
+                            fstate = IDLE;
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
+                            break;
+                        }
+                        rcksum = (uint8_t)(h << 4);
                         fstate = CKSUM2;
                         break;
                     }
 
                     case CKSUM2: {
                         int h = hex_char_val((char)byte);
-                        if (h >= 0) rcksum |= (uint8_t)h;
+                        if (h < 0) {
+                            fstate = IDLE;
+                            if (!tcp_noack_mode.load()) {
+                                char nak = '-';
+                                send(local_client_fd, &nak, 1, MSG_NOSIGNAL);
+                            }
+                            break;
+                        }
+                        rcksum |= (uint8_t)h;
 
                         if (rcksum != ccksum) {
                             // Bad checksum — NAK
@@ -911,11 +938,9 @@ void gdb_stub_shutdown(void) {
 }
 
 gdb_poll_result_t gdb_stub_poll(void) {
-    if (!client_connected_flag.load()) return GDB_POLL_NONE;
-
     gdb_poll_result_t result = GDB_POLL_NONE;
 
-    // Drain command queue
+    // Drain command queue (unconditional — SENT_DISCONNECT may arrive after flag clears)
     std::queue<std::string> local_q;
     {
         std::lock_guard<std::mutex> lk(cmd_mutex);
