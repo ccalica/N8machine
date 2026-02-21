@@ -86,9 +86,9 @@ Rationale:
 3. **Monochrome amplifies symbol value.** Without color, distinct graphic characters are your only tool for visual distinction. 103 rich symbols > 59 symbols + 44 rarely-used mosaics.
 4. **Full mosaics available via charset switch.** Charset 1 ("Graphics Mode") trades lowercase letters for all 64 mosaics. Programs that need pseudo-pixel mode can opt in.
 
-## The 20 Characters in the Primary Charset
+## The 34 Block Characters in the Primary Charset
 
-Placed at $80-$9F (see `n8_charmap.md` for full details):
+Placed at $80-$9F and $FE-$FF (see `n8_charmap.md` for full details):
 
 ```
 $80  █  Full block
@@ -101,10 +101,13 @@ $8B  ▛  3/4 (no LR)      $8C  ▜  3/4 (no LL)
 $8D  ▙  3/4 (no UR)      $8E  ▟  3/4 (no UL)
 $8F  ░  Light shade
 $90  ▒  Medium shade      $91  ▓  Dark shade
-$92-$97  Third blocks (N8-specific, upper/lower/left/right 1/3 and 2/3)
+$92  Upper 1/3           $93  Lower 1/3
+$94  Left 1/3            $95  Right 1/3
+$96  Upper 2/3           $97  Lower 2/3
 $98-$9B  Diagonal triangles (◢◣◤◥)
 $9C-$9E  Diagonal lines (╱╲╳)
 $9F  ▬  Horizontal bar
+$FE  Left 2/3            $FF  Right 2/3
 ```
 
-Total: 32 block element characters (expanded from original 20 budget to include all quadrant combinations and diagonal elements).
+Total: 34 block element characters. All 8 third-block variants (horizontal and vertical, 1/3 and 2/3) provide full symmetric coverage.

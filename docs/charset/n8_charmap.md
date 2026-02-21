@@ -5,7 +5,8 @@ Date: 2026-02-21
 
 ## Design Principles
 
-- All 256 entries are displayable glyphs (no control codes)
+- 255 entries are displayable glyphs (no control codes)
+- $00 is reserved as null — renders as blank (not displayed). Uninitialized framebuffer ($00-filled) shows empty screen.
 - All 256 entries are visually distinct (no duplicates)
 - No inverse bit — inverse video handled separately by the display hardware
 - Standard printable ASCII at $20-$7E (95 chars, fixed)
@@ -15,7 +16,8 @@ Date: 2026-02-21
 
 | Range     | Count | Purpose                                       |
 |-----------|-------|-----------------------------------------------|
-| $00-$1F   | 32    | High-priority graphic chars (arrows, bullets, common symbols, check/X) |
+| $00       | 1     | NULL (not displayed, renders blank)    |
+| $01-$1F   | 31    | High-priority graphic chars (arrows, bullets, common symbols, check/X) |
 | $20-$7E   | 95    | Standard ASCII (fixed)                        |
 | $7F       | 1     | Reversed not sign (replaces DEL)              |
 | $80-$9F   | 32    | Block elements, mosaics, shading              |
@@ -31,18 +33,18 @@ Date: 2026-02-21
 
 | Code | Char | Unicode | Name                    | Category |
 |------|------|---------|-------------------------|----------|
-| $00  | ---  | (none)  | Null glyph / empty box  | SYMBOL   |
+| $00  |      | (none)  | **NULL — not displayed** (renders blank) | NULL |
 | $01  | ☺    | U+263A  | Smiley face             | SYMBOL   |
 | $02  | ●    | U+25CF  | Black circle (bullet)   | GEOM     |
 | $03  | ♥    | U+2665  | Black heart suit        | SUIT     |
 | $04  | ♦    | U+2666  | Black diamond suit      | SUIT     |
 | $05  | ♣    | U+2663  | Black club suit         | SUIT     |
 | $06  | ♠    | U+2660  | Black spade suit        | SUIT     |
-| $07  | •    | U+2022  | Bullet                  | GEOM     |
+| $07  | …    | U+2026  | Horizontal ellipsis     | SYMBOL   |
 | $08  | ✓    | U+2713  | Check mark              | SYMBOL   |
 | $09  | ✗    | U+2717  | Ballot X                | SYMBOL   |
 | $0A  | ★    | U+2605  | Black star              | GEOM     |
-| $0B  | ◆    | U+25C6  | Black diamond           | GEOM     |
+| $0B  | ß    | U+00DF  | Latin small sharp s (eszett) | INTL |
 | $0C  | ←    | U+2190  | Leftward arrow          | ARROW    |
 | $0D  | →    | U+2192  | Rightward arrow         | ARROW    |
 | $0E  | ↑    | U+2191  | Upward arrow            | ARROW    |
@@ -237,7 +239,7 @@ Date: 2026-02-21
 | $9E  | ╳    | U+2573  | Box drawings light diagonal cross | BLOCK |
 | $9F  | ▬    | U+25AC  | Black rectangle (horizontal bar) | BLOCK |
 
-Entries marked (N8) are N8-specific characters with no standard Unicode equivalent. The one-third and two-thirds blocks subdivide the 8x16 cell into horizontal or vertical thirds — a natural fit for the 16-row height (5+6+5 rows) but not part of any Unicode block.
+Entries marked (N8) are N8-specific characters with no standard Unicode equivalent. The one-third and two-thirds blocks subdivide the 8x16 cell into horizontal or vertical thirds — a natural fit for the 16-row height (5+6+5 rows) but not part of any Unicode block. The full set of 8 third-block characters ($92-$97 + $FE-$FF) provides symmetric coverage: upper/lower/left/right for both 1/3 and 2/3 fills.
 
 ## Row $Ax: Box Drawing — Single Line
 
@@ -380,15 +382,15 @@ Entries marked (N8) are N8-specific characters with no standard Unicode equivale
 | $F4  | ¤    | U+00A4  | Currency sign (generic)        | CURRENCY    |
 | $F5  | ⏻    | U+23FB  | Power symbol                   | ELECTRONICS |
 | $F6  | ⏚    | U+23DA  | Earth ground                   | ELECTRONICS |
-| $F7  | ⎍    | U+238D  | Monostable / pulse             | ELECTRONICS |
+| $F7  | ⚡   | U+26A1  | High voltage / lightning bolt  | ELECTRONICS |
 | $F8  | ⌖    | U+2316  | Crosshair / position indicator | ELECTRONICS |
 | $F9  | ⌘    | U+2318  | Command / place of interest    | ELECTRONICS |
 | $FA  | ©    | U+00A9  | Copyright sign                 | SYMBOL      |
 | $FB  | ®    | U+00AE  | Registered sign                | SYMBOL      |
 | $FC  | «    | U+00AB  | Left guillemet                 | DECORATIVE  |
 | $FD  | »    | U+00BB  | Right guillemet                | DECORATIVE  |
-| $FE  | ‹    | U+2039  | Single left guillemet          | DECORATIVE  |
-| $FF  | ›    | U+203A  | Single right guillemet         | DECORATIVE  |
+| $FE  | ---  | (N8)    | Left two-thirds block          | BLOCK       |
+| $FF  | ---  | (N8)    | Right two-thirds block         | BLOCK       |
 
 ---
 
@@ -396,7 +398,7 @@ Entries marked (N8) are N8-specific characters with no standard Unicode equivale
 
 ```
      _0   _1   _2   _3   _4   _5   _6   _7   _8   _9   _A   _B   _C   _D   _E   _F
-0_  null  ☺    ●    ♥    ♦    ♣    ♠    •    ✓    ✗    ★    ◆    ←    →    ↑    ↓
+0_  NULL  ☺    ●    ♥    ♦    ♣    ♠    …    ✓    ✗    ★    ß    ←    →    ↑    ↓
 1_   ↵    ⇐    ⇒    ⇑    ⇓    ▶    ◀    ▲    ▼    ↔    ↕    ⌂    ♪    ♫    §    ¶
 2_  SPC   !    "    #    $    %    &    '    (    )    *    +    ,    -    .    /
 3_   0    1    2    3    4    5    6    7    8    9    :    ;    <    =    >    ?
@@ -411,7 +413,7 @@ B_   ┛    ┣    ┫    ┳    ┻    ╋    ╭    ╮    ╰    ╯    ╌  
 C_   À    Á    Ä    Ç    É    Ñ    Ö    Ü    à    á    ä    ç    é    ñ    ö    ü
 D_   ○    ◎    □    ■    △    ▷    ▽    ◁    ◇    ☆    ⚀    ⚁    ⚂    ⚃    ⚄    ⚅
 E_   ±    ×    ÷    ≠    ≤    ≥    ≈    °    ∞    √    π    Σ    σ    μ    Ω    δ
-F_   ¢    £    ¥    €    ¤    ⏻    ⏚    ⎍    ⌖    ⌘    ©    ®    «    »    ‹    ›
+F_   ¢    £    ¥    €    ¤    ⏻    ⏚    ⚡   ⌖    ⌘    ©    ®    «    »    ⅔←  ⅔→
 ```
 
 ---
@@ -421,17 +423,18 @@ F_   ¢    £    ¥    €    ¤    ⏻    ⏚    ⎍    ⌖    ⌘    ©    ® 
 | Category    | Code                | Count | Description                                |
 |-------------|---------------------|-------|--------------------------------------------|
 | ASCII       | $20-$7E             | 95    | Standard printable ASCII                   |
-| ARROW       | $0C-$0F, $10-$1A   | 19    | Cardinal, double, triangular, bidirectional|
-| BLOCK       | $80-$9F             | 32    | Full/half/quarter blocks, shading, thirds, diagonals |
+| ARROW       | $0C-$1A             | 15    | Cardinal, double, triangular, bidirectional|
+| BLOCK       | $80-$9F, $FE-$FF    | 34    | Full/half/quarter blocks, shading, thirds, diagonals |
 | BOX         | $A0-$BD             | 30    | Single-line, heavy-line, rounded, dashed   |
-| INTL        | $BE-$CF             | 18    | Accented/international characters          |
-| GEOM        | $02, $07, $0A-$0B, $D0-$D9 | 14 | Circles, squares, triangles, diamonds, stars |
+| INTL        | $0B, $BE-$CF        | 19    | Accented/international characters + eszett |
+| GEOM        | $02, $0A, $D0-$D9   | 12    | Circles, squares, triangles, diamonds, stars |
 | SUIT        | $03-$06, $DA-$DF    | 10    | Card suits + dice faces                    |
 | MATH        | $E0-$EF             | 16    | Math operators, Greek letters              |
-| SYMBOL      | $00-$01, $08-$09, $1B-$1F, $7F, $FA-$FB | 12 | Smiley, check/X, musical, section, etc. |
+| NULL        | $00                 | 1     | Not displayed (renders blank)              |
+| SYMBOL      | $01, $07-$09, $1B-$1F, $7F, $FA-$FB | 12 | Smiley, ellipsis, check/X, musical, section, etc. |
 | CURRENCY    | $F0-$F4             | 5     | Cent, pound, yen, euro, generic            |
 | ELECTRONICS | $F5-$F9             | 5     | Power, ground, pulse, crosshair, command   |
-| DECORATIVE  | $FC-$FF             | 4     | Guillemets (double and single)             |
+| DECORATIVE  | $FC-$FD             | 2     | Guillemets (double only)                   |
 | **TOTAL**   |                     | **256** |                                          |
 
 ---
@@ -440,29 +443,32 @@ F_   ¢    £    ¥    €    ¤    ⏻    ⏚    ⎍    ⌖    ⌘    ©    ® 
 
 | Category       | Budget | Final | Delta | Notes                                    |
 |----------------|--------|-------|-------|------------------------------------------|
+| NULL           | 1      | 1     | 0     | $00 renders blank                        |
 | ASCII          | 95     | 95    | 0     | Fixed, $20-$7E                           |
-| Arrows         | ~16    | 19    | +3    | Added return, bidirectional arrows        |
-| Block/Mosaic   | ~20    | 32    | +12   | Full quadrant set, thirds, diagonals, bar|
+| Arrows         | ~16    | 15    | -1    | Cardinal, double, triangular, bidirectional|
+| Block/Mosaic   | ~20    | 34    | +14   | Full quadrant set, thirds, diagonals, bar|
 | Box Drawing    | ~22    | 30    | +8    | Added rounded corners + dashed variants  |
-| International  | ~16    | 18    | +2    | 8 uppercase + 8 lowercase + inverted punctuation |
-| Geometric      | ~14    | 14    | 0     | On target                                |
+| International  | ~16    | 19    | +3    | 8+8 accented + inverted punctuation + ß  |
+| Geometric      | ~14    | 12    | -2    | Circles, squares, triangles, stars       |
 | Card Suits+Dice| ~10    | 10    | 0     | On target                                |
 | Math/Greek     | ~16    | 16    | 0     | On target                                |
 | Symbols        | ~18    | 12    | -6    | Trimmed — moved house to $1B, consolidated |
 | Currency       | ~5     | 5     | 0     | On target                                |
 | Electronics    | ~8     | 5     | -3    | Trimmed to most recognizable at 8x16     |
-| Decorative     | ~8     | 4     | -4    | Guillemets only — best use of pixels     |
-| Reserve/Spare  | ~4     | 0     | -4    | All slots filled — no waste              |
+| Decorative     | ~8     | 2     | -6    | Double guillemets only                   |
 | **TOTAL**      | **256**| **256** | **0** |                                        |
 
 ---
 
 ## Design Rationale
 
-### $00-$1F Placement
-The first 32 positions hold the most frequently needed graphic characters:
+### $00 NULL
+$00 is not displayed — it renders as blank (identical appearance to $20 space, but semantically distinct). This is critical for hardware: uninitialized RAM is $00, so a freshly powered framebuffer shows a clean empty screen without firmware needing to clear it first. $00 is the only non-displayable entry in the charset.
+
+### $01-$1F Placement
+The first 31 graphic positions hold the most frequently needed graphic characters:
 - **$03-$06**: Card suits grouped together (classic game programming pattern)
-- **$07-$09**: Bullet, check, X — the three most common list/status markers
+- **$07-$09**: Ellipsis, check, X — common list/status markers
 - **$0C-$0F**: Cardinal arrows — the most common directional indicators
 - **$15-$18**: Triangular arrows — useful as menu pointers, media controls
 - **$1B**: House symbol — useful "home" indicator, nod to CP437 tradition
@@ -483,5 +489,8 @@ Focused on the most commonly needed Western European accented characters. The se
 ### $7F
 The reversed not sign (⌐) was chosen over the more traditional DEL-replacement candidates. It pairs with the standard not sign (¬, absent but similar to ~ at $7E), and is useful in logic displays. The house symbol was moved to $1B where it's more accessible.
 
+### $0B Eszett
+ß is placed in the $0x high-priority range rather than the $Cx international block because German text uses it frequently and it deserves a low code point for easy access. This slot was freed by removing black diamond (◆), which was a near-duplicate of the diamond suit (♦ at $04).
+
 ### Electronics Characters ($F5-$F9)
-Trimmed from the original 8 to the 5 most recognizable at 8x16 resolution. Power symbol, ground, pulse waveform, crosshair, and the command/place-of-interest symbol. The ohm symbol is redundant with Greek omega (Ω at $EE). The antenna symbol was cut as it's too similar to an arrow at low resolution.
+Trimmed from the original 8 to the 5 most recognizable at 8x16 resolution. Power symbol, ground, lightning bolt, crosshair, and the command/place-of-interest symbol. The ohm symbol is redundant with Greek omega (Ω at $EE). The antenna symbol was cut as it's too similar to an arrow at low resolution.

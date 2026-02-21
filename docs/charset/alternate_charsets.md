@@ -22,7 +22,7 @@ The standard charset defined in `n8_charmap.md`. Balanced mix of arrows, blocks,
 | Range | Primary | Charset 1 |
 |-------|---------|-----------|
 | $61-$7A | Lowercase a-z (26) | **Uppercase A-Z duplicate** (same glyphs as $41-$5A) |
-| $80-$BF | Blocks (32) + Box (30) + ¡¿ (2) | **Full 64 mosaics** ($80-$BF) |
+| $80-$BF | Blocks (34) + Box (30) + ¡¿ (2) less $FE-$FF | **Full 64 mosaics** ($80-$BF) |
 | $C0-$CF | International (16) | **Box drawing (30)** starts at $C0 |
 | $D0-$D5 | Geometric (6) | **Box drawing (cont'd)** |
 | $D6-$D9 | Geometric (4) | **¡¿ + blocks leftover (4)** |
@@ -78,9 +78,9 @@ Pixel geometry: 4px wide columns, 5-6-5 pixel high rows in the 8x16 cell.
 
 | Range | Primary | Charset 2 |
 |-------|---------|-----------|
-| $00-$06 | Smiley, bullet, suits (7) | **Additional accented: Â Ê Î Ô Û â ê** |
-| $07-$09 | Bullet, check, X (3) | **î ô û** |
-| $0A-$0B | Star, diamond (2) | **ß ð** |
+| $00-$06 | NULL, smiley, circle, suits (7) | **Additional accented: Â Ê Î Ô Û â ê** |
+| $07-$09 | Ellipsis, check, X (3) | **î ô û** |
+| $0A-$0B | Star, eszett (2) | **è ð** |
 | $D0-$D9 | Geometric + dice (16) | **Typographic: — – ' ' " " … ™ + 8 more accented** |
 | $DA-$DF | Dice (6) | **Nordic: Å å Æ æ Ø ø** |
 | $F5-$F9 | Electronics (5) | **More accented: Ã ã Õ õ Ú** |
@@ -88,7 +88,7 @@ Pixel geometry: 4px wide columns, 5-6-5 pixel high rows in the 8x16 cell.
 
 ### Total International Coverage
 
-- Primary charset: 18 international chars (Spanish, French, German, Portuguese basics)
+- Primary charset: 19 international chars (Spanish, French, German incl. ß, Portuguese basics)
 - Charset 2: ~55 international chars (adds complete French, Nordic, additional Portuguese/Italian)
 
 ### Languages Fully Supported
