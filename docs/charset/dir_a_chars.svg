@@ -1,0 +1,1148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <title>Direction A: "Commodore Heritage" — Character Grid</title>
+  <defs>
+    <style>
+      .bg { fill: #1a1a2e; }
+      .px { fill: #33ff33; }
+      .title { fill: #33ff33; font-family: monospace; font-size: 18px; }
+      .label { fill: #1a8a1a; font-family: monospace; font-size: 11px; }
+      .subtitle { fill: #22aa22; font-family: monospace; font-size: 13px; }
+    </style>
+  </defs>
+  <rect class="bg" width="1400" height="900"/>
+  <text class="title" x="20" y="30">Direction A: "Commodore Heritage" — Rounded, Organic, PETSCII-Inspired</text>
+  <text class="subtitle" x="20" y="50">8×16 pixel characters · 4× zoom · Soft edges, 1px rounded corners where possible</text>
+
+  <!-- Each character is 32x64 screen pixels (8x16 at 4x zoom) -->
+  <!-- Grid: 8 chars per row, with 8px gap, labels below -->
+  <!-- Row spacing: 64 + 20 (label) + 10 (gap) = 94 -->
+
+  <!-- =================================================================== -->
+  <!-- ROW 1: Letters uppercase A B C M W + lowercase a b c                -->
+  <!-- =================================================================== -->
+
+  <!-- Letter A - Commodore style with rounded top -->
+  <g transform="translate(20,70)">
+    <!-- A: rounded peak, open crossbar feel -->
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="24" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="0"  y="36" width="4" height="4"/>
+    <rect class="px" x="24" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">A</text>
+  </g>
+
+  <!-- Letter B - rounded bumps -->
+  <g transform="translate(60,70)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="0"  width="4" height="4"/>
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="0"  y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="24" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="0"  y="36" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <rect class="px" x="0"  y="40" width="4" height="4"/>
+    <rect class="px" x="4"  y="40" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <text class="label" x="4" y="78">B</text>
+  </g>
+
+  <!-- Letter C - rounded opening -->
+  <g transform="translate(100,70)">
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <text class="label" x="4" y="78">C</text>
+  </g>
+
+  <!-- Letter M - wide with rounded serifs -->
+  <g transform="translate(140,70)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="28" y="0"  width="4" height="4"/>
+    <rect class="px" x="0"  y="4"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="24" y="4"  width="4" height="4"/>
+    <rect class="px" x="28" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="20" y="8"  width="4" height="4"/>
+    <rect class="px" x="28" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="28" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="28" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="28" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="28" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="28" y="32" width="4" height="4"/>
+    <rect class="px" x="0"  y="36" width="4" height="4"/>
+    <rect class="px" x="28" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">M</text>
+  </g>
+
+  <!-- Letter W -->
+  <g transform="translate(180,70)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="28" y="0"  width="4" height="4"/>
+    <rect class="px" x="0"  y="4"  width="4" height="4"/>
+    <rect class="px" x="28" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="28" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="28" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="28" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="28" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="28" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="24" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">W</text>
+  </g>
+
+  <!-- lowercase a - rounded -->
+  <g transform="translate(240,70)">
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">a</text>
+  </g>
+
+  <!-- lowercase b -->
+  <g transform="translate(280,70)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="0"  y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="0"  y="36" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">b</text>
+  </g>
+
+  <!-- lowercase c -->
+  <g transform="translate(320,70)">
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">c</text>
+  </g>
+
+  <!-- =================================================================== -->
+  <!-- ROW 2: m w 0 1 8 + box ┌ ─ ┐                                       -->
+  <!-- =================================================================== -->
+
+  <!-- lowercase m -->
+  <g transform="translate(20,164)">
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="28" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="28" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="28" y="32" width="4" height="4"/>
+    <rect class="px" x="0"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="28" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">m</text>
+  </g>
+
+  <!-- lowercase w -->
+  <g transform="translate(60,164)">
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="28" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="28" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="28" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="24" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">w</text>
+  </g>
+
+  <!-- Number 0 - rounded oval -->
+  <g transform="translate(120,164)">
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="24" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <text class="label" x="4" y="78">0</text>
+  </g>
+
+  <!-- Number 1 -->
+  <g transform="translate(160,164)">
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="4"  y="40" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <rect class="px" x="20" y="40" width="4" height="4"/>
+    <text class="label" x="4" y="78">1</text>
+  </g>
+
+  <!-- Number 8 - rounded double loop -->
+  <g transform="translate(200,164)">
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="24" y="12" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <text class="label" x="4" y="78">8</text>
+  </g>
+
+  <!-- Box ┌ rounded corner -->
+  <g transform="translate(260,164)">
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="28" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="28" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="48" width="4" height="4"/>
+    <rect class="px" x="12" y="52" width="4" height="4"/>
+    <rect class="px" x="12" y="56" width="4" height="4"/>
+    <rect class="px" x="12" y="60" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x250C; rnd</text>
+  </g>
+
+  <!-- Box ─ horizontal -->
+  <g transform="translate(310,164)">
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x2500;</text>
+  </g>
+
+  <!-- Box ┐ rounded corner -->
+  <g transform="translate(350,164)">
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="44" width="4" height="4"/>
+    <rect class="px" x="16" y="48" width="4" height="4"/>
+    <rect class="px" x="16" y="52" width="4" height="4"/>
+    <rect class="px" x="16" y="56" width="4" height="4"/>
+    <rect class="px" x="16" y="60" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2510; rnd</text>
+  </g>
+
+  <!-- =================================================================== -->
+  <!-- ROW 3: │ └ ┘ ├ ┤ + heavy ┃ ━                                       -->
+  <!-- =================================================================== -->
+
+  <!-- Box │ vertical -->
+  <g transform="translate(20,258)">
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="48" width="4" height="4"/>
+    <rect class="px" x="12" y="52" width="4" height="4"/>
+    <rect class="px" x="12" y="56" width="4" height="4"/>
+    <rect class="px" x="12" y="60" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x2502;</text>
+  </g>
+
+  <!-- Box └ rounded -->
+  <g transform="translate(60,258)">
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2514; rnd</text>
+  </g>
+
+  <!-- Box ┘ rounded -->
+  <g transform="translate(110,258)">
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="4"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2518; rnd</text>
+  </g>
+
+  <!-- Box ├ tee -->
+  <g transform="translate(160,258)">
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="48" width="4" height="4"/>
+    <rect class="px" x="12" y="52" width="4" height="4"/>
+    <rect class="px" x="12" y="56" width="4" height="4"/>
+    <rect class="px" x="12" y="60" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x251C;</text>
+  </g>
+
+  <!-- Box ┤ -->
+  <g transform="translate(200,258)">
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="4"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="44" width="4" height="4"/>
+    <rect class="px" x="16" y="48" width="4" height="4"/>
+    <rect class="px" x="16" y="52" width="4" height="4"/>
+    <rect class="px" x="16" y="56" width="4" height="4"/>
+    <rect class="px" x="16" y="60" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x2524;</text>
+  </g>
+
+  <!-- Heavy ┃ vertical -->
+  <g transform="translate(250,258)">
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="8"  y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="16" y="4"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="8"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <rect class="px" x="8"  y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="16" y="44" width="4" height="4"/>
+    <rect class="px" x="8"  y="48" width="4" height="4"/>
+    <rect class="px" x="12" y="48" width="4" height="4"/>
+    <rect class="px" x="16" y="48" width="4" height="4"/>
+    <rect class="px" x="8"  y="52" width="4" height="4"/>
+    <rect class="px" x="12" y="52" width="4" height="4"/>
+    <rect class="px" x="16" y="52" width="4" height="4"/>
+    <rect class="px" x="8"  y="56" width="4" height="4"/>
+    <rect class="px" x="12" y="56" width="4" height="4"/>
+    <rect class="px" x="16" y="56" width="4" height="4"/>
+    <rect class="px" x="8"  y="60" width="4" height="4"/>
+    <rect class="px" x="12" y="60" width="4" height="4"/>
+    <rect class="px" x="16" y="60" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2503; hvy</text>
+  </g>
+
+  <!-- Heavy ━ horizontal -->
+  <g transform="translate(300,258)">
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="28" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="28" y="32" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2501; hvy</text>
+  </g>
+
+  <!-- =================================================================== -->
+  <!-- ROW 4: Blocks and shading                                           -->
+  <!-- =================================================================== -->
+
+  <!-- Full block █ -->
+  <g transform="translate(20,352)">
+    <rect class="px" x="0" y="0" width="32" height="64"/>
+    <text class="label" x="0" y="78">&#x2588; full</text>
+  </g>
+
+  <!-- Upper half block ▀ -->
+  <g transform="translate(60,352)">
+    <rect class="px" x="0" y="0" width="32" height="32"/>
+    <text class="label" x="0" y="78">&#x2580; top</text>
+  </g>
+
+  <!-- Lower half block ▄ -->
+  <g transform="translate(100,352)">
+    <rect class="px" x="0" y="32" width="32" height="32"/>
+    <text class="label" x="0" y="78">&#x2584; btm</text>
+  </g>
+
+  <!-- Left half block ▌ -->
+  <g transform="translate(140,352)">
+    <rect class="px" x="0" y="0" width="16" height="64"/>
+    <text class="label" x="0" y="78">&#x258C; left</text>
+  </g>
+
+  <!-- Right half block ▐ -->
+  <g transform="translate(180,352)">
+    <rect class="px" x="16" y="0" width="16" height="64"/>
+    <text class="label" x="0" y="78">&#x2590; right</text>
+  </g>
+
+  <!-- Quarter block ▖ lower-left -->
+  <g transform="translate(220,352)">
+    <rect class="px" x="0" y="32" width="16" height="32"/>
+    <text class="label" x="0" y="78">&#x2596; qtr</text>
+  </g>
+
+  <!-- Light shade ░ -->
+  <g transform="translate(260,352)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="24" y="40" width="4" height="4"/>
+    <rect class="px" x="0"  y="48" width="4" height="4"/>
+    <rect class="px" x="16" y="48" width="4" height="4"/>
+    <rect class="px" x="8"  y="56" width="4" height="4"/>
+    <rect class="px" x="24" y="56" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2591; lite</text>
+  </g>
+
+  <!-- Medium shade ▒ -->
+  <g transform="translate(300,352)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="24" y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="28" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="28" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="28" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="0"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <rect class="px" x="28" y="36" width="4" height="4"/>
+    <rect class="px" x="0"  y="40" width="4" height="4"/>
+    <rect class="px" x="8"  y="40" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <rect class="px" x="24" y="40" width="4" height="4"/>
+    <rect class="px" x="4"  y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="20" y="44" width="4" height="4"/>
+    <rect class="px" x="28" y="44" width="4" height="4"/>
+    <rect class="px" x="0"  y="48" width="4" height="4"/>
+    <rect class="px" x="8"  y="48" width="4" height="4"/>
+    <rect class="px" x="16" y="48" width="4" height="4"/>
+    <rect class="px" x="24" y="48" width="4" height="4"/>
+    <rect class="px" x="4"  y="52" width="4" height="4"/>
+    <rect class="px" x="12" y="52" width="4" height="4"/>
+    <rect class="px" x="20" y="52" width="4" height="4"/>
+    <rect class="px" x="28" y="52" width="4" height="4"/>
+    <rect class="px" x="0"  y="56" width="4" height="4"/>
+    <rect class="px" x="8"  y="56" width="4" height="4"/>
+    <rect class="px" x="16" y="56" width="4" height="4"/>
+    <rect class="px" x="24" y="56" width="4" height="4"/>
+    <rect class="px" x="4"  y="60" width="4" height="4"/>
+    <rect class="px" x="12" y="60" width="4" height="4"/>
+    <rect class="px" x="20" y="60" width="4" height="4"/>
+    <rect class="px" x="28" y="60" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2592; med</text>
+  </g>
+
+  <!-- Dark shade ▓ -->
+  <g transform="translate(340,352)">
+    <rect class="px" x="0"  y="0"  width="4" height="4"/>
+    <rect class="px" x="4"  y="0"  width="4" height="4"/>
+    <rect class="px" x="8"  y="0"  width="4" height="4"/>
+    <rect class="px" x="12" y="0"  width="4" height="4"/>
+    <rect class="px" x="16" y="0"  width="4" height="4"/>
+    <rect class="px" x="20" y="0"  width="4" height="4"/>
+    <rect class="px" x="24" y="0"  width="4" height="4"/>
+    <rect class="px" x="28" y="0"  width="4" height="4"/>
+    <rect class="px" x="0"  y="4"  width="4" height="4"/>
+    <rect class="px" x="4"  y="4"  width="4" height="4"/>
+    <rect class="px" x="8"  y="4"  width="4" height="4"/>
+    <rect class="px" x="16" y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="4"  width="4" height="4"/>
+    <rect class="px" x="24" y="4"  width="4" height="4"/>
+    <rect class="px" x="28" y="4"  width="4" height="4"/>
+    <rect class="px" x="0"  y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="8"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="20" y="8"  width="4" height="4"/>
+    <rect class="px" x="24" y="8"  width="4" height="4"/>
+    <rect class="px" x="28" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="28" y="12" width="4" height="4"/>
+    <!-- Continue pattern for full height... abbreviated with rect fill -->
+    <rect class="px" x="0" y="16" width="32" height="4"/>
+    <rect class="px" x="0" y="20" width="12" height="4"/>
+    <rect class="px" x="16" y="20" width="16" height="4"/>
+    <rect class="px" x="0" y="24" width="32" height="4"/>
+    <rect class="px" x="0" y="28" width="12" height="4"/>
+    <rect class="px" x="16" y="28" width="16" height="4"/>
+    <rect class="px" x="0" y="32" width="32" height="4"/>
+    <rect class="px" x="0" y="36" width="12" height="4"/>
+    <rect class="px" x="16" y="36" width="16" height="4"/>
+    <rect class="px" x="0" y="40" width="32" height="4"/>
+    <rect class="px" x="0" y="44" width="12" height="4"/>
+    <rect class="px" x="16" y="44" width="16" height="4"/>
+    <rect class="px" x="0" y="48" width="32" height="4"/>
+    <rect class="px" x="0" y="52" width="12" height="4"/>
+    <rect class="px" x="16" y="52" width="16" height="4"/>
+    <rect class="px" x="0" y="56" width="32" height="4"/>
+    <rect class="px" x="0" y="60" width="12" height="4"/>
+    <rect class="px" x="16" y="60" width="16" height="4"/>
+    <text class="label" x="0" y="78">&#x2593; dark</text>
+  </g>
+
+  <!-- =================================================================== -->
+  <!-- ROW 5: Arrows, symbols, PETSCII-unique chars                        -->
+  <!-- =================================================================== -->
+
+  <!-- Arrow ← -->
+  <g transform="translate(20,446)">
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2190;</text>
+  </g>
+
+  <!-- Arrow → -->
+  <g transform="translate(60,446)">
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="28" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="40" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2192;</text>
+  </g>
+
+  <!-- Arrow ↑ -->
+  <g transform="translate(100,446)">
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="8"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="48" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x2191;</text>
+  </g>
+
+  <!-- Arrow ↓ -->
+  <g transform="translate(140,446)">
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="4"  y="40" width="4" height="4"/>
+    <rect class="px" x="12" y="40" width="4" height="4"/>
+    <rect class="px" x="20" y="40" width="4" height="4"/>
+    <rect class="px" x="8"  y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="44" width="4" height="4"/>
+    <rect class="px" x="16" y="44" width="4" height="4"/>
+    <rect class="px" x="12" y="48" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x2193;</text>
+  </g>
+
+  <!-- Bullet • (rounded) -->
+  <g transform="translate(190,446)">
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x2022;</text>
+  </g>
+
+  <!-- Degree ° -->
+  <g transform="translate(230,446)">
+    <rect class="px" x="8"  y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="4"  y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <text class="label" x="4" y="78">&#x00B0;</text>
+  </g>
+
+  <!-- PETSCII Heart ♥ (rounded, organic) -->
+  <g transform="translate(270,446)">
+    <rect class="px" x="4"  y="8"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="20" y="8"  width="4" height="4"/>
+    <rect class="px" x="0"  y="12" width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="24" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2665; heart</text>
+  </g>
+
+  <!-- PETSCII Spade ♠ -->
+  <g transform="translate(320,446)">
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x2660; spade</text>
+  </g>
+
+  <!-- PETSCII Circle ● (large, filled, organic) -->
+  <g transform="translate(380,446)">
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="0"  y="24" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="24" y="24" width="4" height="4"/>
+    <rect class="px" x="0"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="24" y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="32" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <rect class="px" x="16" y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x25CF; circ</text>
+  </g>
+
+  <!-- PETSCII-unique: Curved diagonal ╱ (unique to direction A) -->
+  <g transform="translate(440,446)">
+    <rect class="px" x="24" y="4"  width="4" height="4"/>
+    <rect class="px" x="20" y="8"  width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="4"  y="36" width="4" height="4"/>
+    <rect class="px" x="0"  y="40" width="4" height="4"/>
+    <text class="label" x="0" y="78">diag A</text>
+  </g>
+
+  <!-- PETSCII-unique: Rounded checker / ball pattern -->
+  <g transform="translate(500,446)">
+    <rect class="px" x="8"  y="4"  width="4" height="4"/>
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="16" y="4"  width="4" height="4"/>
+    <rect class="px" x="4"  y="8"  width="4" height="4"/>
+    <rect class="px" x="20" y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="4"  y="28" width="4" height="4"/>
+    <rect class="px" x="20" y="28" width="4" height="4"/>
+    <rect class="px" x="4"  y="32" width="4" height="4"/>
+    <rect class="px" x="20" y="32" width="4" height="4"/>
+    <rect class="px" x="8"  y="36" width="4" height="4"/>
+    <rect class="px" x="12" y="36" width="4" height="4"/>
+    <rect class="px" x="16" y="36" width="4" height="4"/>
+    <text class="label" x="0" y="78">ball A</text>
+  </g>
+
+  <!-- PETSCII-unique: Diamond ◆ -->
+  <g transform="translate(560,446)">
+    <rect class="px" x="12" y="4"  width="4" height="4"/>
+    <rect class="px" x="8"  y="8"  width="4" height="4"/>
+    <rect class="px" x="12" y="8"  width="4" height="4"/>
+    <rect class="px" x="16" y="8"  width="4" height="4"/>
+    <rect class="px" x="4"  y="12" width="4" height="4"/>
+    <rect class="px" x="8"  y="12" width="4" height="4"/>
+    <rect class="px" x="12" y="12" width="4" height="4"/>
+    <rect class="px" x="16" y="12" width="4" height="4"/>
+    <rect class="px" x="20" y="12" width="4" height="4"/>
+    <rect class="px" x="0"  y="16" width="4" height="4"/>
+    <rect class="px" x="4"  y="16" width="4" height="4"/>
+    <rect class="px" x="8"  y="16" width="4" height="4"/>
+    <rect class="px" x="12" y="16" width="4" height="4"/>
+    <rect class="px" x="16" y="16" width="4" height="4"/>
+    <rect class="px" x="20" y="16" width="4" height="4"/>
+    <rect class="px" x="24" y="16" width="4" height="4"/>
+    <rect class="px" x="0"  y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="20" width="4" height="4"/>
+    <rect class="px" x="8"  y="20" width="4" height="4"/>
+    <rect class="px" x="12" y="20" width="4" height="4"/>
+    <rect class="px" x="16" y="20" width="4" height="4"/>
+    <rect class="px" x="20" y="20" width="4" height="4"/>
+    <rect class="px" x="24" y="20" width="4" height="4"/>
+    <rect class="px" x="4"  y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="24" width="4" height="4"/>
+    <rect class="px" x="12" y="24" width="4" height="4"/>
+    <rect class="px" x="16" y="24" width="4" height="4"/>
+    <rect class="px" x="20" y="24" width="4" height="4"/>
+    <rect class="px" x="8"  y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="28" width="4" height="4"/>
+    <rect class="px" x="16" y="28" width="4" height="4"/>
+    <rect class="px" x="12" y="32" width="4" height="4"/>
+    <text class="label" x="0" y="78">&#x25C6; diam</text>
+  </g>
+
+  <!-- Note with annotations -->
+  <text class="subtitle" x="20" y="570">Key traits: Rounded box corners · Organic card suits · Smooth diagonals · Friendly, playful weight</text>
+  <text class="subtitle" x="20" y="590">Total unique characters shown: 40 (letters, digits, box drawing, blocks, shading, arrows, symbols, PETSCII specials)</text>
+</svg>

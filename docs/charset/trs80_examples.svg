@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 480" width="820" height="480">
+  <style>
+    text { font-family: monospace; fill: #e0e0e0; }
+    .title { font-size: 16px; font-weight: bold; }
+    .label { font-size: 13px; }
+    .code { font-size: 13px; fill: #77aaff; }
+    .calc { font-size: 11px; fill: #ffcc00; }
+    .small { font-size: 11px; fill: #999; }
+  </style>
+  <rect width="820" height="480" fill="#1a1a2e"/>
+
+  <text x="410" y="28" text-anchor="middle" class="title">Example Patterns and Their Character Codes</text>
+
+  <!-- Helper: each example is a 2x3 grid of 30x30 blocks with 4px gap -->
+  <!-- Pattern 1: Empty (128) -->
+  <g transform="translate(30, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Empty</text>
+    <rect x="0" y="10" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(128)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128 + 0</text>
+  </g>
+
+  <!-- Pattern 2: Top-left only (129) -->
+  <g transform="translate(130, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Top-left</text>
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(129)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128 + 1</text>
+  </g>
+
+  <!-- Pattern 3: Top row (131) -->
+  <g transform="translate(230, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Top row</text>
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(131)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128 + 1 + 2</text>
+  </g>
+
+  <!-- Pattern 4: Left column (149) -->
+  <g transform="translate(330, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Left col</text>
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(149)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128+1+4+16</text>
+  </g>
+
+  <!-- Pattern 5: Upper half (143) -->
+  <g transform="translate(430, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Upper half</text>
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(143)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128+1+2+4+8</text>
+  </g>
+
+  <!-- Pattern 6: Checkerboard A (153) -->
+  <g transform="translate(530, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Checker A</text>
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(153)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128+1+8+16</text>
+  </g>
+
+  <!-- Pattern 7: Checkerboard B (166) -->
+  <g transform="translate(630, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Checker B</text>
+    <rect x="0" y="10" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#222" stroke="#555" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(166)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128+2+4+32</text>
+  </g>
+
+  <!-- Pattern 8: Full block (191) -->
+  <g transform="translate(730, 50)">
+    <text x="34" y="0" text-anchor="middle" class="label">Full</text>
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="44" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="0" y="78" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <rect x="34" y="78" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1.5" rx="2"/>
+    <text x="34" y="125" text-anchor="middle" class="code">CHR$(191)</text>
+    <text x="34" y="140" text-anchor="middle" class="calc">128+1+2+4</text>
+    <text x="34" y="152" text-anchor="middle" class="calc">+8+16+32</text>
+  </g>
+
+  <!-- Second row: more complex / practical patterns -->
+  <text x="410" y="200" text-anchor="middle" class="title">Practical Compositions: Multiple Cells</text>
+
+  <!-- Horizontal bar (3 cells) -->
+  <g transform="translate(30, 220)">
+    <text x="100" y="0" text-anchor="middle" class="label">Horizontal bar (top third)</text>
+    <!-- Cell 1 -->
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="31" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="0" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="31" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="0" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="31" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <!-- Cell 2 -->
+    <rect x="66" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="97" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="66" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="97" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="66" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="97" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <!-- Cell 3 -->
+    <rect x="132" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="163" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="132" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="163" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="132" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="163" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <text x="100" y="120" text-anchor="middle" class="code">131  131  131</text>
+  </g>
+
+  <!-- Diagonal line (3 cells) -->
+  <g transform="translate(240, 220)">
+    <text x="100" y="0" text-anchor="middle" class="label">Diagonal line (3 cells)</text>
+    <!-- Cell 1: TL lit -->
+    <rect x="0" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="31" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="0" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="31" y="41" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="0" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="31" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <!-- Cell 2: BL lit -->
+    <rect x="66" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="97" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="66" y="41" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="97" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="66" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="97" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <!-- Cell 3: TL+MR lit -->
+    <rect x="132" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="163" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="132" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="163" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="132" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="163" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <text x="100" y="120" text-anchor="middle" class="code">137  148  144</text>
+    <text x="100" y="135" text-anchor="middle" class="calc">1+8  4+16  16</text>
+  </g>
+
+  <!-- Bar chart (4 cells showing different heights) -->
+  <g transform="translate(480, 220)">
+    <text x="130" y="0" text-anchor="middle" class="label">Vertical bar chart (4 bars, different heights)</text>
+    <!-- Bar 1: 1/6 height (just BL) -->
+    <rect x="0" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="31" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="0" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="31" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="0" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="31" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <!-- Bar 2: 3/6 height (ML+BL+BR) -->
+    <rect x="66" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="97" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="66" y="41" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="97" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="66" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="97" y="72" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <!-- Bar 3: 5/6 height (all but TR) -->
+    <rect x="132" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="163" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="132" y="41" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="163" y="41" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="132" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="163" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <!-- Bar 4: 6/6 height (full) -->
+    <rect x="198" y="10" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="229" y="10" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="198" y="41" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="229" y="41" width="30" height="30" fill="#222" stroke="#444" stroke-width="0.5" rx="1"/>
+    <rect x="198" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <rect x="229" y="72" width="30" height="30" fill="#33ff33" stroke="#33ff33" stroke-width="1" rx="1"/>
+    <text x="130" y="120" text-anchor="middle" class="code">144   148   189   181</text>
+    <text x="130" y="135" text-anchor="middle" class="calc">16  4+16  1+4+8+16+32  1+4+16+32</text>
+  </g>
+
+  <!-- Bottom note -->
+  <text x="410" y="410" text-anchor="middle" class="small">Each character cell is independent. SET(x,y) modifies one block without affecting its neighbors in the same cell.</text>
+  <text x="410" y="430" text-anchor="middle" class="small">Vertical bar charts get 6 height levels per cell row (one per block row x left/right).</text>
+  <text x="410" y="450" text-anchor="middle" class="small">With 16 rows of cells, a full-height bar chart has 48 discrete levels (16 rows x 3 block rows).</text>
+</svg>

@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 420" width="600" height="420">
+  <style>
+    text { font-family: monospace; fill: #e0e0e0; }
+    .title { font-size: 16px; font-weight: bold; }
+    .weight { font-size: 28px; font-weight: bold; }
+    .bit { font-size: 14px; }
+    .label { font-size: 14px; }
+    .small { font-size: 12px; fill: #999; }
+    .formula { font-size: 15px; fill: #ffcc00; }
+    .code { font-size: 14px; fill: #77aaff; }
+  </style>
+  <rect width="600" height="420" fill="#1a1a2e"/>
+
+  <!-- Title -->
+  <text x="300" y="30" text-anchor="middle" class="title">Bit Weight Encoding: Character Code = 128 + Sum of Weights</text>
+
+  <!-- 2x3 grid with weights -->
+  <g transform="translate(60, 55)">
+    <!-- Top row -->
+    <rect x="0" y="0" width="110" height="80" fill="#33ff33" fill-opacity="0.15" stroke="#33ff33" stroke-width="2.5" rx="4"/>
+    <rect x="120" y="0" width="110" height="80" fill="#33ff33" fill-opacity="0.15" stroke="#33ff33" stroke-width="2.5" rx="4"/>
+    <text x="55" y="40" text-anchor="middle" class="weight" fill="#33ff33">1</text>
+    <text x="55" y="62" text-anchor="middle" class="bit" fill="#88cc88">bit 0</text>
+    <text x="175" y="40" text-anchor="middle" class="weight" fill="#33ff33">2</text>
+    <text x="175" y="62" text-anchor="middle" class="bit" fill="#88cc88">bit 1</text>
+
+    <!-- Middle row -->
+    <rect x="0" y="90" width="110" height="80" fill="#ffaa00" fill-opacity="0.15" stroke="#ffaa00" stroke-width="2.5" rx="4"/>
+    <rect x="120" y="90" width="110" height="80" fill="#ffaa00" fill-opacity="0.15" stroke="#ffaa00" stroke-width="2.5" rx="4"/>
+    <text x="55" y="130" text-anchor="middle" class="weight" fill="#ffaa00">4</text>
+    <text x="55" y="152" text-anchor="middle" class="bit" fill="#cc9944">bit 2</text>
+    <text x="175" y="130" text-anchor="middle" class="weight" fill="#ffaa00">8</text>
+    <text x="175" y="152" text-anchor="middle" class="bit" fill="#cc9944">bit 3</text>
+
+    <!-- Bottom row -->
+    <rect x="0" y="180" width="110" height="80" fill="#ff5555" fill-opacity="0.15" stroke="#ff5555" stroke-width="2.5" rx="4"/>
+    <rect x="120" y="180" width="110" height="80" fill="#ff5555" fill-opacity="0.15" stroke="#ff5555" stroke-width="2.5" rx="4"/>
+    <text x="55" y="220" text-anchor="middle" class="weight" fill="#ff5555">16</text>
+    <text x="55" y="242" text-anchor="middle" class="bit" fill="#cc5555">bit 4</text>
+    <text x="175" y="220" text-anchor="middle" class="weight" fill="#ff5555">32</text>
+    <text x="175" y="242" text-anchor="middle" class="bit" fill="#cc5555">bit 5</text>
+
+    <!-- Row labels -->
+    <text x="-15" y="44" text-anchor="end" class="label">Top</text>
+    <text x="-15" y="134" text-anchor="end" class="label">Mid</text>
+    <text x="-15" y="224" text-anchor="end" class="label">Bot</text>
+
+    <!-- Col labels -->
+    <text x="55" y="-10" text-anchor="middle" class="label">Left</text>
+    <text x="175" y="-10" text-anchor="middle" class="label">Right</text>
+  </g>
+
+  <!-- Right side: byte format diagram -->
+  <g transform="translate(320, 100)">
+    <text x="120" y="-10" text-anchor="middle" class="label">Byte Format:</text>
+
+    <!-- 8 bit boxes -->
+    <rect x="0" y="10" width="30" height="30" fill="#555" stroke="#999" stroke-width="1.5"/>
+    <rect x="30" y="10" width="30" height="30" fill="#333" stroke="#999" stroke-width="1.5"/>
+    <rect x="60" y="10" width="30" height="30" fill="#ff5555" fill-opacity="0.3" stroke="#ff5555" stroke-width="1.5"/>
+    <rect x="90" y="10" width="30" height="30" fill="#ff5555" fill-opacity="0.3" stroke="#ff5555" stroke-width="1.5"/>
+    <rect x="120" y="10" width="30" height="30" fill="#ffaa00" fill-opacity="0.3" stroke="#ffaa00" stroke-width="1.5"/>
+    <rect x="150" y="10" width="30" height="30" fill="#ffaa00" fill-opacity="0.3" stroke="#ffaa00" stroke-width="1.5"/>
+    <rect x="180" y="10" width="30" height="30" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="1.5"/>
+    <rect x="210" y="10" width="30" height="30" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="1.5"/>
+
+    <!-- Bit values -->
+    <text x="15" y="31" text-anchor="middle" class="bit" fill="#fff">1</text>
+    <text x="45" y="31" text-anchor="middle" class="bit" fill="#888">x</text>
+    <text x="75" y="31" text-anchor="middle" class="bit" fill="#ff5555">b5</text>
+    <text x="105" y="31" text-anchor="middle" class="bit" fill="#ff5555">b4</text>
+    <text x="135" y="31" text-anchor="middle" class="bit" fill="#ffaa00">b3</text>
+    <text x="165" y="31" text-anchor="middle" class="bit" fill="#ffaa00">b2</text>
+    <text x="195" y="31" text-anchor="middle" class="bit" fill="#33ff33">b1</text>
+    <text x="225" y="31" text-anchor="middle" class="bit" fill="#33ff33">b0</text>
+
+    <!-- Bit position labels -->
+    <text x="15" y="56" text-anchor="middle" class="small">7</text>
+    <text x="45" y="56" text-anchor="middle" class="small">6</text>
+    <text x="75" y="56" text-anchor="middle" class="small">5</text>
+    <text x="105" y="56" text-anchor="middle" class="small">4</text>
+    <text x="135" y="56" text-anchor="middle" class="small">3</text>
+    <text x="165" y="56" text-anchor="middle" class="small">2</text>
+    <text x="195" y="56" text-anchor="middle" class="small">1</text>
+    <text x="225" y="56" text-anchor="middle" class="small">0</text>
+
+    <!-- Annotations below using angled leader lines -->
+    <line x1="15" y1="60" x2="15" y2="68" stroke="#999" stroke-width="1"/>
+    <line x1="15" y1="68" x2="-20" y2="82" stroke="#999" stroke-width="1"/>
+    <text x="-22" y="94" text-anchor="middle" class="small">always 1</text>
+    <text x="-22" y="106" text-anchor="middle" class="small">(semigfx)</text>
+
+    <line x1="45" y1="60" x2="45" y2="68" stroke="#999" stroke-width="1"/>
+    <line x1="45" y1="68" x2="70" y2="82" stroke="#999" stroke-width="1"/>
+    <text x="70" y="94" text-anchor="middle" class="small">unused</text>
+  </g>
+
+  <!-- Formula bar -->
+  <rect x="30" y="340" width="540" height="35" fill="#2a2a3e" stroke="#444" stroke-width="1" rx="5"/>
+  <text x="300" y="362" text-anchor="middle" class="formula">bit_weight = 2^(2 * row + col)  where row=0..2, col=0..1</text>
+
+  <!-- Bottom note -->
+  <text x="300" y="400" text-anchor="middle" class="small">Bit 7 = 1 flags the byte as semigraphic (not text). Bit 6 is unused. Bits 5-0 encode the pattern.</text>
+</svg>

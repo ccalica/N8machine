@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520">
+  <style>
+    text { font-family: monospace; fill: #e0e0e0; }
+    .title { font-size: 16px; font-weight: bold; }
+    .label { font-size: 13px; }
+    .small { font-size: 11px; fill: #999; }
+  </style>
+  <rect width="760" height="520" fill="#1a1a2e"/>
+
+  <text x="380" y="25" text-anchor="middle" class="title">What People Actually Drew at 128x48</text>
+
+  <!-- Example 1: Maze walls -->
+  <g transform="translate(20, 45)">
+    <text x="80" y="12" text-anchor="middle" class="label">Maze Game</text>
+    <!-- 10x10 grid of blocks forming a maze, each block 16x12 -->
+    <g transform="translate(0, 20)">
+      <!-- Walls (filled blocks) -->
+      <!-- Top wall -->
+      <rect x="0" y="0" width="160" height="12" fill="#33ff33" rx="1"/>
+      <!-- Left wall -->
+      <rect x="0" y="0" width="16" height="120" fill="#33ff33" rx="1"/>
+      <!-- Right wall -->
+      <rect x="144" y="0" width="16" height="120" fill="#33ff33" rx="1"/>
+      <!-- Bottom wall -->
+      <rect x="0" y="108" width="160" height="12" fill="#33ff33" rx="1"/>
+      <!-- Internal walls -->
+      <rect x="32" y="12" width="16" height="36" fill="#33ff33" rx="1"/>
+      <rect x="32" y="36" width="48" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="12" width="16" height="48" fill="#33ff33" rx="1"/>
+      <rect x="96" y="48" width="48" height="12" fill="#33ff33" rx="1"/>
+      <rect x="48" y="60" width="16" height="36" fill="#33ff33" rx="1"/>
+      <rect x="48" y="72" width="48" height="12" fill="#33ff33" rx="1"/>
+      <rect x="112" y="72" width="16" height="36" fill="#33ff33" rx="1"/>
+      <rect x="16" y="84" width="32" height="12" fill="#33ff33" rx="1"/>
+      <!-- Player dot -->
+      <rect x="19" y="16" width="10" height="8" fill="#ffcc00" rx="1"/>
+    </g>
+    <text x="80" y="160" text-anchor="middle" class="small">Walls and corridors from</text>
+    <text x="80" y="172" text-anchor="middle" class="small">SET/RESET commands</text>
+  </g>
+
+  <!-- Example 2: Bar chart -->
+  <g transform="translate(200, 45)">
+    <text x="90" y="12" text-anchor="middle" class="label">Bar Chart</text>
+    <g transform="translate(5, 20)">
+      <!-- Y axis -->
+      <rect x="10" y="0" width="2" height="120" fill="#33ff33"/>
+      <!-- X axis -->
+      <rect x="10" y="118" width="170" height="2" fill="#33ff33"/>
+
+      <!-- Bars (each bar is 2 squots wide = 1 char cell) -->
+      <!-- Bar 1: height 84 (7 block-rows) -->
+      <rect x="22" y="36" width="20" height="84" fill="#33ff33" fill-opacity="0.8" rx="1"/>
+      <!-- Bar 2: height 48 (4 block-rows) -->
+      <rect x="52" y="72" width="20" height="48" fill="#33ff33" fill-opacity="0.8" rx="1"/>
+      <!-- Bar 3: height 108 (9 block-rows) -->
+      <rect x="82" y="12" width="20" height="108" fill="#33ff33" fill-opacity="0.8" rx="1"/>
+      <!-- Bar 4: height 60 (5 block-rows) -->
+      <rect x="112" y="60" width="20" height="60" fill="#33ff33" fill-opacity="0.8" rx="1"/>
+      <!-- Bar 5: height 96 (8 block-rows) -->
+      <rect x="142" y="24" width="20" height="96" fill="#33ff33" fill-opacity="0.8" rx="1"/>
+
+      <!-- Y axis labels (crude) -->
+      <text x="6" y="6" text-anchor="end" class="small" fill="#33ff33">48</text>
+      <text x="6" y="64" text-anchor="end" class="small" fill="#33ff33">24</text>
+      <text x="6" y="118" text-anchor="end" class="small" fill="#33ff33">0</text>
+    </g>
+    <text x="90" y="160" text-anchor="middle" class="small">48 vertical levels gives</text>
+    <text x="90" y="172" text-anchor="middle" class="small">usable chart resolution</text>
+  </g>
+
+  <!-- Example 3: Bouncing ball animation frame -->
+  <g transform="translate(400, 45)">
+    <text x="80" y="12" text-anchor="middle" class="label">Bouncing Ball</text>
+    <g transform="translate(0, 20)">
+      <!-- Ground line -->
+      <rect x="0" y="108" width="160" height="4" fill="#33ff33" fill-opacity="0.5"/>
+      <!-- Ball (3x3 block crude circle) -->
+      <rect x="56" y="36" width="16" height="12" fill="#33ff33" rx="1"/>
+      <rect x="40" y="48" width="48" height="12" fill="#33ff33" rx="1"/>
+      <rect x="40" y="60" width="48" height="12" fill="#33ff33" rx="1"/>
+      <rect x="56" y="72" width="16" height="12" fill="#33ff33" rx="1"/>
+      <!-- Trajectory dots -->
+      <rect x="16" y="84" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+      <rect x="28" y="72" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+      <rect x="40" y="56" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+      <rect x="100" y="56" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+      <rect x="112" y="72" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+      <rect x="124" y="84" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+      <rect x="136" y="96" width="4" height="4" fill="#33ff33" fill-opacity="0.4"/>
+    </g>
+    <text x="80" y="160" text-anchor="middle" class="small">Simple animations with</text>
+    <text x="80" y="172" text-anchor="middle" class="small">SET/RESET in loops</text>
+  </g>
+
+  <!-- Example 4: Big text composed from blocks -->
+  <g transform="translate(580, 45)">
+    <text x="80" y="12" text-anchor="middle" class="label">Big Text</text>
+    <g transform="translate(0, 20)">
+      <!-- Letter "H" made from blocks (5x7 grid) -->
+      <rect x="8" y="12" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="8" y="24" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="8" y="36" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="8" y="48" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="8" y="60" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="8" y="72" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="8" y="84" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="20" y="48" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="32" y="48" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="12" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="24" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="36" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="48" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="60" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="72" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="44" y="84" width="12" height="12" fill="#33ff33" rx="1"/>
+
+      <!-- Letter "I" -->
+      <rect x="68" y="12" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="12" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="92" y="12" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="24" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="36" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="48" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="60" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="72" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="68" y="84" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="80" y="84" width="12" height="12" fill="#33ff33" rx="1"/>
+      <rect x="92" y="84" width="12" height="12" fill="#33ff33" rx="1"/>
+    </g>
+    <text x="80" y="130" text-anchor="middle" class="small">Large letters composed</text>
+    <text x="80" y="142" text-anchor="middle" class="small">from semigraphic blocks</text>
+    <text x="80" y="154" text-anchor="middle" class="small">(5x7 blocks per letter)</text>
+  </g>
+
+  <!-- Bottom section: BASIC code example -->
+  <g transform="translate(20, 230)">
+    <text x="360" y="0" text-anchor="middle" class="title">BASIC Programming Example</text>
+
+    <rect x="0" y="15" width="720" height="250" fill="#111" stroke="#33ff33" stroke-width="1.5" rx="6"/>
+
+    <text x="15" y="40" class="label" fill="#33ff33">10 REM *** DRAW A BOX USING SET ***</text>
+    <text x="15" y="60" class="label" fill="#33ff33">20 CLS</text>
+    <text x="15" y="80" class="label" fill="#33ff33">30 FOR X = 10 TO 50</text>
+    <text x="15" y="100" class="label" fill="#33ff33">40   SET(X, 10)            : REM top edge</text>
+    <text x="15" y="120" class="label" fill="#33ff33">50   SET(X, 30)            : REM bottom edge</text>
+    <text x="15" y="140" class="label" fill="#33ff33">60 NEXT X</text>
+    <text x="15" y="160" class="label" fill="#33ff33">70 FOR Y = 10 TO 30</text>
+    <text x="15" y="180" class="label" fill="#33ff33">80   SET(10, Y)            : REM left edge</text>
+    <text x="15" y="200" class="label" fill="#33ff33">90   SET(50, Y)            : REM right edge</text>
+    <text x="15" y="220" class="label" fill="#33ff33">100 NEXT Y</text>
+    <text x="15" y="245" class="small">Draws a rectangle from (10,10) to (50,30) — each SET call lights one block.</text>
+  </g>
+</svg>

@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 400" width="520" height="400">
+  <style>
+    text { font-family: monospace; fill: #e0e0e0; }
+    .title { font-size: 16px; font-weight: bold; }
+    .label { font-size: 14px; }
+    .small { font-size: 12px; fill: #999; }
+    .dim { font-size: 11px; fill: #77aaff; }
+  </style>
+  <rect width="520" height="400" fill="#1a1a2e"/>
+
+  <!-- Title -->
+  <text x="260" y="30" text-anchor="middle" class="title">TRS-80 Character Cell: 2x3 Block Grid</text>
+
+  <!-- Left: actual pixel grid (6x12) -->
+  <text x="100" y="60" text-anchor="middle" class="label">Physical Pixels (6x12)</text>
+
+  <!-- 6x12 pixel grid -->
+  <g transform="translate(40, 70)">
+    <!-- Grid lines -->
+    <rect x="0" y="0" width="120" height="240" fill="none" stroke="#444" stroke-width="1"/>
+    <!-- Pixel cells - 20px each -->
+    <!-- Row lines -->
+    <line x1="0" y1="0" x2="120" y2="0" stroke="#444" stroke-width="1"/>
+    <line x1="0" y1="20" x2="120" y2="20" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="40" x2="120" y2="40" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="60" x2="120" y2="60" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="80" x2="120" y2="80" stroke="#444" stroke-width="1"/>
+    <line x1="0" y1="100" x2="120" y2="100" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="120" x2="120" y2="120" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="140" x2="120" y2="140" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="160" x2="120" y2="160" stroke="#444" stroke-width="1"/>
+    <line x1="0" y1="180" x2="120" y2="180" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="200" x2="120" y2="200" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="220" x2="120" y2="220" stroke="#333" stroke-width="0.5"/>
+    <line x1="0" y1="240" x2="120" y2="240" stroke="#444" stroke-width="1"/>
+    <!-- Col lines -->
+    <line x1="0" y1="0" x2="0" y2="240" stroke="#444" stroke-width="1"/>
+    <line x1="20" y1="0" x2="20" y2="240" stroke="#333" stroke-width="0.5"/>
+    <line x1="40" y1="0" x2="40" y2="240" stroke="#333" stroke-width="0.5"/>
+    <line x1="60" y1="0" x2="60" y2="240" stroke="#444" stroke-width="1"/>
+    <line x1="80" y1="0" x2="80" y2="240" stroke="#333" stroke-width="0.5"/>
+    <line x1="100" y1="0" x2="100" y2="240" stroke="#333" stroke-width="0.5"/>
+    <line x1="120" y1="0" x2="120" y2="240" stroke="#444" stroke-width="1"/>
+
+    <!-- Block boundary overlays (thick lines showing 2x3 division) -->
+    <rect x="0" y="0" width="60" height="80" fill="none" stroke="#33ff33" stroke-width="2.5"/>
+    <rect x="60" y="0" width="60" height="80" fill="none" stroke="#33ff33" stroke-width="2.5"/>
+    <rect x="0" y="80" width="60" height="80" fill="none" stroke="#33ff33" stroke-width="2.5"/>
+    <rect x="60" y="80" width="60" height="80" fill="none" stroke="#33ff33" stroke-width="2.5"/>
+    <rect x="0" y="160" width="60" height="80" fill="none" stroke="#33ff33" stroke-width="2.5"/>
+    <rect x="60" y="160" width="60" height="80" fill="none" stroke="#33ff33" stroke-width="2.5"/>
+
+    <!-- Dimension labels -->
+    <text x="30" y="-8" text-anchor="middle" class="dim">3 px</text>
+    <text x="90" y="-8" text-anchor="middle" class="dim">3 px</text>
+    <text x="-8" y="44" text-anchor="middle" class="dim" transform="rotate(-90, -8, 44)">4 px</text>
+  </g>
+
+  <!-- Arrow between -->
+  <text x="260" y="200" text-anchor="middle" class="label" fill="#33ff33">===&gt;</text>
+
+  <!-- Right: logical 2x3 block grid -->
+  <text x="400" y="60" text-anchor="middle" class="label">Logical Block Grid (2x3)</text>
+
+  <g transform="translate(310, 70)">
+    <!-- 2 cols x 3 rows of blocks, each 80x75 -->
+    <!-- Top row -->
+    <rect x="0" y="0" width="80" height="75" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="2.5" rx="3"/>
+    <rect x="90" y="0" width="80" height="75" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="2.5" rx="3"/>
+    <text x="40" y="42" text-anchor="middle" class="label" fill="#33ff33">TL</text>
+    <text x="130" y="42" text-anchor="middle" class="label" fill="#33ff33">TR</text>
+
+    <!-- Middle row -->
+    <rect x="0" y="85" width="80" height="75" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="2.5" rx="3"/>
+    <rect x="90" y="85" width="80" height="75" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="2.5" rx="3"/>
+    <text x="40" y="127" text-anchor="middle" class="label" fill="#33ff33">ML</text>
+    <text x="130" y="127" text-anchor="middle" class="label" fill="#33ff33">MR</text>
+
+    <!-- Bottom row -->
+    <rect x="0" y="170" width="80" height="75" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="2.5" rx="3"/>
+    <rect x="90" y="170" width="80" height="75" fill="#33ff33" fill-opacity="0.3" stroke="#33ff33" stroke-width="2.5" rx="3"/>
+    <text x="40" y="212" text-anchor="middle" class="label" fill="#33ff33">BL</text>
+    <text x="130" y="212" text-anchor="middle" class="label" fill="#33ff33">BR</text>
+  </g>
+
+  <!-- Bottom caption -->
+  <text x="260" y="350" text-anchor="middle" class="small">Each character cell (6x12 pixels) is divided into 6 blocks.</text>
+  <text x="260" y="370" text-anchor="middle" class="small">Each block is independently ON or OFF. 2^6 = 64 possible patterns.</text>
+  <text x="260" y="390" text-anchor="middle" class="small">Model I: 3x4 px per block. Model III: 4x4 px per block (8x12 cell).</text>
+</svg>
