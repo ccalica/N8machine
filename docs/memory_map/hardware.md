@@ -5,17 +5,17 @@ Footnotes show current (pre-move) locations in the emulator.
 
 ## Device Register Map (`$D800–$DFFF`)
 
-| Base    | Device           | Registers Used | Notes                              |
-| -------:| ---------------- | --------------:| ---------------------------------- |
-| `$D800` | System / IRQ     | 1              | IRQ flags, system status           |
-| `$D820` | TTY              | 4              | Serial I/O                         |
-| `$D840` | Video Control    | 5              | Mode, Width, Height, Stride, Banks |
-| `$D860` | Keyboard         | 3              | ASCII + extended, IRQ, Phase 1     |
-| `$D880` | Math Coprocessor | TBD            | RPN stack window                   |
-| `$D8A0` | Storage          | TBD            |                                    |
-| `$D8C0` | MMU              | TBD            | PID register, bank select          |
-| `$D8E0` | TCP UART         | TBD            |                                    |
-| `$D900` | Sound            | TBD            | Maybe                              |
+| Base    | Device           | Registers Used | Notes                            |
+| -------:| ---------------- | --------------:| -------------------------------- |
+| `$D800` | System / IRQ     | 1              | IRQ flags, system status         |
+| `$D820` | TTY              | 4              | Serial I/O                       |
+| `$D840` | Video Control    | 8              | Mode, dimensions, cursor, scroll |
+| `$D860` | Keyboard         | 3              | ASCII + extended, IRQ, Phase 1   |
+| `$D880` | Math Coprocessor | TBD            | RPN stack window                 |
+| `$D8A0` | Storage          | TBD            |                                  |
+| `$D8C0` | MMU              | TBD            | PID register, bank select        |
+| `$D8E0` | TCP UART         | TBD            |                                  |
+| `$D900` | Sound            | TBD            | Maybe                            |
 
 ## System / IRQ — `$D800`
 
@@ -25,11 +25,12 @@ Footnotes show current (pre-move) locations in the emulator.
 
 **Bits:**
 
-| Bit | Source | Description                        |
-| ---:| ------ | ---------------------------------- |
-| 0   | —      | Reserved                           |
-| 1   | TTY    | Data available in TTY input buffer |
-| 2–7 | —      | Reserved                           |
+| Bit | Source   | Description                        |
+| ---:| -------- | ---------------------------------- |
+| 0   | —        | Reserved                           |
+| 1   | TTY      | Data available in TTY input buffer |
+| 2   | Keyboard | Keypress pending (DATA_AVAIL)      |
+| 3–7 | —        | Reserved                           |
 
 Cleared every CPU tick. Devices reassert their bits as needed.
 When non-zero, the IRQ line is pulled high.
@@ -58,30 +59,60 @@ and asserts IRQ bit 1 when data is available.
 | `$D841` | R/W | VID_WIDTH  | Display width (columns)                   |
 | `$D842` | R/W | VID_HEIGHT | Display height (rows)                     |
 | `$D843` | R/W | VID_STRIDE | Row stride                                |
-| `$D844` | R/W | VID_BANKS  | Video bank select                         |
+| `$D844` | W   | VID_OPER   | Scroll operation (write-once trigger)     |
+| `$D845` | R/W | VID_CURSOR | Cursor style and flash rate               |
+| `$D846` | R/W | VID_CURCOL | Cursor column (0-based)                   |
+| `$D847` | R/W | VID_CURROW | Cursor row (0-based)                      |
 
 **VID_MODE values:**
 
-| Value | Mode | Description |
-|------:|------|-------------|
+| Value | Mode         | Description                             |
+| -----:| ------------ | --------------------------------------- |
 | `$00` | Text Default | 80x25, 2000-byte framebuffer at `$C000` |
-| `$01` | Text Custom | User-defined width/height |
+| `$01` | Text Custom  | User-defined width/height (TBD)         |
 
 Writing VID_MODE auto-sets VID_WIDTH, VID_HEIGHT, and VID_STRIDE
 to the mode's defaults. VID_STRIDE defaults to same as VID_WIDTH.
+
+**VID_OPER values (write-only):**
+
+Write triggers an immediate one-time scroll. Register does not latch.
+
+| Value | Operation   |
+| -----:| ----------- |
+| `$00` | Scroll up   |
+| `$01` | Scroll down |
+| `$02` | Scroll left |
+| `$03` | Scroll right|
+
+**VID_CURSOR bits:**
+
+| Bits | Name  | Description                                          |
+| ----:| ----- | ---------------------------------------------------- |
+| 0–1  | MODE  | `00` = off, `01` = on (steady), `10` = flash, `11` = reserved |
+| 2    | SHAPE | `0` = underline, `1` = block                        |
+| 3–4  | RATE  | `00` = off, `01` = slow, `10` = medium, `11` = fast |
+| 5–7  | —     | Reserved                                             |
+
+**Reset state:** VID_MODE = `$00`, VID_WIDTH = 80, VID_HEIGHT = 25,
+VID_STRIDE = 80. VID_CURSOR = `$00` (cursor off). VID_CURCOL = 0,
+VID_CURROW = 0.
+
+**Font:** Baked into the emulator from `docs/charset/`. Swappable font
+ROM deferred to future work (likely via bank switching into a Dev Bank).
 
 ## Keyboard — `$D860` (Phase 1)
 
 8-byte block. Teensy 4.1 handles USB HID-to-ASCII conversion.
 Apple II-style: poll or IRQ, read data, acknowledge.
 
-| Address         | R/W | Name       | Description                                                 |
-| ---------------:| --- | ---------- | ----------------------------------------------------------- |
-| `$D860`         | R   | KBD_DATA   | Key code. `$00–$7F` = ASCII, `$80–$FF` = extended [^7]      |
-| `$D861`         | R   | KBD_STATUS | Flags + live modifier state (see bits below)                |
-| `$D861`         | W   | KBD_ACK    | Write any value: clears DATA_AVAIL, OVERFLOW, deasserts IRQ |
-| `$D862`         | R/W | KBD_CTRL   | Bit 0 = IRQ enable (default 0 = polling only)               |
-| `$D863`–`$D867` | —   | —          | Reserved (Phase 2)                                          |
+| Address         | R/W | Name       | Description                                                                             |
+| ---------------:| --- | ---------- | --------------------------------------------------------------------------------------- |
+| `$D860`         | R   | KBD_DATA   | Key code. `$00–$7F` = ASCII, `$80–$FF` = extended (see [keycodes.md](keycodes.md)) [^7] |
+| `$D861`         | R   | KBD_STATUS | Flags + live modifier state (see bits below)                                            |
+| `$D861`         | W   | KBD_ACK    | Write any value: clears DATA_AVAIL, OVERFLOW, deasserts IRQ                             |
+| `$D862`         | R/W | KBD_CTRL   | Bit 0 = IRQ enable (default 0 = polling only)                                           |
+| `$D863`–`$D867` | —   | —          | Reserved (Phase 2)                                                                      |
 
 **KBD_STATUS bits (read-only):**
 
@@ -101,13 +132,21 @@ regardless of DATA_AVAIL. On overflow, new key replaces previous
 
 ## Frame Buffer — `$C000–$CFFF`
 
-4 KB buffer for text/graphics display data. CPU reads/writes are
-intercepted by bus decode and routed to a separate backing store
-(not backed by main RAM).
+4 KB buffer. CPU reads/writes are intercepted by bus decode and routed
+to a separate backing store (not backed by main RAM).
+
+Each byte is a character index into the baked-in font. Monochrome.
+In Text Default mode (80x25), the first 2000 bytes (`$C000–$C7CF`)
+are active; remaining bytes are unused.
 
 | Address         | R/W | Name    | Description              |
 | ---------------:| --- | ------- | ------------------------ |
 | `$C000`–`$CFFF` | R/W | FB_DATA | 4 KB display buffer [^6] |
+
+## Open Issues
+
+- **Text Custom mode:** Width/height constraints, stride behavior,
+  and max framebuffer usage not yet defined.
 
 ## Footnotes — Current Locations
 
