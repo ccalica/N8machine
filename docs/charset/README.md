@@ -1,4 +1,4 @@
-# N8 Character Set — Design Research
+# N8 Character Set
 
 ## Overview
 
@@ -10,7 +10,36 @@ Custom 256-entry character set for the N8 6502 homebrew computer. 255 displayabl
 
 **Character cell:** 8x16 pixels
 
-## Documents
+**Status:** ✅ Font bitmaps complete, ready for emulator integration
+
+---
+
+## Font Files (Ready to Use)
+
+| File | Description |
+|------|-------------|
+| `n8_font.h` | C header — `uint8_t n8_font[256][16]` for emulator |
+| `n8_font.py` | Python dict — for tooling and scripts |
+| `n8_font_white.svg` | 16x16 grid preview (white phosphor) |
+| `n8_font_green.svg` | 16x16 grid preview (green phosphor) |
+| `n8_font_amber.svg` | 16x16 grid preview (amber phosphor) |
+
+**Generator:** `python3 gen_n8font.py` — regenerate all outputs
+
+**License:** CC0 Public Domain (ASCII based on [PCFace Modern DOS 8x16](https://github.com/susam/pcface))
+
+### Hybrid Aesthetic
+
+The font uses a **hybrid approach** combining three aesthetic directions:
+
+- **Box drawing:** Sharp corners (C) + rounded corners (A) + heavy lines (B)
+- **Geometric shapes:** Sharp angular precision (Direction B / Atari)
+- **Card suits:** Organic curves (Direction A / Commodore)
+- **Overall tone:** Utility-focused (C) with personality in decorative chars (A)
+
+---
+
+## Design Documents
 
 | File | Description |
 |------|-------------|
@@ -43,6 +72,20 @@ Custom 256-entry character set for the N8 6502 homebrew computer. 255 displayabl
 | File | Description |
 |------|-------------|
 | `lcd_mockup.svg` | Compact system status display for 640x128 monochrome LCD |
+
+### Hybrid Aesthetic Mockups
+
+| File | Description |
+|------|-------------|
+| `hybrid_chars_white.svg` | Character grid — hybrid style, white phosphor |
+| `hybrid_chars_green.svg` | Character grid — hybrid style, green phosphor |
+| `hybrid_chars_amber.svg` | Character grid — hybrid style, amber phosphor |
+| `hybrid_debugger_white.svg` | N8 debugger UI mockup, white phosphor |
+| `hybrid_debugger_green.svg` | N8 debugger UI mockup, green phosphor |
+| `hybrid_debugger_amber.svg` | N8 debugger UI mockup, amber phosphor |
+| `hybrid_game_white.svg` | Game menu mockup, white phosphor |
+| `hybrid_game_green.svg` | Game menu mockup, green phosphor |
+| `hybrid_game_amber.svg` | Game menu mockup, amber phosphor |
 
 **Note:** Screen mockups have minor rendering artifacts (box-drawing corner glyphs show as "B" in places, some text truncation). Character grids are clean and are the better reference for aesthetic comparison.
 
@@ -112,3 +155,49 @@ F_   ¢    £    ¥    €    ¤    ⏻    ⏚    ⚡   ⌖    ⌘    ©    ®  
 | Currency | 5 | $F0-$F4 |
 | Electronics | 5 | $F5-$F9 |
 | Decorative | 2 | $FC-$FD |
+
+---
+
+## Next Steps
+
+### Immediate: Emulator Integration
+
+1. **Include `n8_font.h` in emulator** — Add to `src/` and include in build
+2. **Replace ImGui font for text display** — Currently uses ProggyClean; swap to N8 font for `$C000` framebuffer rendering
+3. **Update `emulator.cpp`** — Render characters using `n8_font[char_code]` bitmap data
+4. **Test with firmware** — Verify all 256 characters display correctly
+
+### Future: Charset Switching
+
+5. **Implement charset register** — Memory-mapped at `$C1xx` to select active charset
+6. **Create Charset 1 (Graphics Mode)** — Full 64-entry 2x3 mosaics, trades lowercase
+7. **Create Charset 2 (International)** — Expanded Latin for Western European languages
+
+### Future: Hardware
+
+8. **LCD driver** — Render N8 font on real 640x128 monochrome display
+9. **Font ROM** — Convert to binary blob for hardware font ROM
+
+---
+
+## TODOs
+
+- [ ] Integrate `n8_font.h` into emulator build
+- [ ] Render N8 font in text display window (replace ProggyClean)
+- [ ] Add charset preview/debug window to emulator GUI
+- [ ] Review glyph quality at 1x scale (no zoom) — may need tweaks
+- [ ] Create Charset 1 (Graphics Mode) with full 2x3 mosaics
+- [ ] Create Charset 2 (International) with expanded Latin
+- [ ] Implement runtime charset switching via `$C1xx` register
+- [ ] Document font format for firmware developers
+
+---
+
+## Generator Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `gen_n8font.py` | Generate complete 256-char font (C header, Python dict, SVG previews) |
+| `gen_hybrid.py` | Generate hybrid aesthetic mockups (char grids, screen mockups) |
+| `gen_chargrids.py` | Generate Direction B/C character grids |
+| `gen_screens.py` | Generate Direction A/B/C screen mockups |
