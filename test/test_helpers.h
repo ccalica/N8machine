@@ -18,7 +18,6 @@
 extern m6502_t cpu;
 extern m6502_desc_t desc;
 extern uint64_t pins;
-extern uint8_t frame_buffer[];
 extern uint64_t tick_count;
 
 // ---- Externs for emu_labels functions not declared in emu_labels.h ----
@@ -143,11 +142,10 @@ struct CpuFixture {
 };
 
 // ---- EmulatorFixture -- Bus Decode & Integration Testing ----
-// Uses the actual emulator globals (mem[], frame_buffer[], cpu, pins).
+// Uses the actual emulator globals (mem[], cpu, pins).
 struct EmulatorFixture {
     EmulatorFixture() {
         memset(mem, 0, sizeof(uint8_t) * 65536);
-        memset(frame_buffer, 0, 256);
         memset(bp_mask, 0, sizeof(bool) * 65536);
         memset(wp_write_mask, 0, sizeof(bool) * 65536);
         memset(wp_read_mask, 0, sizeof(bool) * 65536);

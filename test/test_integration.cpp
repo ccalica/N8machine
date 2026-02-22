@@ -68,7 +68,7 @@ TEST_SUITE("integration") {
     // T99: Frame buffer via program
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T99: Frame buffer via program -- LDA/STA to $C000/$C001 fills frame_buffer") {
+    TEST_CASE("T99: Frame buffer via program -- LDA/STA to $C000/$C001 writes mem[]") {
         EmulatorFixture f;
         // LDA #$48; STA $C000; LDA #$69; STA $C001; NOP
         f.load_at(0xD000, {0xA9, 0x48, 0x8D, 0x00, 0xC0,
@@ -76,8 +76,8 @@ TEST_SUITE("integration") {
                             0xEA});
         f.set_reset_vector(0xD000);
         f.step_n(40);
-        CHECK(frame_buffer[0] == 0x48);
-        CHECK(frame_buffer[1] == 0x69);
+        CHECK(mem[0xC000] == 0x48);
+        CHECK(mem[0xC001] == 0x69);
     }
 
     // -------------------------------------------------------------------------

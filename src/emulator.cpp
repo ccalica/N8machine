@@ -28,7 +28,6 @@ uint64_t tick_count = 0;
 
 // 64 KB zero-initialized memory
 uint8_t mem[(1<<16)] = { };
-uint8_t frame_buffer[(1<<8)] = { };
 
 m6502_t cpu;
 m6502_desc_t desc;
@@ -142,18 +141,7 @@ void emulator_step() {
             // BUS_LOG(tick_count, "0Pg", BUS_READ, addr, mem[addr] );
         }
 
-        // Handle some devices    
-        BUS_DECODE(addr, 0xC000, 0xFF00) {
-            // printf("FB: %04X\n", addr);
-            uint16_t dev_addr = addr - 0xC000;
-            if(BUS_READ) { // Read
-                M6502_SET_DATA(pins, frame_buffer[dev_addr]);
-            }
-            else {
-                frame_buffer[dev_addr] = M6502_GET_DATA(pins);
-                BUS_LOG(tick_count, "TXT", BUS_READ, addr, frame_buffer[dev_addr] );
-            }
-        }
+        // Handle some devices
         BUS_DECODE(addr, 0xFFF0, 0xFFF0) {
             BUS_LOG(tick_count, "VEC", BUS_READ, addr, mem[addr] );
         }
