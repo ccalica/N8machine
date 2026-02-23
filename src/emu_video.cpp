@@ -1,10 +1,15 @@
 #include "emu_video.h"
 #include "emulator.h"
 #include "n8_memory_map.h"
+#include "n8_font.h"
 #include "m6502.h"
 #include <cstring>
 
 static uint8_t vid_regs[8] = { 0 };
+
+// Pixel buffer for the display module
+static uint32_t screen_pixels[N8_SCREEN_MAX_W * N8_SCREEN_MAX_H];
+static n8_screen_t screen = { screen_pixels, 0, 0, false };
 
 void video_init() { video_reset(); }
 
@@ -14,6 +19,10 @@ void video_reset() {
     vid_regs[N8_VID_WIDTH]  = N8_VID_DEFAULT_WIDTH;
     vid_regs[N8_VID_HEIGHT] = N8_VID_DEFAULT_HEIGHT;
     vid_regs[N8_VID_STRIDE] = N8_VID_DEFAULT_WIDTH;
+    memset(screen_pixels, 0, sizeof(screen_pixels));
+    screen.width  = N8_VID_DEFAULT_WIDTH * N8_FONT_WIDTH;
+    screen.height = N8_VID_DEFAULT_HEIGHT * N8_FONT_HEIGHT;
+    screen.dirty  = true;
 }
 
 static void video_apply_mode(uint8_t mode) {
@@ -120,3 +129,85 @@ uint8_t video_get_stride()       { return vid_regs[N8_VID_STRIDE]; }
 uint8_t video_get_cursor_style() { return vid_regs[N8_VID_CURSOR]; }
 uint8_t video_get_cursor_col()   { return vid_regs[N8_VID_CURCOL]; }
 uint8_t video_get_cursor_row()   { return vid_regs[N8_VID_CURROW]; }
+
+const n8_screen_t* video_get_screen() { return &screen; }
+
+void video_rasterize(uint32_t frame_count) {
+    uint8_t cursor_reg = vid_regs[N8_VID_CURSOR];
+    uint8_t cursor_mode = cursor_reg & N8_VID_CURSOR_MODE_MASK;
+    bool cursor_active = (cursor_mode != N8_VID_CURSOR_OFF);
+
+    // Skip if frame buffer hasn't changed and no cursor to animate
+    if (!fb_dirty && !cursor_active) return;
+
+    int cols = vid_regs[N8_VID_WIDTH];
+    int rows = safe_rows();
+    int stride = vid_regs[N8_VID_STRIDE];
+    if (cols == 0 || rows == 0 || stride == 0) return;
+
+    // Clamp to pixel buffer limits
+    int px_w = cols * N8_FONT_WIDTH;
+    int px_h = rows * N8_FONT_HEIGHT;
+    if (px_w > N8_SCREEN_MAX_W) { cols = N8_SCREEN_MAX_W / N8_FONT_WIDTH; px_w = cols * N8_FONT_WIDTH; }
+    if (px_h > N8_SCREEN_MAX_H) { rows = N8_SCREEN_MAX_H / N8_FONT_HEIGHT; px_h = rows * N8_FONT_HEIGHT; }
+
+    // Rasterize frame_buffer characters → screen_pixels (white on black)
+    const uint32_t fg = 0xFFFFFFFF;  // white
+    const uint32_t bg = 0xFF000000;  // black
+
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            uint8_t ch = frame_buffer[r * stride + c];
+            const uint8_t* glyph = n8_font[ch];
+            int px_x = c * N8_FONT_WIDTH;
+            int px_y = r * N8_FONT_HEIGHT;
+
+            for (int y = 0; y < N8_FONT_HEIGHT; y++) {
+                uint8_t row_bits = glyph[y];
+                uint32_t* dst = &screen_pixels[(px_y + y) * px_w + px_x];
+                for (int x = 0; x < N8_FONT_WIDTH; x++) {
+                    dst[x] = (row_bits & (0x80 >> x)) ? fg : bg;
+                }
+            }
+        }
+    }
+
+    // Cursor compositing
+    if (cursor_active) {
+        uint8_t cur_col = vid_regs[N8_VID_CURCOL];
+        uint8_t cur_row = vid_regs[N8_VID_CURROW];
+
+        // Only draw if cursor is within visible area
+        if (cur_col < cols && cur_row < rows) {
+            uint8_t rate = (cursor_reg & N8_VID_CURSOR_RATE_MASK) >> 4;
+            bool visible = true;
+
+            if (cursor_mode == N8_VID_CURSOR_FLASH) {
+                if (rate == 0)
+                    visible = false;  // rate 0 = not displayed
+                else
+                    visible = ((frame_count / rate) & 1) == 0;
+            }
+
+            if (visible) {
+                bool is_block = (cursor_reg & N8_VID_CURSOR_SHAPE_MASK) == N8_VID_CURSOR_BLOCK;
+                int cx = cur_col * N8_FONT_WIDTH;
+                int cy = cur_row * N8_FONT_HEIGHT;
+                int y_start = is_block ? 0 : (N8_FONT_HEIGHT - 2);
+                int y_end   = N8_FONT_HEIGHT;
+
+                for (int y = y_start; y < y_end; y++) {
+                    uint32_t* dst = &screen_pixels[(cy + y) * px_w + cx];
+                    for (int x = 0; x < N8_FONT_WIDTH; x++) {
+                        dst[x] ^= 0x00FFFFFF;  // XOR invert RGB, preserve alpha
+                    }
+                }
+            }
+        }
+    }
+
+    screen.width  = px_w;
+    screen.height = px_h;
+    screen.dirty  = true;
+    fb_dirty = false;
+}

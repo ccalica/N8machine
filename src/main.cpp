@@ -38,6 +38,7 @@ using namespace std;
 #include "emu_tty.h"
 #include "emu_video.h"
 #include "emu_kbd.h"
+#include "emu_display.h"
 
 const char* glsl_version;
 SDL_WindowFlags window_flags;
@@ -93,10 +94,12 @@ static uint8_t gdb_read_mem(uint16_t addr) {
 }
 
 static void gdb_write_mem(uint16_t addr, uint8_t val) {
-    if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+    if (addr >= N8_FB_BASE && addr <= N8_FB_END) {
         frame_buffer[addr - N8_FB_BASE] = val;
-    else
+        fb_dirty = true;
+    } else {
         mem[addr] = val;
+    }
 }
 
 static int gdb_step_instruction(void) {
@@ -394,10 +397,13 @@ int main(int, char**)
     static gdb_stub_config_t gdb_cfg = { 3333, true, 16 };
     gdb_stub_init(&gdb_cb, &gdb_cfg);
 
+    display_init(video_get_screen());
+
     // Our state
     bool show_memmap_window = true;
     bool show_status_window = true;
     bool show_console_window = true;
+    bool show_screen_window = true;
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -410,6 +416,7 @@ int main(int, char**)
     io.IniFilename = nullptr;
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
+    static uint32_t frame_count = 0;
     while (!done)
 #endif
     {
@@ -482,6 +489,9 @@ int main(int, char**)
             steps++;
             step_emulator = false;
         }
+        video_rasterize(frame_count);
+        frame_count++;
+
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
@@ -495,8 +505,8 @@ int main(int, char**)
                 done = true;
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
                 done = true;
-            if (event.type == SDL_KEYDOWN && !io.WantCaptureKeyboard
-                && !event.key.repeat) {
+            if (event.type == SDL_KEYDOWN && !event.key.repeat
+                && (!io.WantCaptureKeyboard || display_has_focus())) {
                 uint8_t n8_key = sdl_to_n8_keycode(event.key.keysym);
                 uint8_t mods   = sdl_to_n8_modifiers(SDL_GetModState());
                 if (n8_key != 0) {
@@ -518,6 +528,7 @@ int main(int, char**)
             ImGui::SameLine();  ImGui::Checkbox("Disasm", &show_disasm_window);
             ImGui::SameLine();  ImGui::Checkbox("Memory", &show_memmap_window);
             ImGui::SameLine();  ImGui::Checkbox("Console", &show_console_window);
+            ImGui::SameLine();  ImGui::Checkbox("Screen", &show_screen_window);
             ImGui::Text("  ");
             if (gdb_halted && gdb_stub_is_connected())
                 ImGui::Text("Status: Halted (GDB)");
@@ -578,6 +589,9 @@ int main(int, char**)
         if (show_console_window) {
             emulator_show_console_window(show_console_window);
         }
+        if (show_screen_window) {
+            display_render();
+        }
 
         // Rendering
         ImGui::Render();
@@ -605,6 +619,7 @@ int main(int, char**)
 #endif
 
     // Cleanup
+    display_shutdown();
     gdb_stub_shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
