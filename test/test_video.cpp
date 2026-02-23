@@ -277,4 +277,55 @@ TEST_SUITE("video") {
         CHECK(true); // no crash is the pass condition
     }
 
+    // -------------------------------------------------------------------------
+    // T146a: Scroll left with width > stride is a no-op (guard)
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T146a: Scroll left with width > stride is a no-op") {
+        EmulatorFixture f;
+        // Custom mode: width=40, stride=20 → width > stride
+        uint64_t pm = make_write_pins(N8_VID_BASE + N8_VID_MODE, N8_VIDMODE_TEXT_CUSTOM);
+        video_decode(pm, N8_VID_MODE);
+        uint64_t pw = make_write_pins(N8_VID_BASE + N8_VID_WIDTH, 40);
+        video_decode(pw, N8_VID_WIDTH);
+        uint64_t ps = make_write_pins(N8_VID_BASE + N8_VID_STRIDE, 20);
+        video_decode(ps, N8_VID_STRIDE);
+        uint64_t ph = make_write_pins(N8_VID_BASE + N8_VID_HEIGHT, 10);
+        video_decode(ph, N8_VID_HEIGHT);
+
+        // Put marker data in row 0
+        frame_buffer[0] = 'A';
+        frame_buffer[1] = 'B';
+
+        uint64_t p = make_write_pins(N8_VID_BASE + N8_VID_OPER, N8_VIDOP_SCROLL_LEFT);
+        video_decode(p, N8_VID_OPER);
+        // Should be a no-op — data untouched
+        CHECK(frame_buffer[0] == 'A');
+        CHECK(frame_buffer[1] == 'B');
+    }
+
+    // -------------------------------------------------------------------------
+    // T146b: Scroll right with width > stride is a no-op (guard)
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T146b: Scroll right with width > stride is a no-op") {
+        EmulatorFixture f;
+        uint64_t pm = make_write_pins(N8_VID_BASE + N8_VID_MODE, N8_VIDMODE_TEXT_CUSTOM);
+        video_decode(pm, N8_VID_MODE);
+        uint64_t pw = make_write_pins(N8_VID_BASE + N8_VID_WIDTH, 40);
+        video_decode(pw, N8_VID_WIDTH);
+        uint64_t ps = make_write_pins(N8_VID_BASE + N8_VID_STRIDE, 20);
+        video_decode(ps, N8_VID_STRIDE);
+        uint64_t ph = make_write_pins(N8_VID_BASE + N8_VID_HEIGHT, 10);
+        video_decode(ph, N8_VID_HEIGHT);
+
+        frame_buffer[0] = 'X';
+        frame_buffer[1] = 'Y';
+
+        uint64_t p = make_write_pins(N8_VID_BASE + N8_VID_OPER, N8_VIDOP_SCROLL_RIGHT);
+        video_decode(p, N8_VID_OPER);
+        CHECK(frame_buffer[0] == 'X');
+        CHECK(frame_buffer[1] == 'Y');
+    }
+
 } // TEST_SUITE("video")

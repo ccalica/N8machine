@@ -129,26 +129,14 @@ void emulator_step() {
                 }
             }
         }
+        // IRQ tick: clear all flags, let devices reassert, then update pin
         IRQ_CLR();
-        // pins = pins & ~M6502_IRQ;
-
         tty_tick(pins);
         kbd_tick();
-        // pins & M6502_IRQ ==  M6502_IRQ
-        if(mem[N8_IRQ_FLAGS] == 0) {
-            pins = pins & ~M6502_IRQ;
-            // pins = pins | M6502_IRQ; // pull up
-            // printf("IRQ is set: %d %d\r\n", mem[0x00FF],pins & M6502_IRQ ==  M6502_IRQ);
-            // printf("PC: %4.4x\r\n", m6502_pc(&cpu));
-            // printf("P: 0x%2.2x\r\n", m6502_p(&cpu));
-            // fflush(stdout);
-        }
-        else {
-            // pins = pins & ~M6502_IRQ;
-            pins = pins | M6502_IRQ; // pull up
-            // printf("IRQ is clear\r\n");
-            // fflush(stdout);
-        }
+        if (mem[N8_IRQ_FLAGS] != 0)
+            pins |= M6502_IRQ;
+        else
+            pins &= ~M6502_IRQ;
 
         // Frame buffer: $C000-$CFFF (separate backing store)
         bool fb_access = (addr >= N8_FB_BASE && addr <= N8_FB_END);
@@ -173,12 +161,11 @@ void emulator_step() {
             uint8_t  reg  = dev_offset & 0x1F;  // 0-31
 
             switch (slot) {
-                case N8_IRQ_SLOT:  // $D800: System / IRQ
+                case N8_IRQ_SLOT:  // $D800: System / IRQ (read-only to CPU)
                     if (pins & M6502_RW) {
                         M6502_SET_DATA(pins, mem[N8_IRQ_FLAGS]);
-                    } else {
-                        mem[N8_IRQ_FLAGS] = M6502_GET_DATA(pins);
                     }
+                    // CPU writes ignored — IRQ flags managed by emu_set_irq/emu_clr_irq
                     break;
                 case N8_TTY_SLOT:  // $D820: TTY
                     tty_decode(pins, reg);
@@ -348,6 +335,10 @@ void emulator_write_s(uint8_t v) { m6502_set_s(&cpu, v); }
 void emulator_write_p(uint8_t v) { m6502_set_p(&cpu, v); }
 
 void emulator_write_pc(uint16_t addr) {
+    // TODO: prefetch ignores frame_buffer[] — if PC is set into $C000-$CFFF
+    // via GDB, the CPU will see mem[addr] (zeros) instead of frame_buffer[].
+    // Not a practical issue since FB is not executable, but fix if GDB PC
+    // write to FB ever becomes a real use case.
     pins = (pins & (M6502_IRQ | M6502_NMI | M6502_RES | M6502_RDY)) | M6502_SYNC | M6502_RW;
     M6502_SET_ADDR(pins, addr);
     M6502_SET_DATA(pins, mem[addr]);

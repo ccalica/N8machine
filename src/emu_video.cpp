@@ -54,7 +54,7 @@ static void video_scroll_left() {
     int w = vid_regs[N8_VID_WIDTH];
     int s = vid_regs[N8_VID_STRIDE];
     int h = safe_rows();
-    if (w < 2 || s == 0) return;
+    if (w < 2 || s == 0 || w > s) return;
     for (int row = 0; row < h; row++) {
         uint8_t *line = frame_buffer + row * s;
         memmove(line, line + 1, w - 1);
@@ -66,7 +66,7 @@ static void video_scroll_right() {
     int w = vid_regs[N8_VID_WIDTH];
     int s = vid_regs[N8_VID_STRIDE];
     int h = safe_rows();
-    if (w < 2 || s == 0) return;
+    if (w < 2 || s == 0 || w > s) return;
     for (int row = 0; row < h; row++) {
         uint8_t *line = frame_buffer + row * s;
         memmove(line + 1, line, w - 1);

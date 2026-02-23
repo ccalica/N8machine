@@ -21,7 +21,7 @@ void kbd_inject_key(uint8_t keycode, uint8_t modifiers) {
         kbd_status |= N8_KBD_STAT_OVERFLOW;
     }
     kbd_data = keycode;
-    kbd_status = (kbd_status & ~0x3C) | (modifiers & 0x3C);
+    kbd_status = (kbd_status & ~N8_KBD_MODIFIER_MASK) | (modifiers & N8_KBD_MODIFIER_MASK);
     kbd_status |= N8_KBD_STAT_AVAIL;
 
     if (kbd_ctrl & N8_KBD_CTRL_IRQ_EN) {

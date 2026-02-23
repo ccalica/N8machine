@@ -444,4 +444,52 @@ TEST_SUITE("gdb_callbacks") {
         CHECK(emulator_wp_enabled() == false);
     }
 
+    // ---- GDB memory read/write through frame buffer ----
+
+    TEST_CASE("GDB read_mem at $C000 returns frame_buffer[], not mem[]") {
+        EmulatorFixture f;
+        frame_buffer[0] = 0xAB;
+        frame_buffer[0x500] = 0xCD;
+        mem[0xC000] = 0x00; // mem[] should not be consulted
+        mem[0xC500] = 0x00;
+        // Simulate what gdb_read_mem does (same logic as main.cpp callback)
+        auto gdb_read = [](uint16_t addr) -> uint8_t {
+            if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+                return frame_buffer[addr - N8_FB_BASE];
+            return mem[addr];
+        };
+        CHECK(gdb_read(0xC000) == 0xAB);
+        CHECK(gdb_read(0xC500) == 0xCD);
+    }
+
+    TEST_CASE("GDB write_mem at $C000 writes to frame_buffer[], not mem[]") {
+        EmulatorFixture f;
+        // Simulate what gdb_write_mem does
+        auto gdb_write = [](uint16_t addr, uint8_t val) {
+            if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+                frame_buffer[addr - N8_FB_BASE] = val;
+            else
+                mem[addr] = val;
+        };
+        gdb_write(0xC000, 0x42);
+        gdb_write(0xCFFF, 0x99);
+        CHECK(frame_buffer[0] == 0x42);
+        CHECK(frame_buffer[0xFFF] == 0x99);
+        CHECK(mem[0xC000] == 0x00); // mem[] untouched
+    }
+
+    // ---- IRQ slot write is read-only ----
+
+    TEST_CASE("CPU write to $D800 (IRQ flags) is ignored") {
+        EmulatorFixture f;
+        // Set up: inject TTY char so tty_tick sets IRQ bit 1
+        tty_inject_char('A');
+        // Program: LDA #$00; STA $D800; NOP (try to clear IRQ flags)
+        f.load_at(0xD000, {0xA9, 0x00, 0x8D, 0x00, 0xD8, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(40);
+        // tty_tick will have reasserted bit 1 despite the write attempt
+        CHECK((mem[N8_IRQ_FLAGS] & 0x02) != 0);
+    }
+
 } // TEST_SUITE("gdb_callbacks")

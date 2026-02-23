@@ -2,6 +2,8 @@
 ; Mirror of src/n8_memory_map.h
 
 .define N8_IRQ_FLAGS      $D800
+.define N8_IRQ_BIT_TTY    1
+.define N8_IRQ_BIT_KBD    2
 
 .define N8_TTY_OUT_STATUS $D820
 .define N8_TTY_OUT_DATA   $D821

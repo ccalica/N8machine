@@ -599,9 +599,10 @@ TEST_SUITE("gdb_protocol") {
         CHECK(result.find("start=\"0xC000\" length=\"0x1000\"") != std::string::npos);
     }
 
-    TEST_CASE("T181: Memory map XML contains $D800 RAM region (device space)") {
+    TEST_CASE("T181: Memory map XML contains $D800 IO region (device space)") {
         GdbProtocolFixture f;
         std::string result = gdb_stub_process_packet("qXfer:memory-map:read::0,fff");
+        CHECK(result.find("type=\"io\"") != std::string::npos);
         CHECK(result.find("start=\"0xD800\" length=\"0x0800\"") != std::string::npos);
     }
 

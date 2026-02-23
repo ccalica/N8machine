@@ -126,7 +126,7 @@ static const char memory_map_xml[] =
     "  <memory type=\"ram\"  start=\"0x0000\" length=\"0xC000\"/>\n"
     "  <memory type=\"ram\"  start=\"0xC000\" length=\"0x1000\"/>\n"
     "  <memory type=\"ram\"  start=\"0xD000\" length=\"0x0800\"/>\n"
-    "  <memory type=\"ram\"  start=\"0xD800\" length=\"0x0800\"/>\n"
+    "  <memory type=\"io\"   start=\"0xD800\" length=\"0x0800\"/>\n"
     "  <memory type=\"rom\"  start=\"0xE000\" length=\"0x2000\"/>\n"
     "</memory-map>\n";
 

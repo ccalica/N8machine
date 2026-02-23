@@ -36,6 +36,7 @@ using namespace std;
 #include "gdb_stub.h"
 #include "m6502.h"
 #include "emu_tty.h"
+#include "emu_video.h"
 #include "emu_kbd.h"
 
 const char* glsl_version;
@@ -167,9 +168,13 @@ static int gdb_get_stop_reason(void) {
 }
 
 static void gdb_reset(void) {
-    // D47: Use M6502_RES pin, NOT emulator_reset()
+    // D47: Use M6502_RES pin, NOT emulator_reset() (avoids ROM reload)
     pins |= M6502_RES;
     tty_reset();
+    video_reset();
+    kbd_reset();
+    memset(frame_buffer, 0, N8_FB_SIZE);
+    fb_dirty = true;
 }
 
 // ---- SDL → N8 keyboard translation ----
