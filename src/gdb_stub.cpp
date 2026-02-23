@@ -124,10 +124,10 @@ static const char memory_map_xml[] =
     "<!DOCTYPE memory-map SYSTEM \"gdb-memory-map.dtd\">\n"
     "<memory-map>\n"
     "  <memory type=\"ram\"  start=\"0x0000\" length=\"0xC000\"/>\n"
-    "  <memory type=\"ram\"  start=\"0xC000\" length=\"0x0100\"/>\n"
-    "  <memory type=\"ram\"  start=\"0xC100\" length=\"0x0010\"/>\n"
-    "  <memory type=\"ram\"  start=\"0xC110\" length=\"0x0EF0\"/>\n"
-    "  <memory type=\"rom\"  start=\"0xD000\" length=\"0x3000\"/>\n"
+    "  <memory type=\"ram\"  start=\"0xC000\" length=\"0x1000\"/>\n"
+    "  <memory type=\"ram\"  start=\"0xD000\" length=\"0x0800\"/>\n"
+    "  <memory type=\"ram\"  start=\"0xD800\" length=\"0x0800\"/>\n"
+    "  <memory type=\"rom\"  start=\"0xE000\" length=\"0x2000\"/>\n"
     "</memory-map>\n";
 
 // ---- Response formatting ----

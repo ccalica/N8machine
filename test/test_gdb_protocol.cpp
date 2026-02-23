@@ -589,8 +589,43 @@ TEST_SUITE("gdb_protocol") {
         std::string result = gdb_stub_process_packet("qXfer:memory-map:read::0,fff");
         CHECK(result[0] == 'l');
         CHECK(result.find("memory-map") != std::string::npos);
-        CHECK(result.find("0xD000") != std::string::npos);
+        CHECK(result.find("0xE000") != std::string::npos);
         CHECK(result.find("rom") != std::string::npos);
+    }
+
+    TEST_CASE("T180: Memory map XML contains $C000 RAM region (4KB FB)") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("qXfer:memory-map:read::0,fff");
+        CHECK(result.find("start=\"0xC000\" length=\"0x1000\"") != std::string::npos);
+    }
+
+    TEST_CASE("T181: Memory map XML contains $D800 RAM region (device space)") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("qXfer:memory-map:read::0,fff");
+        CHECK(result.find("start=\"0xD800\" length=\"0x0800\"") != std::string::npos);
+    }
+
+    TEST_CASE("T182: Memory map ROM at $E000 with length $2000") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("qXfer:memory-map:read::0,fff");
+        CHECK(result.find("type=\"rom\"  start=\"0xE000\" length=\"0x2000\"") != std::string::npos);
+    }
+
+    TEST_CASE("T183: GDB read at $D840 returns mem[] value (no side effects)") {
+        GdbProtocolFixture f;
+        // GDB reads go through the callback which reads mem[] directly,
+        // not through video_decode — no side effects
+        mock_mem[0xD840] = 0xAB;
+        std::string result = gdb_stub_process_packet("mD840,1");
+        CHECK(result == "ab");
+    }
+
+    TEST_CASE("T184: GDB write at $C000 writes to frame_buffer[]") {
+        GdbProtocolFixture f;
+        // GDB write callback redirects $C000-$CFFF to frame_buffer[]
+        std::string result = gdb_stub_process_packet("Mc000,1:42");
+        CHECK(result == "OK");
+        CHECK(mock_mem[0xC000] == 0x42);
     }
 
     TEST_CASE("T59: qfThreadInfo returns m01") {
