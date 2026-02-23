@@ -233,10 +233,10 @@ TEST_SUITE("integration") {
     }
 
     // -------------------------------------------------------------------------
-    // T174: Legacy loadrom: >8KB binary loads at $D000
+    // T174: Oversized ROM is truncated to 8KB at $E000
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T174: Legacy loadrom >8KB binary loads at $D000") {
+    TEST_CASE("T174: Oversized ROM is truncated to 8KB at $E000") {
         EmulatorFixture f;
         const char *old_rom = rom_file;
         rom_file = "/tmp/n8_test_rom_174.bin";
@@ -253,8 +253,11 @@ TEST_SUITE("integration") {
         fclose(fp);
 
         emulator_loadrom();
-        CHECK(mem[0xD000] == 0xA9);
-        CHECK(mem[0xD001] == 0xFF);
+        // Loads at $E000, truncated to 8KB
+        CHECK(mem[0xE000] == 0xA9);
+        CHECK(mem[0xE001] == 0xFF);
+        // $D000 should NOT have data (no legacy fallback)
+        CHECK(mem[0xD000] == 0x00);
 
         rom_file = old_rom;
     }

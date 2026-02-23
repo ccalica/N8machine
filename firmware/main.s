@@ -16,13 +16,13 @@ strB:    .byte "PLAY?",13,10,0
 .code
 _main:  LDX #$00
         LDA #$02
-        STA TXT_BUFF,X
+        STA N8_FB_BASE+1,X
         LDA #$05
         INX
-        STA TXT_BUFF,X
+        STA N8_FB_BASE+1,X
         LDA #$08
         INX
-        STA TXT_BUFF,X
+        STA N8_FB_BASE+1,X
 tty_test:
         LDA #<strA
         LDX #>strA

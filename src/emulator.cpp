@@ -76,17 +76,17 @@ void emulator_loadrom() {
     long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    uint16_t load_addr;
-    if (size <= N8_ROM_SIZE) {
-        load_addr = N8_ROM_BASE;       // $E000 (new 8KB layout)
-    } else {
-        load_addr = N8_LEGACY_ROM_BASE; // $D000 (legacy 12KB)
+    if (size > N8_ROM_SIZE) {
+        printf("WARNING: ROM '%s' is %ld bytes, truncating to %d\r\n",
+               rom_file, size, N8_ROM_SIZE);
+        fflush(stdout);
+        size = N8_ROM_SIZE;
     }
 
-    printf("Loading ROM at $%04X (%ld bytes)\r\n", load_addr, size);
+    printf("Loading ROM at $%04X (%ld bytes)\r\n", N8_ROM_BASE, size);
     fflush(stdout);
 
-    fread(&mem[load_addr], 1, size, fp);
+    fread(&mem[N8_ROM_BASE], 1, size, fp);
     fclose(fp);
 }
 void emulator_init() {

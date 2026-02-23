@@ -121,10 +121,3 @@
 #define N8_FONT_CHARS      256
 #define N8_FONT_WIDTH      8
 #define N8_FONT_HEIGHT     16
-
-// --- Legacy addresses (removed in Phase 10) ---
-#define N8_LEGACY_IRQ_ADDR   0x00FF
-#define N8_LEGACY_TTY_BASE   0xC100
-#define N8_LEGACY_FB_SIZE    0x0100
-#define N8_LEGACY_ROM_BASE   0xD000
-#define N8_LEGACY_ROM_SIZE   0x3000
