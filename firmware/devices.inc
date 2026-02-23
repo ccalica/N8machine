@@ -3,11 +3,13 @@
 ; Device locations on memory map
 ; ---------------------------------------------------------------------------
 
-.define   TXT_CTRL  $C000    ;  Text Display Control Register
-.define   TXT_BUFF  $C001    ;  Text Display Buffer Window (255 bytes)
+.include "n8_memory_map.inc"
 
-.define   TTY_OUT_CTRL $C100    ;  TTY  Register
-.define   TTY_OUT_DATA $C101    ;  TTY Out Data Register
-.define   TTY_IN_CTRL  $C102    ;  TTY In Control Register
-.define   TTY_IN_DATA  $C103    ;  TTY In Data Register
+; Legacy aliases for transitional compatibility
+.define TXT_CTRL         N8_FB_BASE
+.define TXT_BUFF         N8_FB_BASE+1
 
+.define TTY_OUT_CTRL     N8_TTY_OUT_STATUS
+.define TTY_OUT_DATA     N8_TTY_OUT_DATA
+.define TTY_IN_CTRL      N8_TTY_IN_STATUS
+.define TTY_IN_DATA      N8_TTY_IN_DATA
