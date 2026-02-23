@@ -63,15 +63,28 @@ void emu_clr_irq(int bit) {
 }
 
 void emulator_loadrom() {
-    uint16_t rom_ptr = 0xD000;
-    printf("Loading ROM\r\n");fflush(stdout);
     FILE *fp = fopen(rom_file, "r");
-    while(1) {
-        uint8_t c = fgetc(fp);
-        if(feof(fp)) break;
-        mem[rom_ptr] = c;
-        rom_ptr++;  
+    if (!fp) {
+        printf("ERROR: Cannot open ROM file '%s'\r\n", rom_file);
+        fflush(stdout);
+        return;
     }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    uint16_t load_addr;
+    if (size <= N8_ROM_SIZE) {
+        load_addr = N8_ROM_BASE;       // $E000 (new 8KB layout)
+    } else {
+        load_addr = N8_LEGACY_ROM_BASE; // $D000 (legacy 12KB)
+    }
+
+    printf("Loading ROM at $%04X (%ld bytes)\r\n", load_addr, size);
+    fflush(stdout);
+
+    fread(&mem[load_addr], 1, size, fp);
     fclose(fp);
 }
 void emulator_init() {
@@ -180,7 +193,10 @@ void emulator_step() {
                 M6502_SET_DATA(pins, mem[addr]);
             }
             else {
-                mem[addr] = M6502_GET_DATA(pins);
+                if (addr < N8_ROM_BASE) {
+                    mem[addr] = M6502_GET_DATA(pins);
+                }
+                // else: silently ignore CPU writes to ROM ($E000-$FFFF)
             }
         }
 

@@ -1,6 +1,8 @@
 #include "doctest.h"
 #include "test_helpers.h"
 
+extern const char *rom_file;
+
 TEST_SUITE("integration") {
 
     // -------------------------------------------------------------------------
@@ -163,6 +165,129 @@ TEST_SUITE("integration") {
         tty_inject_char('A');
         f.step_n(50);
         CHECK(m6502_pc(&cpu) < 0xD100);
+    }
+
+    // -------------------------------------------------------------------------
+    // T170: emulator_loadrom places 8KB binary at $E000
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T170: emulator_loadrom places 8KB binary at $E000") {
+        EmulatorFixture f;
+        // Create a temp ROM file with known content (< 8KB)
+        const char *old_rom = rom_file;
+        rom_file = "/tmp/n8_test_rom_170.bin";
+
+        // Write a small ROM: 16 bytes
+        FILE *fp = fopen(rom_file, "w");
+        REQUIRE(fp != nullptr);
+        uint8_t rom_data[] = {0xA9, 0x42, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA,
+                               0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA};
+        fwrite(rom_data, 1, sizeof(rom_data), fp);
+        fclose(fp);
+
+        emulator_loadrom();
+        CHECK(mem[0xE000] == 0xA9);
+        CHECK(mem[0xE001] == 0x42);
+
+        rom_file = old_rom;
+    }
+
+    // -------------------------------------------------------------------------
+    // T171: Code at $E000 is executable
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T171: Code at $E000 is executable") {
+        EmulatorFixture f;
+        // LDA #$42; STA $0200; NOP sled
+        f.load_at(0xE000, {0xA9, 0x42, 0x8D, 0x00, 0x02, 0xEA, 0xEA, 0xEA});
+        f.set_reset_vector(0xE000);
+        f.step_n(30);
+        CHECK(mem[0x0200] == 0x42);
+    }
+
+    // -------------------------------------------------------------------------
+    // T172: Reset vector at $FFFC-$FFFD works from ROM region
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T172: Reset vector in ROM region works") {
+        EmulatorFixture f;
+        f.load_at(0xE000, {0xEA, 0xEA, 0xEA, 0xEA, 0xEA});
+        f.set_reset_vector(0xE000);
+        f.step_n(20);
+        uint16_t pc = m6502_pc(&cpu);
+        CHECK(pc >= 0xE000);
+        CHECK(pc < 0xE010);
+    }
+
+    // -------------------------------------------------------------------------
+    // T173: RAM at $0400 is writable
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T173: RAM at $0400 is writable") {
+        EmulatorFixture f;
+        // LDA #$55; STA $0400; NOP
+        f.load_at(0xE000, {0xA9, 0x55, 0x8D, 0x00, 0x04, 0xEA});
+        f.set_reset_vector(0xE000);
+        f.step_n(30);
+        CHECK(mem[0x0400] == 0x55);
+    }
+
+    // -------------------------------------------------------------------------
+    // T174: Legacy loadrom: >8KB binary loads at $D000
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T174: Legacy loadrom >8KB binary loads at $D000") {
+        EmulatorFixture f;
+        const char *old_rom = rom_file;
+        rom_file = "/tmp/n8_test_rom_174.bin";
+
+        // Write a 12KB ROM
+        FILE *fp = fopen(rom_file, "w");
+        REQUIRE(fp != nullptr);
+        uint8_t byte = 0xEA;
+        for (int i = 0; i < 12288; i++) fwrite(&byte, 1, 1, fp);
+        // Put marker at start
+        fseek(fp, 0, SEEK_SET);
+        uint8_t marker[] = {0xA9, 0xFF};
+        fwrite(marker, 1, 2, fp);
+        fclose(fp);
+
+        emulator_loadrom();
+        CHECK(mem[0xD000] == 0xA9);
+        CHECK(mem[0xD001] == 0xFF);
+
+        rom_file = old_rom;
+    }
+
+    // -------------------------------------------------------------------------
+    // T175: CPU write to $E000 is silently ignored (ROM protection)
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T175: CPU write to $E000 silently ignored") {
+        EmulatorFixture f;
+        mem[0xE000] = 0xEA; // preset to NOP
+        // Program at $D000: LDA #$FF; STA $E000; NOP
+        f.load_at(0xD000, {0xA9, 0xFF, 0x8D, 0x00, 0xE0, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(30);
+        // CPU write should be ignored — mem[0xE000] should still be NOP
+        CHECK(mem[0xE000] == 0xEA);
+    }
+
+    // -------------------------------------------------------------------------
+    // T176: Dev bank $D000-$D7FF is writable RAM
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T176: Dev bank $D000-$D7FF is writable RAM") {
+        EmulatorFixture f;
+        // Program at $E000: LDA #$AA; STA $D000; LDA #$BB; STA $D7FF; NOP
+        f.load_at(0xE000, {0xA9, 0xAA, 0x8D, 0x00, 0xD0,
+                            0xA9, 0xBB, 0x8D, 0xFF, 0xD7,
+                            0xEA});
+        f.set_reset_vector(0xE000);
+        f.step_n(40);
+        CHECK(mem[0xD000] == 0xAA);
+        CHECK(mem[0xD7FF] == 0xBB);
     }
 
 } // TEST_SUITE("integration")
