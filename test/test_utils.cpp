@@ -159,38 +159,38 @@ TEST_SUITE("utils") {
     // IRQ register tests (direct set/clear, no emulator_step)
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T69: emu_set_irq(1) sets bit 1 in mem[0x00FF]") {
-        mem[0x00FF] = 0;
+    TEST_CASE("T69: emu_set_irq(1) sets bit 1 in mem[N8_IRQ_FLAGS]") {
+        mem[N8_IRQ_FLAGS] = 0;
         emu_set_irq(1);
-        CHECK((mem[0x00FF] & 0x02) != 0);
+        CHECK((mem[N8_IRQ_FLAGS] & 0x02) != 0);
     }
 
-    TEST_CASE("T69a: emu_set_irq(0) sets bit 0 in mem[0x00FF]") {
-        mem[0x00FF] = 0;
+    TEST_CASE("T69a: emu_set_irq(0) sets bit 0 in mem[N8_IRQ_FLAGS]") {
+        mem[N8_IRQ_FLAGS] = 0;
         emu_set_irq(0);
-        CHECK((mem[0x00FF] & 0x01) != 0);
+        CHECK((mem[N8_IRQ_FLAGS] & 0x01) != 0);
     }
 
-    TEST_CASE("T69b: emu_set_irq(0) then emu_set_irq(1) -> mem[0x00FF]==0x03") {
-        mem[0x00FF] = 0;
+    TEST_CASE("T69b: emu_set_irq(0) then emu_set_irq(1) -> mem[N8_IRQ_FLAGS]==0x03") {
+        mem[N8_IRQ_FLAGS] = 0;
         emu_set_irq(0);
         emu_set_irq(1);
-        CHECK(mem[0x00FF] == 0x03);
+        CHECK(mem[N8_IRQ_FLAGS] == 0x03);
     }
 
-    TEST_CASE("T70: emu_set_irq(1) then emu_clr_irq(1) -> mem[0x00FF]==0x00") {
-        mem[0x00FF] = 0;
+    TEST_CASE("T70: emu_set_irq(1) then emu_clr_irq(1) -> mem[N8_IRQ_FLAGS]==0x00") {
+        mem[N8_IRQ_FLAGS] = 0;
         emu_set_irq(1);
         emu_clr_irq(1);
-        CHECK(mem[0x00FF] == 0x00);
+        CHECK(mem[N8_IRQ_FLAGS] == 0x00);
     }
 
-    TEST_CASE("T70a: set bits 0+1, clr bit 1 -> mem[0x00FF]==0x01") {
-        mem[0x00FF] = 0;
+    TEST_CASE("T70a: set bits 0+1, clr bit 1 -> mem[N8_IRQ_FLAGS]==0x01") {
+        mem[N8_IRQ_FLAGS] = 0;
         emu_set_irq(0);
         emu_set_irq(1);
         emu_clr_irq(1);
-        CHECK(mem[0x00FF] == 0x01);
+        CHECK(mem[N8_IRQ_FLAGS] == 0x01);
     }
 
 } // TEST_SUITE("utils")

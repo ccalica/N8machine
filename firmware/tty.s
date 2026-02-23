@@ -1,5 +1,5 @@
 
-; -----------TTY_OUT_DATA-----------------------------------------------------
+; -----------N8_TTY_OUT_DATA-----------------------------------------------------
 ; 
 
 .export   _tty_putc,_tty_puts,_tty_peekc,_tty_getc
@@ -23,11 +23,11 @@ rb_end:     .byte 0             ; index where next char pull
 ; tty_putc
 
 _tty_putc:  PHA               ; A contains ASCII char push to stack
-@wait:      LDA TTY_OUT_CTRL
+@wait:      LDA N8_TTY_OUT_STATUS
             AND #$01          ; Test for 1 bit
             BNE @wait         ; Wait for bit 0 to clear
             PLA               ; Pop char from stack
-            STA TTY_OUT_DATA
+            STA N8_TTY_OUT_DATA
             RTS
 
 _tty_puts:  STA ZP_A_PTR         ; Store lower byte

@@ -31,13 +31,13 @@ _irq_int:   PHA                 ; Push A
 
 ; -------------------------------------------------------
 ; Handle interrupts here
-irq:        LDA TTY_IN_CTRL     ; check for tty char
-            STA TXT_BUFF
+irq:        LDA N8_TTY_IN_STATUS     ; check for tty char
+            STA N8_FB_BASE+1
             AND #$01
             BEQ irq_rtn
-            LDA TTY_IN_DATA     ; load the char
+            LDA N8_TTY_IN_DATA     ; load the char
             JSR tty_recv
-            STA TXT_BUFF+1
+            STA N8_FB_BASE+2
             JMP irq
 
 irq_rtn:    PLA                 ; Load Y from stack

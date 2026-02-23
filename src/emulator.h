@@ -7,11 +7,14 @@
 // #include "m6502.h"
 
 extern uint8_t mem[];
+extern uint8_t frame_buffer[];
+extern bool fb_dirty;
 extern bool bp_mask[];
 extern bool wp_write_mask[];
 extern bool wp_read_mask[];
 
 void emulator_init();
+void emulator_loadrom();
 void emulator_step();
 void emulator_reset();
 void emulator_enablebp(bool);

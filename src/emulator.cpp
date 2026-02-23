@@ -4,7 +4,10 @@
 #include "imgui.h"
 
 #include "emulator.h"
+#include "n8_memory_map.h"
 #include "emu_tty.h"
+#include "emu_video.h"
+#include "emu_kbd.h"
 #include "emu_labels.h"
 #include "gui_console.h"
 #include "utils.h"
@@ -20,14 +23,18 @@
 // #define BUS_LOG(tc,sys,rw,a,d) printf("%lu: %s %s %04X: %02X\r\n",tc,sys,rw ? "R" : "W",a,d);
 #define BUS_LOG(tc,sys,rw,a,d) ;;
 
-#define IRQ_CLR() mem[0x00FF] = 0x00;
-#define IRQ_SET(bit) mem[0x00FF] = (mem[0x00FF] | 0x01 << bit)
+#define IRQ_CLR() mem[N8_IRQ_FLAGS] = 0x00;
+#define IRQ_SET(bit) mem[N8_IRQ_FLAGS] = (mem[N8_IRQ_FLAGS] | (0x01 << bit))
 
 const char *rom_file = "N8firmware";
 uint64_t tick_count = 0;
 
 // 64 KB zero-initialized memory
 uint8_t mem[(1<<16)] = { };
+
+// 4 KB frame buffer (separate backing store, not backed by mem[])
+uint8_t frame_buffer[N8_FB_SIZE] = { };
+bool fb_dirty = true;
 
 m6502_t cpu;
 m6502_desc_t desc;
@@ -54,19 +61,32 @@ void emu_set_irq(int bit) {
     IRQ_SET(bit);
 }
 void emu_clr_irq(int bit) {
-    mem[0x00FF] = (mem[0x00FF] & ~(0x01 << bit) );
+    mem[N8_IRQ_FLAGS] = (mem[N8_IRQ_FLAGS] & ~(0x01 << bit) );
 }
 
 void emulator_loadrom() {
-    uint16_t rom_ptr = 0xD000;
-    printf("Loading ROM\r\n");fflush(stdout);
     FILE *fp = fopen(rom_file, "r");
-    while(1) {
-        uint8_t c = fgetc(fp);
-        if(feof(fp)) break;
-        mem[rom_ptr] = c;
-        rom_ptr++;  
+    if (!fp) {
+        printf("ERROR: Cannot open ROM file '%s'\r\n", rom_file);
+        fflush(stdout);
+        return;
     }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    if (size > N8_ROM_SIZE) {
+        printf("WARNING: ROM '%s' is %ld bytes, truncating to %d\r\n",
+               rom_file, size, N8_ROM_SIZE);
+        fflush(stdout);
+        size = N8_ROM_SIZE;
+    }
+
+    printf("Loading ROM at $%04X (%ld bytes)\r\n", N8_ROM_BASE, size);
+    fflush(stdout);
+
+    fread(&mem[N8_ROM_BASE], 1, size, fp);
     fclose(fp);
 }
 void emulator_init() {
@@ -75,6 +95,8 @@ void emulator_init() {
     
     pins = m6502_init(&cpu, &desc);
     tty_init();
+    video_init();
+    kbd_init();
     
 }
 
@@ -107,51 +129,75 @@ void emulator_step() {
                 }
             }
         }
+        // IRQ tick: clear all flags, let devices reassert, then update pin
         IRQ_CLR();
-        // pins = pins & ~M6502_IRQ;
-
         tty_tick(pins);
-        // pins & M6502_IRQ ==  M6502_IRQ
-        if(mem[0x00FF] == 0) {
-            pins = pins & ~M6502_IRQ;
-            // pins = pins | M6502_IRQ; // pull up
-            // printf("IRQ is set: %d %d\r\n", mem[0x00FF],pins & M6502_IRQ ==  M6502_IRQ);
-            // printf("PC: %4.4x\r\n", m6502_pc(&cpu));
-            // printf("P: 0x%2.2x\r\n", m6502_p(&cpu));
-            // fflush(stdout);
-        }
-        else {
-            // pins = pins & ~M6502_IRQ;
-            pins = pins | M6502_IRQ; // pull up
-            // printf("IRQ is clear\r\n");
-            // fflush(stdout);
+        kbd_tick();
+        if (mem[N8_IRQ_FLAGS] != 0)
+            pins |= M6502_IRQ;
+        else
+            pins &= ~M6502_IRQ;
+
+        // Frame buffer: $C000-$CFFF (separate backing store)
+        bool fb_access = (addr >= N8_FB_BASE && addr <= N8_FB_END);
+        if (fb_access) {
+            uint16_t fb_offset = addr - N8_FB_BASE;
+            if (pins & M6502_RW) {
+                M6502_SET_DATA(pins, frame_buffer[fb_offset]);
+            } else {
+                uint8_t val = M6502_GET_DATA(pins);
+                if (frame_buffer[fb_offset] != val) {
+                    frame_buffer[fb_offset] = val;
+                    fb_dirty = true;
+                }
+            }
         }
 
-        // Write to underlying RAM first
-        if (BUS_READ) {
-            M6502_SET_DATA(pins, mem[addr]);
-        }
-        else {
-            mem[addr] = M6502_GET_DATA(pins);
-            // printf("%04X: %02X\n", addr, mem[addr]);
+        // Device register space: $D800-$DFFF
+        bool dev_access = !fb_access && (addr >= N8_DEV_BASE && addr <= N8_DEV_END);
+        if (dev_access) {
+            uint16_t dev_offset = addr - N8_DEV_BASE;
+            uint8_t  slot = dev_offset >> 5;    // 0-63
+            uint8_t  reg  = dev_offset & 0x1F;  // 0-31
+
+            switch (slot) {
+                case N8_IRQ_SLOT:  // $D800: System / IRQ (read-only to CPU)
+                    if (pins & M6502_RW) {
+                        M6502_SET_DATA(pins, mem[N8_IRQ_FLAGS]);
+                    }
+                    // CPU writes ignored — IRQ flags managed by emu_set_irq/emu_clr_irq
+                    break;
+                case N8_TTY_SLOT:  // $D820: TTY
+                    tty_decode(pins, reg);
+                    break;
+                case N8_VID_SLOT:  // $D840: Video Control
+                    video_decode(pins, reg);
+                    break;
+                case N8_KBD_SLOT:  // $D860: Keyboard
+                    kbd_decode(pins, reg);
+                    break;
+                default:
+                    // Reserved slots: read returns $00, write ignored
+                    if (pins & M6502_RW) {
+                        M6502_SET_DATA(pins, 0x00);
+                    }
+                    break;
+            }
         }
 
-        // Monitor Zeropage
-        BUS_DECODE(addr, 0x0000, 0xFF00) {
-            // BUS_LOG(tick_count, "0Pg", BUS_READ, addr, mem[addr] );
+        // Generic RAM/ROM access (skip if FB or device handled it)
+        if (!fb_access && !dev_access) {
+            if (BUS_READ) {
+                M6502_SET_DATA(pins, mem[addr]);
+            }
+            else {
+                if (addr < N8_ROM_BASE) {
+                    mem[addr] = M6502_GET_DATA(pins);
+                }
+                // else: silently ignore CPU writes to ROM ($E000-$FFFF)
+            }
         }
 
-        // Handle some devices
-        BUS_DECODE(addr, 0xFFF0, 0xFFF0) {
-            BUS_LOG(tick_count, "VEC", BUS_READ, addr, mem[addr] );
-        }
-        // TTY device
-        BUS_DECODE(addr, 0xC100, 0xFFF0) { 
-            const uint8_t dev_reg = (addr - 0xC100) & 0x00FF;
-            tty_decode(pins, dev_reg);
-        }
-        // IRQ handling
-        
         tick_count++;
 
 }
@@ -266,9 +312,12 @@ void emulator_setbp_old(char * buff) {
 void emulator_reset() {
     pins = pins | M6502_RES;
     tty_reset();
+    video_reset();
+    kbd_reset();
+    memset(frame_buffer, 0, N8_FB_SIZE);
+    fb_dirty = true;
     emulator_loadrom();
     emu_labels_init();
-
 }
 
 // ---- GDB stub accessor functions ----
@@ -286,6 +335,10 @@ void emulator_write_s(uint8_t v) { m6502_set_s(&cpu, v); }
 void emulator_write_p(uint8_t v) { m6502_set_p(&cpu, v); }
 
 void emulator_write_pc(uint16_t addr) {
+    // TODO: prefetch ignores frame_buffer[] — if PC is set into $C000-$CFFF
+    // via GDB, the CPU will see mem[addr] (zeros) instead of frame_buffer[].
+    // Not a practical issue since FB is not executable, but fix if GDB PC
+    // write to FB ever becomes a real use case.
     pins = (pins & (M6502_IRQ | M6502_NMI | M6502_RES | M6502_RDY)) | M6502_SYNC | M6502_RW;
     M6502_SET_ADDR(pins, addr);
     M6502_SET_DATA(pins, mem[addr]);
@@ -383,7 +436,7 @@ void emulator_show_status_window(bool &show_status_window, float frame_time, flo
     ImGui::Text("Data: %2.2x     Bu Addr: %4.4x", M6502_GET_DATA(pins), M6502_GET_ADDR(pins));
     ImGui::Text("  SP: %2.2x        PC: %4.4x",m6502_s(&cpu),m6502_pc(&cpu));
     // ImGui::Text(" IRQ: %2d %2d ", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[0x00FF] != 0));
-    ImGui::Text(" IRQ: %2d %2d Last PC: %4.4x", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[0x00FF] != 0), cur_instruction);
+    ImGui::Text(" IRQ: %2d %2d Last PC: %4.4x", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[N8_IRQ_FLAGS] != 0), cur_instruction);
     ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", frame_time, fps);
     ImGui::Text("Ticks: %lu", tick_count);
     // if (ImGui::Button("Close Me"))

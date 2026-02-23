@@ -14,4 +14,3 @@
 .define BYTE_1      $F1
 .define BYTE_2      $F2
 .define BYTE_3      $F3
-.define ZP_IRQ      $FF

@@ -19,10 +19,10 @@
 .export   main_loop
 
 ; --- TTY device registers ---
-TTY_OUT_CTRL = $C100
-TTY_OUT_DATA = $C101
-TTY_IN_CTRL  = $C102
-TTY_IN_DATA  = $C103
+TTY_OUT_CTRL = $D820
+TTY_OUT_DATA = $D821
+TTY_IN_CTRL  = $D822
+TTY_IN_DATA  = $D823
 
 ; --- Text display ---
 TXT_BASE  = $C000

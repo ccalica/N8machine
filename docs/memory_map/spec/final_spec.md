@@ -1,6 +1,6 @@
 # N8 Machine — Memory Map Migration & Device Implementation Spec
 
-**Version:** 1.0 (Final Synthesis)
+**Version:** 2.0
 **Date:** 2026-02-22
 **Status:** Ready for implementation
 
@@ -97,15 +97,15 @@ This spec covers two tasks:
 |------:|:------------|----------:|------:|
 | 0 | Constants header | 0 | 221 |
 | 1 | IRQ migration + device router | 4 | 225 |
-| 2 | TTY migration | 3 | 228 |
-| 3 | Frame buffer expansion | 7 | 235 |
-| 4 | ROM layout migration | 7 | 242 |
-| 5 | Video control registers | 17 | 259 |
-| 6 | Keyboard registers | 17 | 276 |
-| 7 | GDB stub update | 5 | 281 |
-| 8 | Firmware source migration | 0 (build gate) | 281 |
-| 9 | Playground migration | 0 (build gate) | 281 |
-| 10 | E2E validation & cleanup | 10 (manual) | 281 + 10 |
+| 2 | TTY migration | 4 | 229 |
+| 3 | Frame buffer expansion | 7 | 236 |
+| 4 | ROM layout migration | 7 | 243 |
+| 5 | Video control registers | 19 | 262 |
+| 6 | Keyboard registers | 18 | 280 |
+| 7 | GDB stub update | 5 | 285 |
+| 8 | Firmware source migration | 0 (build gate) | 285 |
+| 9 | Playground migration | 0 (build gate) | 285 |
+| 10 | E2E validation & cleanup | 10 (manual) | 285 + 10 |
 
 ### Key Architectural Decisions
 
@@ -118,6 +118,7 @@ This spec covers two tasks:
 | `kbd_tick()` | Included | Required by IRQ clear-reassert architecture |
 | ROM migration timing | Phase 4 (before video/kbd) | Clears device space before wiring devices |
 | ROM write protection | CPU bus writes to `$E000+` silently ignored | 3 lines; prevents firmware bugs |
+| VID_OPER `$00` | NOP (no operation) | Default register value must be harmless |
 | Scroll fill character | `0x00` | Hardware-like (memory clear to zero) |
 | `N8_RAM_START` | `0x0400` | Matches proposed memory map reserved region |
 | Keyboard file naming | `emu_kbd.*` | Consistent with `emu_tty.*` |
@@ -126,10 +127,10 @@ This spec covers two tasks:
 
 ## 3. Phase 0 — Constants Header
 
-**Goal:** Create a single source of truth for all hardware addresses.
+**Goal:** Create a single source of truth for all hardware addresses. Declare the complete target configuration upfront — every constant, address, and register offset for the final memory map — so subsequent phases only wire behavior, never invent new constants.
 
 **Entry criteria:** `make test` passes (221 tests).
-**Exit criteria:** New header exists. `make` and `make test` pass unchanged. No magic numbers replaced yet.
+**Exit criteria:** New header exists with all target constants. `make` and `make test` pass unchanged. No magic numbers replaced yet — that happens in Phase 1.
 
 ### New file: `src/n8_memory_map.h`
 
@@ -195,11 +196,25 @@ This spec covers two tasks:
 #define N8_VIDMODE_TEXT_DEFAULT  0x00
 #define N8_VIDMODE_TEXT_CUSTOM   0x01
 
-// VID_OPER values
-#define N8_VIDOP_SCROLL_UP      0x00
-#define N8_VIDOP_SCROLL_DOWN    0x01
-#define N8_VIDOP_SCROLL_LEFT    0x02
-#define N8_VIDOP_SCROLL_RIGHT   0x03
+// VID_OPER values (write-once trigger, does not latch)
+#define N8_VIDOP_NOP            0x00  // No operation (default register value)
+#define N8_VIDOP_SCROLL_UP      0x01
+#define N8_VIDOP_SCROLL_DOWN    0x02
+#define N8_VIDOP_SCROLL_LEFT    0x03
+#define N8_VIDOP_SCROLL_RIGHT   0x04
+
+// VID_CURSOR bit fields
+//   bits 0-1: mode (0=off, 1=steady, 2=flash)
+//   bits 2-3: shape (0=underline, 1=block)
+//   bits 4-7: flash rate (frames per toggle; 0=cursor not displayed)
+#define N8_VID_CURSOR_MODE_MASK   0x03
+#define N8_VID_CURSOR_SHAPE_MASK  0x0C
+#define N8_VID_CURSOR_RATE_MASK   0xF0
+#define N8_VID_CURSOR_OFF         0x00
+#define N8_VID_CURSOR_STEADY      0x01
+#define N8_VID_CURSOR_FLASH       0x02
+#define N8_VID_CURSOR_UNDERLINE   0x00
+#define N8_VID_CURSOR_BLOCK       0x04
 
 // Default text mode dimensions
 #define N8_VID_DEFAULT_WIDTH    80
@@ -286,6 +301,11 @@ This spec covers two tasks:
 
 - Add `#include "n8_memory_map.h"` to `test/test_helpers.h`.
 - No behavior changes. No magic number replacements yet.
+- `src/machine.h`: Leave as-is for now. Add comment:
+  ```cpp
+  // TODO: Evaluate whether total_memory should move to n8_memory_map.h
+  // or whether machine.h should be retired entirely after migration.
+  ```
 
 ### Tests
 
@@ -344,6 +364,8 @@ if (addr >= N8_DEV_BASE && addr < (N8_DEV_BASE + N8_DEV_SIZE)) {
 
 **`src/emu_tty.cpp`:** `#include "n8_memory_map.h"`. Replace `emu_set_irq(1)` / `emu_clr_irq(1)` with `N8_IRQ_BIT_TTY`.
 
+**`src/emulator.cpp` — `emulator_show_status_window()`:** Update the IRQ flags display from `mem[0x00FF]` to `mem[N8_IRQ_FLAGS]`. This function renders the ImGui debugger status panel and must reflect the new IRQ address.
+
 ### Test changes
 
 Update all `mem[0x00FF]` references in `test_utils.cpp`, `test_tty.cpp` to `mem[N8_IRQ_FLAGS]`.
@@ -401,12 +423,13 @@ Update all `make_read_pins(0xC1xx)` / `make_write_pins(0xC1xx, ...)` in `test_tt
 | T114 | TTY read at old `$C100` does NOT trigger `tty_decode` |
 | T115 | TTY read at `$D820` returns OUT_STATUS (`$00`) |
 | T116 | TTY write at `$D821` sends character |
+| T116a | `tty_tick()` reasserts IRQ bit 1 at `$D800` after `IRQ_CLR()` |
 
 ### Phase gate
 
 - All prior tests pass (with updated addresses).
-- T114-T116 pass.
-- **Total: 228 tests.**
+- T114-T116a pass.
+- **Total: 229 tests.**
 
 ### Rollback
 
@@ -521,7 +544,7 @@ The fixture constructor must `memset(frame_buffer, 0, N8_FB_SIZE)` and set `fb_d
 
 - All prior tests pass (with updated references).
 - T117-T123 (7 new tests) pass.
-- **Total: 235 tests.**
+- **Total: 236 tests.**
 
 ### Rollback
 
@@ -611,9 +634,9 @@ Existing tests that `load_at(0xD000, ...)` via `EmulatorFixture` still work — 
 
 ### Phase gate
 
-- All prior 235 tests pass.
+- All prior 236 tests pass.
 - T170-T176 (7 new tests) pass.
-- **Total: 242 tests.**
+- **Total: 243 tests.**
 
 ### Rollback
 
@@ -756,6 +779,7 @@ void video_decode(uint64_t& pins, uint8_t reg) {
             case N8_VID_OPER:
                 // Write-once trigger, does not latch
                 switch (val) {
+                    case N8_VIDOP_NOP:          /* no-op */           break;
                     case N8_VIDOP_SCROLL_UP:    video_scroll_up();    break;
                     case N8_VIDOP_SCROLL_DOWN:  video_scroll_down();  break;
                     case N8_VIDOP_SCROLL_LEFT:  video_scroll_left();  break;
@@ -791,6 +815,10 @@ case N8_VID_SLOT:  // $D840: Video Control
 
 Call `video_init()` from `emulator_init()`. Call `video_reset()` from `emulator_reset()`.
 
+### EmulatorFixture update
+
+The fixture constructor must call `video_init()` so that `vid_regs[]` is initialized for video tests. Without this, tests that read VID_MODE etc. via bus decode will see uninitialized state.
+
 ### Build changes
 
 Add `$(SRC_DIR)/emu_video.cpp` to `SOURCES` and `$(BUILD_DIR)/emu_video.o` to `TEST_SRC_OBJS`.
@@ -806,24 +834,26 @@ Add `$(SRC_DIR)/emu_video.cpp` to `SOURCES` and `$(BUILD_DIR)/emu_video.o` to `T
 | T134 | Write/read VID_WIDTH |
 | T135 | Write/read VID_HEIGHT |
 | T136 | Write/read VID_STRIDE |
-| T137 | VID_OPER=`$00` scroll up: row 0 gets row 1, last row zeroed |
-| T138 | VID_OPER=`$01` scroll down: row 1 gets row 0, first row zeroed |
+| T137 | VID_OPER=`$01` scroll up: row 0 gets row 1, last row zeroed |
+| T138 | VID_OPER=`$02` scroll down: row 1 gets row 0, first row zeroed |
 | T139 | Read VID_OPER returns 0 (write-only) |
+| T139a | VID_OPER=`$00` (NOP) does not modify frame buffer |
 | T140 | Write/read VID_CURSOR |
 | T141 | Write/read VID_CURCOL |
 | T142 | Write/read VID_CURROW |
+| T142a | VID_CURSOR: mode=FLASH + rate=0 → cursor not displayed |
 | T143 | Phantom registers (`$D848-$D85F`) read 0, write no-op |
-| T144 | VID_OPER=`$02` scroll left |
-| T145 | VID_OPER=`$03` scroll right |
+| T144 | VID_OPER=`$03` scroll left |
+| T145 | VID_OPER=`$04` scroll right |
 | T146 | Scroll with stride*height > `N8_FB_SIZE` does not corrupt memory |
 
 Tests T137-T138, T144-T145 use `EmulatorFixture`. Pre-fill `frame_buffer[]`, trigger scroll via program (`STA` to `$D844`), verify `frame_buffer[]` contents.
 
 ### Phase gate
 
-- All prior 242 tests pass.
-- T130-T146 (17 new tests) pass.
-- **Total: 259 tests.**
+- All prior 243 tests pass.
+- T130-T146 (19 new tests, including T139a and T142a) pass.
+- **Total: 262 tests.**
 
 ### Rollback
 
@@ -959,6 +989,10 @@ case N8_KBD_SLOT:  // $D860: Keyboard
 Add `kbd_tick()` call in `emulator_step()` next to `tty_tick(pins)`.
 Add `kbd_init()` to `emulator_init()`, `kbd_reset()` to `emulator_reset()`.
 
+### EmulatorFixture update
+
+The fixture constructor must call `kbd_init()` so that keyboard state is initialized for keyboard tests. Combined with Phase 5's `video_init()` call, the fixture now initializes all device subsystems.
+
 ### SDL2 key translation (`src/main.cpp`)
 
 ```cpp
@@ -1012,12 +1046,13 @@ Add `$(SRC_DIR)/emu_kbd.cpp` to `SOURCES` and `$(BUILD_DIR)/emu_kbd.o` to `TEST_
 | T164 | Bus decode: program writes KBD_ACK via STA, clears status |
 | T165 | `kbd_tick()` reasserts IRQ when data avail + IRQ enabled |
 | T166 | `kbd_tick()` does NOT assert IRQ when IRQ disabled |
+| T167 | SDL auto-repeat events (`event.key.repeat`) are filtered out |
 
 ### Phase gate
 
-- All prior 259 tests pass.
-- T150-T166 (17 new tests) pass.
-- **Total: 276 tests.**
+- All prior 262 tests pass.
+- T150-T167 (18 new tests) pass.
+- **Total: 280 tests.**
 
 ### Rollback
 
@@ -1067,9 +1102,9 @@ Regions: `$0000-$BFFF` RAM, `$C000-$CFFF` frame buffer (GDB reads/writes go to `
 
 ### Phase gate
 
-- All prior 276 tests pass (T58 updated).
+- All prior 280 tests pass (T58 updated).
 - T180-T184 (5 new tests) pass.
-- **Total: 281 tests.**
+- **Total: 285 tests.**
 
 ### Rollback
 
@@ -1164,7 +1199,7 @@ Key changes: ROM at `$E000` (8KB, was `$D000` 12KB). RAM starts at `$0400` (was 
 ### Phase gate
 
 - `make firmware` produces `N8firmware` without errors.
-- `make test`: **281 passed, 0 failed**.
+- `make test`: **285 passed, 0 failed**.
 - Manual: `./n8` boots, banner prints via TTY, echo loop works.
 
 ### Rollback
@@ -1194,7 +1229,7 @@ Restore original `n8.cfg`, `devices.inc`, `devices.h`, `zp.inc`.
 ### Phase gate
 
 - All playground programs build.
-- `make test`: **281 passed, 0 failed**.
+- `make test`: **285 passed, 0 failed**.
 - Manual: `n8gdb repl` with `test_tty` sends output correctly.
 
 ### Rollback
@@ -1233,7 +1268,7 @@ Restore original equates and `playground.cfg` files.
 ### Final gate
 
 - `make clean && make && make firmware && make test` all succeed.
-- **281 automated tests, 0 failures.**
+- **285 automated tests, 0 failures.**
 - All 10 E2E scenarios pass manually.
 - No legacy addresses remain in the codebase.
 - Tag: `git tag memory-map-v2`
@@ -1260,7 +1295,7 @@ frame_buffer[4096]  -->  screen_pixels[640x400]  -->  GL texture  -->  ImGui::Im
 - **Dirty flag optimization:** Skip rasterization when `fb_dirty` is false and cursor is not flashing.
 - **Font source:** Copy `docs/charset/n8_font.h` to `src/n8_font.h` for build isolation.
 - **OpenGL texture:** `glGenTextures` + `glTexSubImage2D` (not `SDL_Renderer`, which conflicts with the GL context).
-- **Cursor:** Frame-counter-based flash (deterministic, no timer dependency). Modes: off, steady, flash. Shapes: underline, block.
+- **Cursor:** Frame-counter-based flash (deterministic, no timer dependency). Modes: off, steady, flash. Shapes: underline, block. **Rate=0 with any mode means cursor is not displayed** (resolves the flash+rate=0 edge case).
 - **Phosphor color:** `0xFF33FF33` (green phosphor) as default, UI-selectable.
 - **ImGui window:** "N8 Display" with `ImGui::GetContentRegionAvail()` scaling, `GL_NEAREST` filtering.
 - **`emu_display.cpp`** excluded from test build (OpenGL dependency).
@@ -1301,6 +1336,7 @@ frame_buffer[4096]  -->  screen_pixels[640x400]  -->  GL texture  -->  ImGui::Im
 | T114 | 2 | TTY read at old `$C100` does NOT trigger `tty_decode` |
 | T115 | 2 | TTY read at `$D820` returns OUT_STATUS |
 | T116 | 2 | TTY write at `$D821` sends character |
+| T116a | 2 | `tty_tick()` reasserts IRQ bit 1 at `$D800` after `IRQ_CLR()` |
 | T117 | 3 | Write to `$C100` stores in `frame_buffer[0x100]` |
 | T118 | 3 | Write to `$C7CF` stores correctly |
 | T119 | 3 | Write to `$CFFF` stores correctly |
@@ -1320,15 +1356,17 @@ frame_buffer[4096]  -->  screen_pixels[640x400]  -->  GL texture  -->  ImGui::Im
 | T134 | 5 | Write/read VID_WIDTH |
 | T135 | 5 | Write/read VID_HEIGHT |
 | T136 | 5 | Write/read VID_STRIDE |
-| T137 | 5 | Scroll up: row 0 gets row 1, last row zeroed |
-| T138 | 5 | Scroll down: row 1 gets row 0, first row zeroed |
+| T137 | 5 | Scroll up (`$01`): row 0 gets row 1, last row zeroed |
+| T138 | 5 | Scroll down (`$02`): row 1 gets row 0, first row zeroed |
 | T139 | 5 | Read VID_OPER returns 0 (write-only) |
+| T139a | 5 | VID_OPER=`$00` (NOP) does not modify frame buffer |
 | T140 | 5 | Write/read VID_CURSOR |
 | T141 | 5 | Write/read VID_CURCOL |
 | T142 | 5 | Write/read VID_CURROW |
+| T142a | 5 | VID_CURSOR: mode=FLASH + rate=0 → cursor not displayed |
 | T143 | 5 | Phantom registers (`$D848-$D85F`) read 0, write no-op |
-| T144 | 5 | Scroll left |
-| T145 | 5 | Scroll right |
+| T144 | 5 | Scroll left (`$03`) |
+| T145 | 5 | Scroll right (`$04`) |
 | T146 | 5 | Scroll with oversized stride*height is safe |
 
 **`test/test_kbd.cpp` (new file):**
@@ -1352,6 +1390,7 @@ frame_buffer[4096]  -->  screen_pixels[640x400]  -->  GL texture  -->  ImGui::Im
 | T164 | 6 | Bus decode: program writes KBD_ACK |
 | T165 | 6 | `kbd_tick()` reasserts IRQ when data avail + IRQ enabled |
 | T166 | 6 | `kbd_tick()` does NOT assert IRQ when disabled |
+| T167 | 6 | SDL auto-repeat events (`event.key.repeat`) are filtered out |
 
 **`test/test_integration.cpp` additions:**
 
@@ -1403,7 +1442,7 @@ Tests modified in place (same ID, updated addresses):
 | GDB device register reads trigger side effects | Low | Medium | GDB reads `mem[addr]` directly, bypassing decode |
 | Firmware won't build with new linker config | Low | High | `make firmware` is a phase gate |
 | Legacy loadrom dual-path is fragile | Medium | Low | Temporary; removed in Phase 10. Tested by T174 |
-| `EmulatorFixture` not updated for `frame_buffer[]` | Medium | Medium | Explicit `memset(frame_buffer, 0, N8_FB_SIZE)` in constructor |
+| `EmulatorFixture` not updated for devices | Medium | Medium | Phase 3: `memset(frame_buffer, ...)`. Phase 5: `video_init()`. Phase 6: `kbd_init()`. |
 
 ---
 

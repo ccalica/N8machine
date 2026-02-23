@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-N8machine is a 6502 homebrew computer emulator with a GUI debugger. It emulates a custom 6502 machine with 64KB address space, memory-mapped I/O (text display at $C000, TTY at $C100), and 12KB ROM at $D000. The GUI uses SDL2 + Dear ImGui + OpenGL3. A GDB RSP stub on TCP port 3333 enables remote debugging via the included `n8gdb` Node.js client.
+N8machine is a 6502 homebrew computer emulator with a GUI debugger. It emulates a custom 6502 machine with 64KB address space, slot-based device registers at `$D800-$DFFF`, 4KB frame buffer at `$C000`, and 8KB ROM at `$E000`. The GUI uses SDL2 + Dear ImGui + OpenGL3. A GDB RSP stub on TCP port 3333 enables remote debugging via the included `n8gdb` Node.js client.
 
 ## Build Commands
 
@@ -24,22 +24,28 @@ Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` 
 
 ## Architecture
 
-**CPU core:** `src/m6502.h` — vendored cycle-accurate 6502 from [floooh/chips](https://github.com/floooh/chips/). All bus interaction is via a 64-bit pin mask (`m6502_tick()`). Device decode uses `BUS_DECODE(bus, base, mask)` macro in `emulator.cpp`.
+**CPU core:** `src/m6502.h` — vendored cycle-accurate 6502 from [floooh/chips](https://github.com/floooh/chips/). All bus interaction is via a 64-bit pin mask (`m6502_tick()`).
 
-**Memory map:**
+**Memory map:** (all constants defined in `src/n8_memory_map.h`)
 - `$0000-$00FF` Zero Page (cc65 runtime vars + firmware ZP at `$E0-$FF`)
 - `$0100-$01FF` Hardware Stack
-- `$0200-$BEFF` RAM
-- `$C000-$C0FF` Text Display (frame_buffer[256])
-- `$C100-$C10F` TTY device (maps to host stdin/stdout via `emu_tty.cpp`)
-- `$D000-$FFF9` ROM (firmware binary)
-- `$FFFA-$FFFF` Vectors (NMI/RESET/IRQ)
+- `$0400-$BFFF` Program RAM
+- `$C000-$CFFF` Frame Buffer (4KB, separate `frame_buffer[]` backing store)
+- `$D000-$D7FF` Dev Bank (2KB RAM)
+- `$D800-$D81F` System/IRQ (slot 0) — `mem[$D800]` = IRQ flags
+- `$D820-$D83F` TTY (slot 1) — `emu_tty.cpp`
+- `$D840-$D85F` Video Control (slot 2) — `emu_video.cpp`
+- `$D860-$D87F` Keyboard (slot 3) — `emu_kbd.cpp`
+- `$D880-$DFFF` Reserved device slots
+- `$E000-$FFFF` ROM (8KB firmware binary)
+
+**Device router:** Slot-based dispatch in `emulator_step()`: `slot = (addr - $D800) >> 5`, `reg = offset & 0x1F`. Bus decode priority: frame buffer → device router → generic mem[] (with ROM write protection).
 
 **GDB stub** (`src/gdb_stub.cpp`): Zero coupling to emulator — all access through `gdb_stub_callbacks_t` function pointers wired in `main.cpp`. TCP listener runs in a separate thread. Compile-time toggle: `ENABLE_GDB_STUB=0` makes all stub functions empty inlines.
 
-**Main loop** (`src/main.cpp`): Each frame polls `gdb_stub_poll()` for GDB commands, then runs `emulator_step()` in a ~13ms time slice. Breakpoint/watchpoint hits call `gdb_stub_notify_stop()` to send async stop replies.
+**Main loop** (`src/main.cpp`): Each frame polls `gdb_stub_poll()` for GDB commands, then runs `emulator_step()` in a ~13ms time slice. Breakpoint/watchpoint hits call `gdb_stub_notify_stop()` to send async stop replies. SDL keyboard events are translated to N8 keycodes via `sdl_to_n8_keycode()` and injected via `kbd_inject_key()`.
 
-**IRQ mechanism:** `mem[0x00FF]` is the IRQ flag register. TTY asserts IRQ bit 1 when its ring buffer has data.
+**IRQ mechanism:** `mem[$D800]` is the IRQ flag register. `IRQ_CLR()` zeros it every tick; devices reassert via their tick functions (`tty_tick()`, `kbd_tick()`). TTY asserts bit 1, keyboard asserts bit 2.
 
 ## Testing
 
@@ -59,7 +65,7 @@ Two test fixtures in `test/test_helpers.h`:
 
 ```bash
 node bin/n8gdb/n8gdb.mjs repl --sym firmware/gdb_playground/test_regs.sym
-n8> load firmware/gdb_playground/test_regs 0xD000
+n8> load firmware/gdb_playground/test_regs 0xE000
 n8> reset
 n8> bp final_state
 n8> run
@@ -75,16 +81,19 @@ cc65 toolchain (`cl65 -t none --cpu 6502`). Linker config: `firmware/n8.cfg`. Cu
 - `firmware/playground/` — experimental firmware programs
 - `firmware/gdb_playground/` — GDB RSP stub validation tests (7 test programs)
 
-Playground programs build to 12KB ROM binaries at $D000 with `.sym` files for n8gdb label resolution.
+Playground programs build to 8KB ROM binaries at $E000 with `.sym` files for n8gdb label resolution.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/main.cpp` | SDL2/ImGui event loop, GDB callback wiring, emulator control |
-| `src/emulator.cpp` | CPU core, 64KB memory, bus decode, breakpoint/watchpoint logic |
+| `src/main.cpp` | SDL2/ImGui event loop, GDB callback wiring, SDL key translation |
+| `src/emulator.cpp` | CPU core, 64KB memory, device router, breakpoint/watchpoint logic |
+| `src/n8_memory_map.h` | All hardware address constants and register definitions |
 | `src/gdb_stub.cpp` | GDB RSP protocol handler + TCP transport thread |
 | `src/emu_tty.cpp` | TTY memory-mapped device (raw terminal I/O) |
+| `src/emu_video.cpp` | Video control registers, scroll operations |
+| `src/emu_kbd.cpp` | Keyboard registers, IRQ reassertion, key injection |
 | `src/m6502.h` | Vendored 6502 CPU emulator (do not edit) |
 | `bin/n8gdb/rsp.mjs` | Low-level GDB RSP TCP client |
 | `bin/n8gdb/n8gdb.mjs` | n8gdb CLI commands and REPL |

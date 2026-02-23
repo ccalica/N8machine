@@ -3,8 +3,11 @@
 // CRITICAL: Do NOT define CHIPS_IMPL in any test file.
 // The m6502 implementation is already compiled into emulator.o.
 #include "m6502.h"
+#include "n8_memory_map.h"
 #include "emulator.h"
 #include "emu_tty.h"
+#include "emu_video.h"
+#include "emu_kbd.h"
 #include "emu_labels.h"
 #include "emu_dis6502.h"
 #include "utils.h"
@@ -146,6 +149,8 @@ struct CpuFixture {
 struct EmulatorFixture {
     EmulatorFixture() {
         memset(mem, 0, sizeof(uint8_t) * 65536);
+        memset(frame_buffer, 0, N8_FB_SIZE);
+        fb_dirty = true;
         memset(bp_mask, 0, sizeof(bool) * 65536);
         memset(wp_write_mask, 0, sizeof(bool) * 65536);
         memset(wp_read_mask, 0, sizeof(bool) * 65536);
@@ -156,6 +161,8 @@ struct EmulatorFixture {
         emulator_clear_wp_hit();
         emu_labels_clear();
         tty_reset();
+        video_init();
+        kbd_init();
         pins = m6502_init(&cpu, &desc);
         stub_clear_console_buffer();
     }

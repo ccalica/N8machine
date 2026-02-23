@@ -21,8 +21,8 @@
 .export   str_hello, str_nums, str_banner
 
 ; TTY device registers
-TTY_OUT_CTRL = $C100
-TTY_OUT_DATA = $C101
+TTY_OUT_CTRL = $D820
+TTY_OUT_DATA = $D821
 
 ; Zero page pointer for puts
 zp_ptr = $E0                ; E0/E1

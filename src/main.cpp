@@ -29,12 +29,15 @@ using namespace std;
 #include <thread>
 
 #include "emulator.h"
+#include "n8_memory_map.h"
 #include "emu_dis6502.h"
 #include "machine.h"
 #include "utils.h"
 #include "gdb_stub.h"
 #include "m6502.h"
 #include "emu_tty.h"
+#include "emu_video.h"
+#include "emu_kbd.h"
 
 const char* glsl_version;
 SDL_WindowFlags window_flags;
@@ -84,11 +87,16 @@ static void gdb_write_reg16(int reg_id, uint16_t val) {
 }
 
 static uint8_t gdb_read_mem(uint16_t addr) {
+    if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+        return frame_buffer[addr - N8_FB_BASE];
     return mem[addr];
 }
 
 static void gdb_write_mem(uint16_t addr, uint8_t val) {
-    mem[addr] = val;
+    if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+        frame_buffer[addr - N8_FB_BASE] = val;
+    else
+        mem[addr] = val;
 }
 
 static int gdb_step_instruction(void) {
@@ -160,11 +168,111 @@ static int gdb_get_stop_reason(void) {
 }
 
 static void gdb_reset(void) {
-    // D47: Use M6502_RES pin, NOT emulator_reset()
+    // D47: Use M6502_RES pin, NOT emulator_reset() (avoids ROM reload)
     pins |= M6502_RES;
     tty_reset();
+    video_reset();
+    kbd_reset();
+    memset(frame_buffer, 0, N8_FB_SIZE);
+    fb_dirty = true;
 }
 
+// ---- SDL → N8 keyboard translation ----
+
+static uint8_t sdl_to_n8_keycode(SDL_Keysym keysym) {
+    SDL_Keycode key = keysym.sym;
+    Uint16 mod = keysym.mod;
+
+    // Ctrl+letter → $01-$1A
+    if ((mod & KMOD_CTRL) && key >= SDLK_a && key <= SDLK_z) {
+        return (uint8_t)(key - SDLK_a + 1);
+    }
+
+    // Special keys
+    switch (key) {
+        case SDLK_RETURN:    return 0x0D;
+        case SDLK_BACKSPACE: return 0x08;
+        case SDLK_TAB:       return 0x09;
+        case SDLK_ESCAPE:    return 0x1B;
+        case SDLK_DELETE:    return 0x87;
+        // Arrow keys ($80+)
+        case SDLK_UP:        return 0x80;
+        case SDLK_DOWN:      return 0x81;
+        case SDLK_LEFT:      return 0x82;
+        case SDLK_RIGHT:     return 0x83;
+        case SDLK_HOME:      return 0x84;
+        case SDLK_END:       return 0x85;
+        case SDLK_PAGEUP:    return 0x86;
+        case SDLK_PAGEDOWN:  return 0x88;
+        case SDLK_INSERT:    return 0x89;
+        // Function keys ($90+)
+        case SDLK_F1:        return 0x90;
+        case SDLK_F2:        return 0x91;
+        case SDLK_F3:        return 0x92;
+        case SDLK_F4:        return 0x93;
+        case SDLK_F5:        return 0x94;
+        case SDLK_F6:        return 0x95;
+        case SDLK_F7:        return 0x96;
+        case SDLK_F8:        return 0x97;
+        case SDLK_F9:        return 0x98;
+        case SDLK_F10:       return 0x99;
+        case SDLK_F11:       return 0x9A;
+        case SDLK_F12:       return 0x9B;
+        default: break;
+    }
+
+    // Printable ASCII ($20-$7E)
+    if (key >= SDLK_SPACE && key <= SDLK_z) {
+        if (mod & KMOD_SHIFT) {
+            // Shifted symbols
+            switch (key) {
+                case SDLK_1: return '!';
+                case SDLK_2: return '@';
+                case SDLK_3: return '#';
+                case SDLK_4: return '$';
+                case SDLK_5: return '%';
+                case SDLK_6: return '^';
+                case SDLK_7: return '&';
+                case SDLK_8: return '*';
+                case SDLK_9: return '(';
+                case SDLK_0: return ')';
+                case SDLK_MINUS:        return '_';
+                case SDLK_EQUALS:       return '+';
+                case SDLK_LEFTBRACKET:  return '{';
+                case SDLK_RIGHTBRACKET: return '}';
+                case SDLK_BACKSLASH:    return '|';
+                case SDLK_SEMICOLON:    return ':';
+                case SDLK_QUOTE:        return '"';
+                case SDLK_BACKQUOTE:    return '~';
+                case SDLK_COMMA:        return '<';
+                case SDLK_PERIOD:       return '>';
+                case SDLK_SLASH:        return '?';
+                default: break;
+            }
+            // Shift+letter → uppercase
+            if (key >= SDLK_a && key <= SDLK_z) {
+                return (uint8_t)(key - SDLK_a + 'A');
+            }
+        }
+        // Caps lock + letter → uppercase
+        if ((mod & KMOD_CAPS) && key >= SDLK_a && key <= SDLK_z) {
+            bool shifted = (mod & KMOD_SHIFT) != 0;
+            return shifted ? (uint8_t)key : (uint8_t)(key - SDLK_a + 'A');
+        }
+        return (uint8_t)key;
+    }
+
+    return 0; // Unmapped key
+}
+
+static uint8_t sdl_to_n8_modifiers(Uint16 sdl_mod) {
+    uint8_t mods = 0;
+    if (sdl_mod & KMOD_SHIFT) mods |= N8_KBD_STAT_SHIFT;
+    if (sdl_mod & KMOD_CTRL)  mods |= N8_KBD_STAT_CTRL;
+    if (sdl_mod & KMOD_ALT)   mods |= N8_KBD_STAT_ALT;
+    if (sdl_mod & KMOD_CAPS)  mods |= N8_KBD_STAT_CAPS;
+    return mods;
+}
 
 int SDL_GL_Init() {
     // Setup SDL
@@ -387,6 +495,14 @@ int main(int, char**)
                 done = true;
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
                 done = true;
+            if (event.type == SDL_KEYDOWN && !io.WantCaptureKeyboard
+                && !event.key.repeat) {
+                uint8_t n8_key = sdl_to_n8_keycode(event.key.keysym);
+                uint8_t mods   = sdl_to_n8_modifiers(SDL_GetModState());
+                if (n8_key != 0) {
+                    kbd_inject_key(n8_key, mods);
+                }
+            }
         }
 
         // Start the Dear ImGui frame
