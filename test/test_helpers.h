@@ -3,6 +3,7 @@
 // CRITICAL: Do NOT define CHIPS_IMPL in any test file.
 // The m6502 implementation is already compiled into emulator.o.
 #include "m6502.h"
+#include "n8_memory_map.h"
 #include "emulator.h"
 #include "emu_tty.h"
 #include "emu_labels.h"
