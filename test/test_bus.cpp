@@ -140,4 +140,63 @@ TEST_SUITE("bus") {
         CHECK(mem[0x00FF] == 0xFF);
     }
 
+    // -------------------------------------------------------------------------
+    // T114: TTY read at old $C100 does NOT trigger tty_decode
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T114: TTY read at old $C100 does NOT trigger tty_decode") {
+        EmulatorFixture f;
+        tty_inject_char('X');
+        // Program: LDA $C100; STA $0200; NOP
+        f.load_at(0xD000, {0xAD, 0x00, 0xC1, 0x8D, 0x00, 0x02, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(40);
+        // $C100 is now plain RAM (generic mem[] read), not TTY out_status
+        // mem[0xC100] was zeroed by EmulatorFixture, so should be 0
+        CHECK(mem[0x0200] == 0x00);
+    }
+
+    // -------------------------------------------------------------------------
+    // T115: TTY read at $D820 returns OUT_STATUS ($00)
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T115: TTY read at $D820 returns OUT_STATUS") {
+        EmulatorFixture f;
+        // Program: LDA $D820; STA $0200; NOP
+        f.load_at(0xD000, {0xAD, 0x20, 0xD8, 0x8D, 0x00, 0x02, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(40);
+        // OUT_STATUS always returns 0x00 (ready)
+        CHECK(mem[0x0200] == 0x00);
+    }
+
+    // -------------------------------------------------------------------------
+    // T116: TTY write at $D821 sends character
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T116: TTY write at $D821 sends character (no crash)") {
+        EmulatorFixture f;
+        // Program: LDA #$48; STA $D821; NOP  ('H' to TTY out)
+        f.load_at(0xD000, {0xA9, 0x48, 0x8D, 0x21, 0xD8, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(40);
+        // putchar side effect — just verify no crash
+        CHECK(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // T116a: tty_tick reasserts IRQ bit 1 at $D800 after IRQ_CLR
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T116a: tty_tick reasserts IRQ bit 1 at $D800 after IRQ_CLR") {
+        EmulatorFixture f;
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(10); // boot
+        tty_inject_char('A');
+        emulator_step();
+        // After IRQ_CLR + tty_tick, TTY bit should be reasserted
+        CHECK((mem[N8_IRQ_FLAGS] & 0x02) != 0);
+    }
+
 } // TEST_SUITE("bus")

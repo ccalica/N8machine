@@ -109,8 +109,8 @@ TEST_SUITE("gdb_callbacks") {
 
     TEST_CASE("Memory read of TTY region returns mem[], not device state") {
         EmulatorFixture f;
-        mem[0xC100] = 0x55;
-        CHECK(mem[0xC100] == 0x55);
+        mem[N8_TTY_OUT_STATUS] = 0x55;
+        CHECK(mem[N8_TTY_OUT_STATUS] == 0x55);
     }
 
     TEST_CASE("Memory write to RAM") {
@@ -188,7 +188,7 @@ TEST_SUITE("gdb_callbacks") {
         tty_reset();
         CHECK(tty_buff_count() == 0);
 
-        uint64_t p = make_read_pins(0xC103);
+        uint64_t p = make_read_pins(N8_TTY_IN_DATA);
         tty_decode(p, 3);
         CHECK(M6502_GET_DATA(p) == 0x00);
     }
@@ -198,7 +198,7 @@ TEST_SUITE("gdb_callbacks") {
         tty_reset();
         // Read multiple times from empty queue
         for (int i = 0; i < 5; i++) {
-            uint64_t p = make_read_pins(0xC103);
+            uint64_t p = make_read_pins(N8_TTY_IN_DATA);
             tty_decode(p, 3);
             CHECK(M6502_GET_DATA(p) == 0x00);
         }
@@ -260,7 +260,7 @@ TEST_SUITE("gdb_callbacks") {
         CHECK(tty_buff_count() == 1);
 
         // Read TTY address via mem[] directly (as GDB would)
-        uint8_t val = mem[0xC103];
+        uint8_t val = mem[N8_TTY_IN_DATA];
         (void)val; // ignore value
 
         CHECK(tty_buff_count() == 1); // queue untouched

@@ -143,7 +143,9 @@ void emulator_step() {
                         mem[N8_IRQ_FLAGS] = M6502_GET_DATA(pins);
                     }
                     break;
-                case N8_TTY_SLOT:  // $D820: TTY (Phase 2 wiring — not active yet)
+                case N8_TTY_SLOT:  // $D820: TTY
+                    tty_decode(pins, reg);
+                    break;
                 default:
                     // Reserved slots: read returns $00, write ignored
                     if (pins & M6502_RW) {
@@ -161,12 +163,6 @@ void emulator_step() {
             else {
                 mem[addr] = M6502_GET_DATA(pins);
             }
-        }
-
-        // TTY device (legacy address — removed in Phase 2)
-        BUS_DECODE(addr, 0xC100, 0xFFF0) {
-            const uint8_t dev_reg = (addr - 0xC100) & 0x00FF;
-            tty_decode(pins, dev_reg);
         }
 
         tick_count++;
