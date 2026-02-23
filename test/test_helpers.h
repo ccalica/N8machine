@@ -6,6 +6,7 @@
 #include "n8_memory_map.h"
 #include "emulator.h"
 #include "emu_tty.h"
+#include "emu_video.h"
 #include "emu_labels.h"
 #include "emu_dis6502.h"
 #include "utils.h"
@@ -159,6 +160,7 @@ struct EmulatorFixture {
         emulator_clear_wp_hit();
         emu_labels_clear();
         tty_reset();
+        video_init();
         pins = m6502_init(&cpu, &desc);
         stub_clear_console_buffer();
     }

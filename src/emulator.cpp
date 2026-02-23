@@ -6,6 +6,7 @@
 #include "emulator.h"
 #include "n8_memory_map.h"
 #include "emu_tty.h"
+#include "emu_video.h"
 #include "emu_labels.h"
 #include "gui_console.h"
 #include "utils.h"
@@ -93,6 +94,7 @@ void emulator_init() {
     
     pins = m6502_init(&cpu, &desc);
     tty_init();
+    video_init();
     
 }
 
@@ -177,6 +179,9 @@ void emulator_step() {
                     break;
                 case N8_TTY_SLOT:  // $D820: TTY
                     tty_decode(pins, reg);
+                    break;
+                case N8_VID_SLOT:  // $D840: Video Control
+                    video_decode(pins, reg);
                     break;
                 default:
                     // Reserved slots: read returns $00, write ignored
@@ -314,6 +319,7 @@ void emulator_setbp_old(char * buff) {
 void emulator_reset() {
     pins = pins | M6502_RES;
     tty_reset();
+    video_reset();
     memset(frame_buffer, 0, N8_FB_SIZE);
     fb_dirty = true;
     emulator_loadrom();
