@@ -30,6 +30,10 @@ uint64_t tick_count = 0;
 // 64 KB zero-initialized memory
 uint8_t mem[(1<<16)] = { };
 
+// 4 KB frame buffer (separate backing store, not backed by mem[])
+uint8_t frame_buffer[N8_FB_SIZE] = { };
+bool fb_dirty = true;
+
 m6502_t cpu;
 m6502_desc_t desc;
 uint64_t pins;
@@ -128,8 +132,23 @@ void emulator_step() {
             // fflush(stdout);
         }
 
+        // Frame buffer: $C000-$CFFF (separate backing store)
+        bool fb_access = (addr >= N8_FB_BASE && addr <= N8_FB_END);
+        if (fb_access) {
+            uint16_t fb_offset = addr - N8_FB_BASE;
+            if (pins & M6502_RW) {
+                M6502_SET_DATA(pins, frame_buffer[fb_offset]);
+            } else {
+                uint8_t val = M6502_GET_DATA(pins);
+                if (frame_buffer[fb_offset] != val) {
+                    frame_buffer[fb_offset] = val;
+                    fb_dirty = true;
+                }
+            }
+        }
+
         // Device register space: $D800-$DFFF
-        bool dev_access = (addr >= N8_DEV_BASE && addr <= N8_DEV_END);
+        bool dev_access = !fb_access && (addr >= N8_DEV_BASE && addr <= N8_DEV_END);
         if (dev_access) {
             uint16_t dev_offset = addr - N8_DEV_BASE;
             uint8_t  slot = dev_offset >> 5;    // 0-63
@@ -155,8 +174,8 @@ void emulator_step() {
             }
         }
 
-        // Generic RAM/ROM access (skip if device handled it)
-        if (!dev_access) {
+        // Generic RAM/ROM access (skip if FB or device handled it)
+        if (!fb_access && !dev_access) {
             if (BUS_READ) {
                 M6502_SET_DATA(pins, mem[addr]);
             }
@@ -279,9 +298,10 @@ void emulator_setbp_old(char * buff) {
 void emulator_reset() {
     pins = pins | M6502_RES;
     tty_reset();
+    memset(frame_buffer, 0, N8_FB_SIZE);
+    fb_dirty = true;
     emulator_loadrom();
     emu_labels_init();
-
 }
 
 // ---- GDB stub accessor functions ----

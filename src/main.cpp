@@ -29,6 +29,7 @@ using namespace std;
 #include <thread>
 
 #include "emulator.h"
+#include "n8_memory_map.h"
 #include "emu_dis6502.h"
 #include "machine.h"
 #include "utils.h"
@@ -84,11 +85,16 @@ static void gdb_write_reg16(int reg_id, uint16_t val) {
 }
 
 static uint8_t gdb_read_mem(uint16_t addr) {
+    if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+        return frame_buffer[addr - N8_FB_BASE];
     return mem[addr];
 }
 
 static void gdb_write_mem(uint16_t addr, uint8_t val) {
-    mem[addr] = val;
+    if (addr >= N8_FB_BASE && addr <= N8_FB_END)
+        frame_buffer[addr - N8_FB_BASE] = val;
+    else
+        mem[addr] = val;
 }
 
 static int gdb_step_instruction(void) {

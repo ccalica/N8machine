@@ -147,6 +147,8 @@ struct CpuFixture {
 struct EmulatorFixture {
     EmulatorFixture() {
         memset(mem, 0, sizeof(uint8_t) * 65536);
+        memset(frame_buffer, 0, N8_FB_SIZE);
+        fb_dirty = true;
         memset(bp_mask, 0, sizeof(bool) * 65536);
         memset(wp_write_mask, 0, sizeof(bool) * 65536);
         memset(wp_read_mask, 0, sizeof(bool) * 65536);
