@@ -77,4 +77,67 @@ TEST_SUITE("bus") {
         CHECK(mem[0xC005] == 0x33);
     }
 
+    // -------------------------------------------------------------------------
+    // T110: Write/read $D800 (IRQ_FLAGS device space)
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T110: Device router routes $D800 reads to IRQ_FLAGS") {
+        EmulatorFixture f;
+        // Inject TTY char so tty_tick sets IRQ bit 1
+        tty_inject_char('A');
+        // Program: LDA $D800; STA $0200; NOP
+        f.load_at(0xD000, {0xAD, 0x00, 0xD8, 0x8D, 0x00, 0x02, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(40);
+        // IRQ bit 1 (TTY) should be set in the value read from $D800
+        CHECK((mem[0x0200] & 0x02) != 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // T111: IRQ_CLR() clears all flags, then devices reassert
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T111: IRQ_CLR clears custom bits, tty_tick reasserts TTY bit") {
+        EmulatorFixture f;
+        // Set all bits in IRQ flags
+        mem[N8_IRQ_FLAGS] = 0xFF;
+        f.load_at(0xD000, {0xEA});
+        f.set_reset_vector(0xD000);
+        // After step: IRQ_CLR zeros all flags, then tty_tick reasserts TTY bit only
+        emulator_step();
+        // Custom bits (not TTY) should be cleared
+        CHECK((mem[N8_IRQ_FLAGS] & 0xFC) == 0x00);
+    }
+
+    // -------------------------------------------------------------------------
+    // T112: IRQ line asserted when flags non-zero after tick
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T112: IRQ line asserted when N8_IRQ_FLAGS non-zero after tick") {
+        EmulatorFixture f;
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(10); // boot
+        tty_inject_char('A'); // will cause tty_tick to set IRQ bit
+        emulator_step();
+        CHECK((pins & M6502_IRQ) != 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // T113: Old $00FF no longer acts as IRQ register
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T113: Old $00FF is plain RAM, not IRQ register") {
+        EmulatorFixture f;
+        f.load_at(0xD000, {0xEA, 0xEA, 0xEA});
+        f.set_reset_vector(0xD000);
+        f.step_n(10); // boot
+        // Write to old IRQ address
+        mem[0x00FF] = 0xFF;
+        emulator_step();
+        // IRQ_CLR zeros N8_IRQ_FLAGS ($D800), not $00FF
+        // The old address should still have 0xFF (plain RAM, untouched by IRQ_CLR)
+        CHECK(mem[0x00FF] == 0xFF);
+    }
+
 } // TEST_SUITE("bus")

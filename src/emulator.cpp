@@ -4,6 +4,7 @@
 #include "imgui.h"
 
 #include "emulator.h"
+#include "n8_memory_map.h"
 #include "emu_tty.h"
 #include "emu_labels.h"
 #include "gui_console.h"
@@ -20,8 +21,8 @@
 // #define BUS_LOG(tc,sys,rw,a,d) printf("%lu: %s %s %04X: %02X\r\n",tc,sys,rw ? "R" : "W",a,d);
 #define BUS_LOG(tc,sys,rw,a,d) ;;
 
-#define IRQ_CLR() mem[0x00FF] = 0x00;
-#define IRQ_SET(bit) mem[0x00FF] = (mem[0x00FF] | 0x01 << bit)
+#define IRQ_CLR() mem[N8_IRQ_FLAGS] = 0x00;
+#define IRQ_SET(bit) mem[N8_IRQ_FLAGS] = (mem[N8_IRQ_FLAGS] | (0x01 << bit))
 
 const char *rom_file = "N8firmware";
 uint64_t tick_count = 0;
@@ -54,7 +55,7 @@ void emu_set_irq(int bit) {
     IRQ_SET(bit);
 }
 void emu_clr_irq(int bit) {
-    mem[0x00FF] = (mem[0x00FF] & ~(0x01 << bit) );
+    mem[N8_IRQ_FLAGS] = (mem[N8_IRQ_FLAGS] & ~(0x01 << bit) );
 }
 
 void emulator_loadrom() {
@@ -112,7 +113,7 @@ void emulator_step() {
 
         tty_tick(pins);
         // pins & M6502_IRQ ==  M6502_IRQ
-        if(mem[0x00FF] == 0) {
+        if(mem[N8_IRQ_FLAGS] == 0) {
             pins = pins & ~M6502_IRQ;
             // pins = pins | M6502_IRQ; // pull up
             // printf("IRQ is set: %d %d\r\n", mem[0x00FF],pins & M6502_IRQ ==  M6502_IRQ);
@@ -127,31 +128,47 @@ void emulator_step() {
             // fflush(stdout);
         }
 
-        // Write to underlying RAM first
-        if (BUS_READ) {
-            M6502_SET_DATA(pins, mem[addr]);
-        }
-        else {
-            mem[addr] = M6502_GET_DATA(pins);
-            // printf("%04X: %02X\n", addr, mem[addr]);
+        // Device register space: $D800-$DFFF
+        bool dev_access = (addr >= N8_DEV_BASE && addr <= N8_DEV_END);
+        if (dev_access) {
+            uint16_t dev_offset = addr - N8_DEV_BASE;
+            uint8_t  slot = dev_offset >> 5;    // 0-63
+            uint8_t  reg  = dev_offset & 0x1F;  // 0-31
+
+            switch (slot) {
+                case N8_IRQ_SLOT:  // $D800: System / IRQ
+                    if (pins & M6502_RW) {
+                        M6502_SET_DATA(pins, mem[N8_IRQ_FLAGS]);
+                    } else {
+                        mem[N8_IRQ_FLAGS] = M6502_GET_DATA(pins);
+                    }
+                    break;
+                case N8_TTY_SLOT:  // $D820: TTY (Phase 2 wiring — not active yet)
+                default:
+                    // Reserved slots: read returns $00, write ignored
+                    if (pins & M6502_RW) {
+                        M6502_SET_DATA(pins, 0x00);
+                    }
+                    break;
+            }
         }
 
-        // Monitor Zeropage
-        BUS_DECODE(addr, 0x0000, 0xFF00) {
-            // BUS_LOG(tick_count, "0Pg", BUS_READ, addr, mem[addr] );
+        // Generic RAM/ROM access (skip if device handled it)
+        if (!dev_access) {
+            if (BUS_READ) {
+                M6502_SET_DATA(pins, mem[addr]);
+            }
+            else {
+                mem[addr] = M6502_GET_DATA(pins);
+            }
         }
 
-        // Handle some devices
-        BUS_DECODE(addr, 0xFFF0, 0xFFF0) {
-            BUS_LOG(tick_count, "VEC", BUS_READ, addr, mem[addr] );
-        }
-        // TTY device
-        BUS_DECODE(addr, 0xC100, 0xFFF0) { 
+        // TTY device (legacy address — removed in Phase 2)
+        BUS_DECODE(addr, 0xC100, 0xFFF0) {
             const uint8_t dev_reg = (addr - 0xC100) & 0x00FF;
             tty_decode(pins, dev_reg);
         }
-        // IRQ handling
-        
+
         tick_count++;
 
 }
@@ -383,7 +400,7 @@ void emulator_show_status_window(bool &show_status_window, float frame_time, flo
     ImGui::Text("Data: %2.2x     Bu Addr: %4.4x", M6502_GET_DATA(pins), M6502_GET_ADDR(pins));
     ImGui::Text("  SP: %2.2x        PC: %4.4x",m6502_s(&cpu),m6502_pc(&cpu));
     // ImGui::Text(" IRQ: %2d %2d ", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[0x00FF] != 0));
-    ImGui::Text(" IRQ: %2d %2d Last PC: %4.4x", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[0x00FF] != 0), cur_instruction);
+    ImGui::Text(" IRQ: %2d %2d Last PC: %4.4x", (pins & M6502_IRQ) == M6502_IRQ, (int) (mem[N8_IRQ_FLAGS] != 0), cur_instruction);
     ImGui::Text("App avg %.3f ms/frame (%.1f FPS)", frame_time, fps);
     ImGui::Text("Ticks: %lu", tick_count);
     // if (ImGui::Button("Close Me"))

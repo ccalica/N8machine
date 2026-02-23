@@ -1,6 +1,7 @@
 
 #include "emu_tty.h"
 #include "emulator.h"
+#include "n8_memory_map.h"
 #include "m6502.h"
 
 #include <unistd.h>
@@ -50,7 +51,7 @@ int getch() {
 
 void tty_tick(uint64_t &pins) {
     if(tty_buff.size() > 0) { 
-        emu_set_irq(1);
+        emu_set_irq(N8_IRQ_BIT_TTY);
     }
     if(!tty_kbhit()) {
         return;
@@ -60,7 +61,7 @@ void tty_tick(uint64_t &pins) {
         exit(-1);
     }
     tty_buff.push((uint8_t (c & 0xff)));
-    emu_set_irq(1);
+    emu_set_irq(N8_IRQ_BIT_TTY);
 }
 
 void tty_decode(uint64_t &pins, uint8_t dev_reg) {
@@ -89,7 +90,7 @@ void tty_decode(uint64_t &pins, uint8_t dev_reg) {
                 data_bus = tty_buff.front();
                 tty_buff.pop();
                 if(tty_buff.size()== 0) {
-                    emu_clr_irq(1);
+                    emu_clr_irq(N8_IRQ_BIT_TTY);
                 }
                 break;
             default:
@@ -129,7 +130,7 @@ void tty_reset() {
     while( !tty_buff.empty()) {
         tty_buff.pop();
     }
-    emu_clr_irq(1);
+    emu_clr_irq(N8_IRQ_BIT_TTY);
     printf("tty_reset():\r\n");
     fflush(stdout);
 }
