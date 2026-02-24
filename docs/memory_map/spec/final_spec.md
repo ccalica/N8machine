@@ -88,7 +88,7 @@ This spec covers two tasks:
 |-----:|-----:|:-------|:----------|
 | `$D800` | 0 | System/IRQ | 1 (IRQ_FLAGS) |
 | `$D820` | 1 | TTY | 4 (OUT_STATUS, OUT_DATA, IN_STATUS, IN_DATA) |
-| `$D840` | 2 | Video Control | 8 (MODE, WIDTH, HEIGHT, STRIDE, OPER, CURSOR, CURCOL, CURROW) |
+| `$D840` | 2 | Video Control | 9 (MODE, WIDTH, HEIGHT, STRIDE, OPER, CURSOR, CURCOL, CURROW, VSYNC) |
 | `$D860` | 3 | Keyboard | 3 (KBD_DATA, KBD_STATUS/ACK, KBD_CTRL) |
 
 ### Phase Summary
@@ -190,6 +190,7 @@ This spec covers two tasks:
 #define N8_VID_CURSOR      0x05
 #define N8_VID_CURCOL      0x06
 #define N8_VID_CURROW      0x07
+#define N8_VID_VSYNC       0x08
 #define N8_VID_SLOT        2
 
 // VID_MODE values
@@ -288,6 +289,7 @@ This spec covers two tasks:
 .define N8_VID_CURSOR     $D845
 .define N8_VID_CURCOL     $D846
 .define N8_VID_CURROW     $D847
+.define N8_VID_VSYNC      $D848
 
 .define N8_KBD_DATA       $D860
 .define N8_KBD_STATUS     $D861

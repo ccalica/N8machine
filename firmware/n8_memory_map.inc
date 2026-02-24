@@ -18,6 +18,7 @@
 .define N8_VID_CURSOR     $D845
 .define N8_VID_CURCOL     $D846
 .define N8_VID_CURROW     $D847
+.define N8_VID_VSYNC      $D848
 
 .define N8_KBD_DATA       $D860
 .define N8_KBD_STATUS     $D861

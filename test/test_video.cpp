@@ -210,12 +210,12 @@ TEST_SUITE("video") {
     }
 
     // -------------------------------------------------------------------------
-    // T143: Phantom registers ($D848-$D85F) read 0, write no-op
+    // T143: Phantom registers ($D849-$D85F) read 0, write no-op
     // -------------------------------------------------------------------------
 
     TEST_CASE("T143: Phantom registers read 0, write no-op") {
         EmulatorFixture f;
-        for (uint8_t reg = 8; reg < 32; reg++) {
+        for (uint8_t reg = 9; reg < 32; reg++) {
             uint64_t pr = make_read_pins(N8_VID_BASE + reg);
             video_decode(pr, reg);
             CHECK(M6502_GET_DATA(pr) == 0x00);
@@ -326,6 +326,74 @@ TEST_SUITE("video") {
         video_decode(p, N8_VID_OPER);
         CHECK(frame_buffer[0] == 'X');
         CHECK(frame_buffer[1] == 'Y');
+    }
+
+    // -------------------------------------------------------------------------
+    // T147: VID_VSYNC reads 0 after reset
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T147: VID_VSYNC reads 0 after reset") {
+        EmulatorFixture f;
+        video_reset();
+        uint64_t p = make_read_pins(N8_VID_BASE + N8_VID_VSYNC);
+        video_decode(p, N8_VID_VSYNC);
+        CHECK(M6502_GET_DATA(p) == 0x00);
+    }
+
+    // -------------------------------------------------------------------------
+    // T148: VID_VSYNC increments on video_rasterize
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T148: VID_VSYNC increments on video_rasterize") {
+        EmulatorFixture f;
+        video_reset();
+        fb_dirty = true;
+        video_rasterize(0);
+        uint64_t p = make_read_pins(N8_VID_BASE + N8_VID_VSYNC);
+        video_decode(p, N8_VID_VSYNC);
+        CHECK(M6502_GET_DATA(p) == 1);
+        fb_dirty = true;
+        video_rasterize(1);
+        uint64_t p2 = make_read_pins(N8_VID_BASE + N8_VID_VSYNC);
+        video_decode(p2, N8_VID_VSYNC);
+        CHECK(M6502_GET_DATA(p2) == 2);
+    }
+
+    // -------------------------------------------------------------------------
+    // T149: VID_VSYNC wraps at 256
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T149: VID_VSYNC wraps at 256") {
+        EmulatorFixture f;
+        video_reset();
+        for (int i = 0; i < 255; i++) {
+            video_rasterize(i);
+        }
+        uint64_t p1 = make_read_pins(N8_VID_BASE + N8_VID_VSYNC);
+        video_decode(p1, N8_VID_VSYNC);
+        CHECK(M6502_GET_DATA(p1) == 255);
+        video_rasterize(255);
+        uint64_t p2 = make_read_pins(N8_VID_BASE + N8_VID_VSYNC);
+        video_decode(p2, N8_VID_VSYNC);
+        CHECK(M6502_GET_DATA(p2) == 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // T149a: VID_VSYNC writes are ignored
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T149a: VID_VSYNC writes are ignored") {
+        EmulatorFixture f;
+        video_reset();
+        fb_dirty = true;
+        video_rasterize(0);
+        // Try to write a value
+        uint64_t pw = make_write_pins(N8_VID_BASE + N8_VID_VSYNC, 0x42);
+        video_decode(pw, N8_VID_VSYNC);
+        // Should still read 1 (from the one rasterize call)
+        uint64_t pr = make_read_pins(N8_VID_BASE + N8_VID_VSYNC);
+        video_decode(pr, N8_VID_VSYNC);
+        CHECK(M6502_GET_DATA(pr) == 1);
     }
 
 } // TEST_SUITE("video")

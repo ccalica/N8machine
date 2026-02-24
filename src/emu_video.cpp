@@ -6,6 +6,7 @@
 #include <cstring>
 
 static uint8_t vid_regs[8] = { 0 };
+static uint8_t vsync_counter = 0;
 
 // Pixel buffer for the display module
 static uint32_t screen_pixels[N8_SCREEN_MAX_W * N8_SCREEN_MAX_H];
@@ -19,6 +20,7 @@ void video_reset() {
     vid_regs[N8_VID_WIDTH]  = N8_VID_DEFAULT_WIDTH;
     vid_regs[N8_VID_HEIGHT] = N8_VID_DEFAULT_HEIGHT;
     vid_regs[N8_VID_STRIDE] = N8_VID_DEFAULT_WIDTH;
+    vsync_counter = 0;
     memset(screen_pixels, 0, sizeof(screen_pixels));
     screen.width  = N8_VID_DEFAULT_WIDTH * N8_FONT_WIDTH;
     screen.height = N8_VID_DEFAULT_HEIGHT * N8_FONT_HEIGHT;
@@ -84,7 +86,12 @@ static void video_scroll_right() {
 }
 
 void video_decode(uint64_t& pins, uint8_t reg) {
-    if (reg > 7) {
+    if (reg == N8_VID_VSYNC) {
+        // VID_VSYNC: read-only frame counter
+        if (pins & M6502_RW) M6502_SET_DATA(pins, vsync_counter);
+        return;
+    }
+    if (reg > N8_VID_VSYNC) {
         // Phantom registers: read 0, write no-op
         if (pins & M6502_RW) M6502_SET_DATA(pins, 0x00);
         return;
@@ -133,6 +140,8 @@ uint8_t video_get_cursor_row()   { return vid_regs[N8_VID_CURROW]; }
 const n8_screen_t* video_get_screen() { return &screen; }
 
 void video_rasterize(uint32_t frame_count) {
+    vsync_counter++;
+
     uint8_t cursor_reg = vid_regs[N8_VID_CURSOR];
     uint8_t cursor_mode = cursor_reg & N8_VID_CURSOR_MODE_MASK;
     bool cursor_active = (cursor_mode != N8_VID_CURSOR_OFF);

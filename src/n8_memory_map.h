@@ -53,6 +53,7 @@
 #define N8_VID_CURSOR      0x05
 #define N8_VID_CURCOL      0x06
 #define N8_VID_CURROW      0x07
+#define N8_VID_VSYNC       0x08
 #define N8_VID_SLOT        2
 
 // VID_MODE values
