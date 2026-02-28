@@ -1,7 +1,6 @@
 # N8 Machine — Hardware Registers
 
 Device registers at `$D800–$DFFF` (2 KB), 32-byte spacing per device.
-Footnotes show current (pre-move) locations in the emulator.
 
 ## Device Register Map (`$D800–$DFFF`)
 
@@ -9,7 +8,7 @@ Footnotes show current (pre-move) locations in the emulator.
 | -------:| ---------------- | --------------:| -------------------------------- |
 | `$D800` | System / IRQ     | 1              | IRQ flags, system status         |
 | `$D820` | TTY              | 4              | Serial I/O                       |
-| `$D840` | Video Control    | 8              | Mode, dimensions, cursor, scroll |
+| `$D840` | Video Control    | 9              | Mode, dimensions, cursor, scroll |
 | `$D860` | Keyboard         | 3              | ASCII + extended, IRQ, Phase 1   |
 | `$D880` | Math Coprocessor | TBD            | RPN stack window                 |
 | `$D8A0` | Storage          | TBD            |                                  |
@@ -21,7 +20,7 @@ Footnotes show current (pre-move) locations in the emulator.
 
 | Address | R/W | Name      | Description                |
 | -------:| --- | --------- | -------------------------- |
-| `$D800` | R/W | IRQ_FLAGS | Bit-mapped IRQ status [^1] |
+| `$D800` | R/W | IRQ_FLAGS | Bit-mapped IRQ status |
 
 **Bits:**
 
@@ -42,13 +41,13 @@ and asserts IRQ bit 1 when data is available.
 
 | Address | R/W | Name           | Description                                                          |
 | -------:| --- | -------------- | -------------------------------------------------------------------- |
-| `$D820` | R   | TTY_OUT_STATUS | Always `$00` (ready to transmit) [^2]                                |
+| `$D820` | R   | TTY_OUT_STATUS | Always `$00` (ready to transmit)                                     |
 | `$D820` | W   | —              | No-op                                                                |
-| `$D821` | R   | TTY_OUT_DATA   | Returns `$FF` (invalid; write-only in practice) [^3]                 |
+| `$D821` | R   | TTY_OUT_DATA   | Returns `$FF` (invalid; write-only in practice)                      |
 | `$D821` | W   | TTY_OUT_DATA   | Write byte to stdout                                                 |
-| `$D822` | R   | TTY_IN_STATUS  | `$00` = empty, `$01` = data available [^4]                           |
+| `$D822` | R   | TTY_IN_STATUS  | `$00` = empty, `$01` = data available                                |
 | `$D822` | W   | —              | No-op                                                                |
-| `$D823` | R   | TTY_IN_DATA    | Read byte from input buffer (pops; clears IRQ bit 1 when empty) [^5] |
+| `$D823` | R   | TTY_IN_DATA    | Read byte from input buffer (pops; clears IRQ bit 1 when empty)      |
 | `$D823` | W   | —              | No-op                                                                |
 
 ## Video Control — `$D840`
@@ -63,6 +62,7 @@ and asserts IRQ bit 1 when data is available.
 | `$D845` | R/W | VID_CURSOR | Cursor style and flash rate               |
 | `$D846` | R/W | VID_CURCOL | Cursor column (0-based)                   |
 | `$D847` | R/W | VID_CURROW | Cursor row (0-based)                      |
+| `$D848` | R   | VID_VSYNC  | Frame counter (increments each frame)     |
 
 **VID_MODE values:**
 
@@ -78,21 +78,21 @@ to the mode's defaults. VID_STRIDE defaults to same as VID_WIDTH.
 
 Write triggers an immediate one-time scroll. Register does not latch.
 
-| Value | Operation   |
-| -----:| ----------- |
-| `$00` | Scroll up   |
-| `$01` | Scroll down |
-| `$02` | Scroll left |
-| `$03` | Scroll right|
+| Value | Operation    |
+| -----:| ------------ |
+| `$00` | No operation |
+| `$01` | Scroll up    |
+| `$02` | Scroll down  |
+| `$03` | Scroll left  |
+| `$04` | Scroll right |
 
 **VID_CURSOR bits:**
 
-| Bits | Name  | Description                                          |
-| ----:| ----- | ---------------------------------------------------- |
+| Bits | Name  | Description                                                    |
+| ----:| ----- | -------------------------------------------------------------- |
 | 0–1  | MODE  | `00` = off, `01` = on (steady), `10` = flash, `11` = reserved |
-| 2    | SHAPE | `0` = underline, `1` = block                        |
-| 3–4  | RATE  | `00` = off, `01` = slow, `10` = medium, `11` = fast |
-| 5–7  | —     | Reserved                                             |
+| 2–3  | SHAPE | `00` = underline, `01` = block                                |
+| 4–7  | RATE  | Frames per toggle (`0` = cursor not displayed)                 |
 
 **Reset state:** VID_MODE = `$00`, VID_WIDTH = 80, VID_HEIGHT = 25,
 VID_STRIDE = 80. VID_CURSOR = `$00` (cursor off). VID_CURCOL = 0,
@@ -108,7 +108,7 @@ Apple II-style: poll or IRQ, read data, acknowledge.
 
 | Address         | R/W | Name       | Description                                                                             |
 | ---------------:| --- | ---------- | --------------------------------------------------------------------------------------- |
-| `$D860`         | R   | KBD_DATA   | Key code. `$00–$7F` = ASCII, `$80–$FF` = extended (see [keycodes.md](keycodes.md)) [^7] |
+| `$D860`         | R   | KBD_DATA   | Key code. `$00–$7F` = ASCII, `$80–$FF` = extended (see [keycodes.md](keycodes.md)) |
 | `$D861`         | R   | KBD_STATUS | Flags + live modifier state (see bits below)                                            |
 | `$D861`         | W   | KBD_ACK    | Write any value: clears DATA_AVAIL, OVERFLOW, deasserts IRQ                             |
 | `$D862`         | R/W | KBD_CTRL   | Bit 0 = IRQ enable (default 0 = polling only)                                           |
@@ -141,19 +141,10 @@ are active; remaining bytes are unused.
 
 | Address         | R/W | Name    | Description              |
 | ---------------:| --- | ------- | ------------------------ |
-| `$C000`–`$CFFF` | R/W | FB_DATA | 4 KB display buffer [^6] |
+| `$C000`–`$CFFF` | R/W | FB_DATA | 4 KB display buffer |
 
 ## Open Issues
 
 - **Text Custom mode:** Width/height constraints, stride behavior,
   and max framebuffer usage not yet defined.
 
-## Footnotes — Current Locations
-
-[^1]: IRQ_FLAGS is currently at **`$00FF`** (zero page).
-[^2]: TTY_OUT_STATUS is currently at **`$C100`**.
-[^3]: TTY_OUT_DATA is currently at **`$C101`**.
-[^4]: TTY_IN_STATUS is currently at **`$C102`**.
-[^5]: TTY_IN_DATA is currently at **`$C103`**.
-[^6]: Frame buffer is currently **256 bytes** at **`$C000–$C0FF`**.
-[^7]: Notion spec used placeholder **`$FF00`**. See: *N8Machine Keyboard Register Interface Spec — Phase 1*.
