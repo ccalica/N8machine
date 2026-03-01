@@ -24,7 +24,7 @@
 .import   item_desc_lo, item_desc_hi
 .import   item_init_loc, item_flags
 ; NUM_ITEMS defined locally (must match world.s)
-NUM_ITEMS = 8
+NUM_ITEMS = 11
 .import   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
 .import   str_not_here, str_cant_take, str_no_have, str_examine_what
 .import   str_take_what, str_drop_what
@@ -33,14 +33,24 @@ NUM_ITEMS = 8
 ; Item IDs (must match world.s)
 ITEM_CREDCHIP   = 0
 ITEM_STIMPACK   = 2
+ITEM_FAKEID     = 3
 ITEM_ICEBREAKER = 4
+ITEM_KEYCARD    = 8
+ITEM_CROWBAR    = 9
 
 ; Room IDs (must match world.s)
-ROOM_MICROSOFTS = 3
-ROOM_CLINIC     = 4
+ROOM_MICROSOFTS  = 3
+ROOM_CLINIC      = 4
+ROOM_METRO_CAR   = 9
+ROOM_CORP_PLAZA  = 10
+ROOM_TOWER_LOBBY = 11
+ROOM_SECURITY    = 12
+ROOM_ELEVATOR    = 13
 
 ; Puzzle flags
-PF_NEURAL_LINK  = $01           ; bit 0: neural link installed
+PF_NEURAL_LINK   = $01          ; bit 0: neural link installed
+PF_TOWER_ACCESS  = $02          ; bit 1: tower lobby → security unlocked
+PF_ELEVATOR_KEY  = $04          ; bit 2: elevator unlocked
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -247,7 +257,9 @@ dispatch:
         ; Compare VERB_BUF with table entry
         STX zp_tmp2             ; save table index
         JSR strcmp
-        LDX zp_tmp2
+        PHA                     ; save strcmp result (Z flag)
+        LDX zp_tmp2             ; restore table index (clobbers Z)
+        PLA                     ; restore strcmp result (sets Z)
         BEQ @found              ; strcmp returned 0 = match
 
         ; Next entry (4 bytes: 2 name ptr + 2 handler ptr)
@@ -441,8 +453,8 @@ print_exits:
         LDA room_exit_n,X
         CMP #NO_EXIT
         BEQ @check_s
-        INC zp_tmp2
         JSR print_exit_sep
+        INC zp_tmp2
         LDA #<str_dir_n
         STA zp_str
         LDA #>str_dir_n
@@ -454,8 +466,8 @@ print_exits:
         LDA room_exit_s,X
         CMP #NO_EXIT
         BEQ @check_e
-        INC zp_tmp2
         JSR print_exit_sep
+        INC zp_tmp2
         LDA #<str_dir_s
         STA zp_str
         LDA #>str_dir_s
@@ -467,8 +479,8 @@ print_exits:
         LDA room_exit_e,X
         CMP #NO_EXIT
         BEQ @check_w
-        INC zp_tmp2
         JSR print_exit_sep
+        INC zp_tmp2
         LDA #<str_dir_e
         STA zp_str
         LDA #>str_dir_e
@@ -480,8 +492,8 @@ print_exits:
         LDA room_exit_w,X
         CMP #NO_EXIT
         BEQ @check_u
-        INC zp_tmp2
         JSR print_exit_sep
+        INC zp_tmp2
         LDA #<str_dir_w
         STA zp_str
         LDA #>str_dir_w
@@ -493,8 +505,8 @@ print_exits:
         LDA room_exit_u,X
         CMP #NO_EXIT
         BEQ @check_d
-        INC zp_tmp2
         JSR print_exit_sep
+        INC zp_tmp2
         LDA #<str_dir_u
         STA zp_str
         LDA #>str_dir_u
@@ -506,8 +518,8 @@ print_exits:
         LDA room_exit_d,X
         CMP #NO_EXIT
         BEQ @done
-        INC zp_tmp2
         JSR print_exit_sep
+        INC zp_tmp2
         LDA #<str_dir_d
         STA zp_str
         LDA #>str_dir_d
@@ -551,7 +563,9 @@ do_go:
         BEQ @bad_dir            ; end of table
         STX zp_tmp2
         JSR strcmp_noun
+        PHA
         LDX zp_tmp2
+        PLA
         BEQ @matched
         INX
         INX
@@ -625,6 +639,25 @@ do_down:
 try_move:
         CMP #NO_EXIT
         BEQ @blocked
+
+        ; Check for locked exits
+        ; Tower Lobby → Security requires PF_TOWER_ACCESS
+        CMP #ROOM_SECURITY
+        BNE @chk_elev
+        LDA puzzle_flags
+        AND #PF_TOWER_ACCESS
+        BNE @chk_elev_ok
+        LDA #<str_guard_block
+        STA zp_str
+        LDA #>str_guard_block
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@chk_elev_ok:
+        LDA #ROOM_SECURITY      ; restore A
+@chk_elev:
+        ; (Elevator lock checked in Phase 7 via up exit)
+
         STA cur_room
         JSR update_status_bar
         JSR new_line
@@ -737,7 +770,9 @@ find_noun_item:
         LDA item_name_hi,X
         STA zp_ptr2+1
         JSR strcmp_noun
+        PHA
         LDX zp_item
+        PLA
         BEQ @found
         INX
         JMP @loop
@@ -838,7 +873,9 @@ do_drop:
         LDA item_name_hi,X
         STA zp_ptr2+1
         JSR strcmp_noun
+        PHA
         LDX zp_item
+        PLA
         BEQ @found
 @find_next:
         INX
@@ -974,23 +1011,40 @@ do_use:
         JMP new_line
 
 @in_inv:
-        ; --- Puzzle: use credchip at Microsofts → get ICE breaker ---
+        ; Dispatch to puzzle handlers by item ID
         LDA zp_item
         CMP #ITEM_CREDCHIP
-        BNE @no_puzzle
+        BEQ @use_credchip
+        CMP #ITEM_STIMPACK
+        BEQ @use_stimpack
+        CMP #ITEM_FAKEID
+        BEQ @use_fakeid
+        CMP #ITEM_KEYCARD
+        BEQ @use_keycard
+        CMP #ITEM_CROWBAR
+        BEQ @use_crowbar
+        JMP use_no_puzzle
 
+@use_credchip:  JMP use_puzzle_credchip
+@use_stimpack:  JMP use_puzzle_stimpack
+@use_fakeid:    JMP use_puzzle_fakeid
+@use_keycard:   JMP use_puzzle_keycard
+@use_crowbar:   JMP use_puzzle_crowbar
+
+; --- Individual puzzle handlers (separate routines, no branch range issues) ---
+
+use_puzzle_credchip:
         LDA cur_room
         CMP #ROOM_MICROSOFTS
-        BNE @wrong_place
-
-        ; Success: consume credchip, place ICE breaker in inventory
+        BEQ @ok
+        JMP use_no_puzzle
+@ok:
         LDX #ITEM_CREDCHIP
         LDA #LOC_GONE
         STA item_location,X
         LDX #ITEM_ICEBREAKER
         LDA #LOC_INVENTORY
         STA item_location,X
-
         LDA #<str_buy_ice
         STA zp_str
         LDA #>str_buy_ice
@@ -998,29 +1052,18 @@ do_use:
         JSR print_wrap
         JMP new_line
 
-@wrong_place:
-        ; Fall through to @no_puzzle
-
-@no_puzzle_stim:
-        ; --- Puzzle: use stim pack at Clinic → neural link ---
-        LDA zp_item
-        CMP #ITEM_STIMPACK
-        BNE @no_puzzle
-
+use_puzzle_stimpack:
         LDA cur_room
         CMP #ROOM_CLINIC
-        BNE @no_puzzle
-
-        ; Already installed?
+        BEQ @ok
+        JMP use_no_puzzle
+@ok:
         LDA puzzle_flags
         AND #PF_NEURAL_LINK
-        BNE @already_linked
-
-        ; Install neural link
+        BNE @already
         LDA puzzle_flags
         ORA #PF_NEURAL_LINK
         STA puzzle_flags
-        ; Consume stim pack
         LDX #ITEM_STIMPACK
         LDA #LOC_GONE
         STA item_location,X
@@ -1030,8 +1073,7 @@ do_use:
         STA zp_str+1
         JSR print_wrap
         JMP new_line
-
-@already_linked:
+@already:
         LDA #<str_already_linked
         STA zp_str
         LDA #>str_already_linked
@@ -1039,7 +1081,63 @@ do_use:
         JSR print_str
         JMP new_line
 
-@no_puzzle:
+use_puzzle_fakeid:
+        LDA cur_room
+        CMP #ROOM_TOWER_LOBBY
+        BEQ @ok
+        JMP use_no_puzzle
+@ok:
+        LDA puzzle_flags
+        AND #PF_TOWER_ACCESS
+        BNE @already
+        LDA puzzle_flags
+        ORA #PF_TOWER_ACCESS
+        STA puzzle_flags
+        LDA #<str_fakeid_use
+        STA zp_str
+        LDA #>str_fakeid_use
+        STA zp_str+1
+        JSR print_wrap
+        JMP new_line
+@already:
+        LDA #<str_already_access
+        STA zp_str
+        LDA #>str_already_access
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+use_puzzle_keycard:
+        LDA cur_room
+        CMP #ROOM_ELEVATOR
+        BEQ @ok
+        JMP use_no_puzzle
+@ok:
+        LDA puzzle_flags
+        AND #PF_ELEVATOR_KEY
+        BNE @already
+        LDA puzzle_flags
+        ORA #PF_ELEVATOR_KEY
+        STA puzzle_flags
+        LDA #<str_keycard_use
+        STA zp_str
+        LDA #>str_keycard_use
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@already:
+        LDA #<str_already_elev
+        STA zp_str
+        LDA #>str_already_elev
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+use_puzzle_crowbar:
+        ; Placeholder — crowbar puzzle in Phase 7
+        JMP use_no_puzzle
+
+use_no_puzzle:
         LDA #<str_cant_use
         STA zp_str
         LDA #>str_cant_use
@@ -1159,11 +1257,11 @@ print_wrap:
         JSR word_len_ahead      ; returns A = length of next word
         CLC
         ADC zp_col
+        LDY zp_tmp              ; restore Y (clobbered by word_len_ahead)
         CMP #SCR_COLS
         BCC @just_print         ; word fits, print the space
 
         ; Word won't fit — wrap
-        LDY zp_tmp
         INY                     ; skip the space
         STY zp_tmp
         JSR new_line
@@ -1491,6 +1589,22 @@ str_neural_link:
 
 str_already_linked:
         .byte "Your neural link is already installed.", 0
+
+str_fakeid_use:
+        .byte "You flash the Tessier-Ashpool ID at the lobby guard. "
+        .byte "He nods and waves you toward the security office.", 0
+
+str_already_access:
+        .byte "The guard already cleared you.", 0
+
+str_keycard_use:
+        .byte "The keycard reader chirps. The elevator hums to life.", 0
+
+str_already_elev:
+        .byte "The elevator is already active.", 0
+
+str_guard_block:
+        .byte "A guard blocks the way. You need clearance.", 0
 
 str_buy_ice:
         .byte "You slide the credchip across the counter. The vendor "
