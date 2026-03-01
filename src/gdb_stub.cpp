@@ -16,6 +16,9 @@ static bool halted = true;
 static bool noack = false;
 static int  last_stop_signal = 5; // SIGTRAP
 static bool interrupt_flag = false;
+static bool ever_connected = false;
+static bool was_running = false;
+static bool continue_issued = false;  // set by 'c', cleared by stop/connect/disconnect
 static std::string last_response;
 
 // ---- Framing state machine ----
@@ -376,6 +379,7 @@ static std::string handle_continue(const char* data) {
 
     // Phase 1: just set state to running. Async execution deferred to Phase 2.
     halted = false;
+    continue_issued = true;
     return "";  // no immediate reply for continue (async)
 }
 
@@ -436,6 +440,8 @@ static std::string handle_H(const char* /*data*/) {
 }
 
 static std::string handle_D() {
+    was_running = continue_issued;
+    continue_issued = false;
     connected = false;
     halted = false;
     return "OK";
@@ -510,6 +516,10 @@ static std::string handle_query(const char* data) {
             int64_t mod = parse_hex(space + 1, strlen(space + 1), 0xFF);
             if (kc < 0 || mod < 0) return "E03";
             if (cb && cb->kbd_inject) cb->kbd_inject((uint8_t)kc, (uint8_t)mod);
+            return "OK";
+        }
+        if (cmd == "clear-bp") {
+            if (cb && cb->clear_all_bp) cb->clear_all_bp();
             return "OK";
         }
         // Unknown monitor command
@@ -765,6 +775,12 @@ static void tcp_thread_func(int port) {
             client_connected_flag.store(true);
             tcp_noack_mode.store(false);
 
+            // Drain stale responses from previous session
+            {
+                std::lock_guard<std::mutex> lk(resp_mutex);
+                while (!resp_queue.empty()) resp_queue.pop();
+            }
+
             // Enqueue connect sentinel
             {
                 std::lock_guard<std::mutex> lk(cmd_mutex);
@@ -948,7 +964,11 @@ static void tcp_thread_func(int port) {
                 } // for each byte
             } // client loop
 
-            // Client disconnected
+            // Client disconnected — close connected flag immediately to prevent
+            // bp notifications during the window before main thread processes
+            // SENT_DISCONNECT. was_running is captured in the main thread's
+            // SENT_DISCONNECT handler (race-free with gdb_stub_notify_stop).
+            connected = false;
             {
                 std::lock_guard<std::mutex> lk(cmd_mutex);
                 cmd_queue.push(SENT_DISCONNECT);
@@ -966,14 +986,6 @@ static void tcp_thread_func(int port) {
     // Cleanup
     if (local_client_fd >= 0) close(local_client_fd);
     if (server_fd >= 0) { close(server_fd); server_fd = -1; }
-}
-
-// ---- Priority helper ----
-
-static bool higher_poll_priority(gdb_poll_result_t a, gdb_poll_result_t b) {
-    // KILL > DETACHED > HALTED > STEPPED > RESUMED > NONE
-    static const int prio[] = { 0, 3, 1, 2, 4, 5 };
-    return prio[(int)a] > prio[(int)b];
 }
 
 // ---- Public API ----
@@ -1034,9 +1046,17 @@ gdb_poll_result_t gdb_stub_poll(void) {
             if (cmd == SENT_CONNECT) {
                 connected = true;
                 halted = true;
+                continue_issued = false;
                 noack = false;
                 tcp_noack_mode.store(false);
-                last_stop_signal = 5;
+                if (!ever_connected) {
+                    last_stop_signal = 5;  // SIGTRAP on first connect
+                } else if (was_running) {
+                    last_stop_signal = 0;  // signal 0 = was running
+                } else {
+                    last_stop_signal = 5;  // SIGTRAP if was halted
+                }
+                ever_connected = true;
                 // D23/D49: align to SYNC boundary
                 if (cb && cb->get_pc && cb->write_reg16) {
                     uint16_t pc = cb->get_pc();
@@ -1044,12 +1064,15 @@ gdb_poll_result_t gdb_stub_poll(void) {
                 }
                 r = GDB_POLL_HALTED;
             } else if (cmd == SENT_DISCONNECT) {
+                was_running = continue_issued;
+                continue_issued = false;
                 connected = false;
                 halted = false;
                 r = GDB_POLL_DETACHED;
             } else if (cmd == SENT_INTERRUPT) {
                 interrupt_requested_flag.store(false);
                 halted = true;
+                continue_issued = false;
                 last_stop_signal = 2;
                 // Push stop reply for TCP thread
                 {
@@ -1116,7 +1139,11 @@ gdb_poll_result_t gdb_stub_poll(void) {
             }
         }
 
-        if (higher_poll_priority(r, result)) result = r;
+        // Last state-changing result wins (preserves command ordering).
+        // Exception: KILL always takes final precedence.
+        if (r != GDB_POLL_NONE) {
+            if (result != GDB_POLL_KILL) result = r;
+        }
     }
 
     return result;
@@ -1128,6 +1155,7 @@ bool gdb_stub_is_halted(void) { return halted; }
 void gdb_stub_notify_stop(int signal) {
     last_stop_signal = signal;
     halted = true;
+    continue_issued = false;
     std::string stop_reply = "T" + to_hex_byte((uint8_t)signal) + "thread:01;";
     {
         std::lock_guard<std::mutex> lk(resp_mutex);
@@ -1140,6 +1168,10 @@ bool gdb_interrupt_requested(void) {
     return interrupt_requested_flag.exchange(false);
 }
 
+bool gdb_stub_was_running(void) {
+    return was_running;
+}
+
 int gdb_stub_get_step_guard(void) {
     return (config.step_guard > 0) ? config.step_guard : 16;
 }
@@ -1147,6 +1179,7 @@ int gdb_stub_get_step_guard(void) {
 void gdb_stub_notify_watchpoint(uint16_t addr, int type) {
     last_stop_signal = 5;  // SIGTRAP
     halted = true;
+    continue_issued = false;
     const char* wp_type_str = (type == 2) ? "watch" :
                               (type == 3) ? "rwatch" : "awatch";
     std::string stop_reply = "T05" + std::string(wp_type_str) + ":" +
@@ -1187,6 +1220,9 @@ void gdb_stub_reset_state(void) {
     noack = false;
     last_stop_signal = 5;
     interrupt_flag = false;
+    ever_connected = false;
+    was_running = false;
+    continue_issued = false;
     frame_state = FRAME_IDLE;
     packet_buf.clear();
     last_response.clear();
@@ -1206,6 +1242,32 @@ bool gdb_stub_interrupt_requested(void) {
 // Allow tests to set callbacks
 void gdb_stub_set_callbacks(const gdb_stub_callbacks_t* callbacks) {
     cb = callbacks;
+}
+
+void gdb_stub_simulate_connect(void) {
+    connected = true;
+    halted = true;
+    continue_issued = false;
+    noack = false;
+    if (!ever_connected) {
+        last_stop_signal = 5;
+    } else if (was_running) {
+        last_stop_signal = 0;
+    } else {
+        last_stop_signal = 5;
+    }
+    ever_connected = true;
+}
+
+void gdb_stub_simulate_disconnect(void) {
+    connected = false;
+    was_running = continue_issued;
+    continue_issued = false;
+    halted = false;
+}
+
+bool gdb_stub_get_was_running(void) {
+    return was_running;
 }
 
 #endif // GDB_STUB_TESTING

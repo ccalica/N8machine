@@ -19,9 +19,12 @@
  *   bp    <addr|label>            Set breakpoint
  *   bpc   <addr|label>            Clear breakpoint
  *   run   [--timeout ms]          Continue execution (wait for stop)
+ *   resume                        Continue and disconnect (fire-and-forget)
  *   step  [n]                     Single step (n times)
  *   halt                          Send interrupt (Ctrl-C)
  *   reset                         Reset CPU
+ *   status                        Show CPU state without changing it
+ *   clear-bp                      Clear all breakpoints/watchpoints
  *   detach                        Detach and disconnect
  *   repl                          Interactive REPL mode
  *
@@ -395,23 +398,27 @@ function cmdHelp() {
     '  bp    <addr|label>          Set breakpoint',
     '  bpc   <addr|label>          Clear breakpoint',
     '  run   [--timeout ms]        Continue execution (wait for stop)',
+    '  resume                      Continue and disconnect (fire-and-forget)',
     '  step  [n]                   Single step (n times)',
     '  halt                        Send interrupt (Ctrl-C)',
     '  reset                       Reset CPU',
-    '  kbd_inject <input>          Inject keystrokes into keyboard buffer',
+    '  status                      Show CPU state without changing it',
+    '  kbd_inject <text>           Inject keystrokes (text[enter]text...)',
     '  console_text                Read video text buffer as Unicode',
     '  console_video <path>        Save screen screenshot as PNG',
+    '  clear-bp                    Clear all breakpoints/watchpoints',
     '  detach                      Detach and disconnect',
     '  help                        Show this help',
     '  repl                        Interactive REPL mode',
     '',
-    'kbd_inject input formats:',
-    '  kbd_inject 0x41             Hex keycode',
-    '  kbd_inject \'A\'              ASCII char',
-    '  kbd_inject "Hello"          String (injects each char)',
-    '  kbd_inject enter            Named key (enter esc tab backspace delete',
-    '                              up down left right home end pageup pagedown',
-    '                              insert f1-f12 space)',
+    'kbd_inject syntax:',
+    '  kbd_inject go north[enter]  Text with inline named keys',
+    '  kbd_inject [up][up][enter]  Named keys only',
+    '  kbd_inject Hello![enter]    Bare text is sent as keystrokes',
+    '  kbd_inject [0x41]           Hex keycode via [0xNN]',
+    '  Named keys: enter esc tab backspace delete space',
+    '              up down left right home end pageup pagedown',
+    '              insert f1-f12',
     '  Modifier flags: --shift --ctrl --alt --caps --mod 0xNN',
     '',
     'Addresses: hex with 0x or $ prefix, or bare hex. Decimal with # prefix.',
@@ -469,37 +476,55 @@ async function cmdKbdInject(client, args) {
   }
 
   if (inputArgs.length === 0) {
-    console.error('Usage: kbd_inject <key|"string"|0xNN|named_key> [--shift] [--ctrl] [--alt] [--caps] [--mod 0xNN]');
+    console.error('Usage: kbd_inject <text[named_key]text...> [--shift] [--ctrl] [--alt] [--caps]');
     return;
   }
 
   const input = inputArgs.join(' ');
   const keys = [];  // [{keycode, modifiers}, ...]
 
-  // String mode: "Hello" or 'x'
-  if ((input.startsWith('"') && input.endsWith('"')) ||
-      (input.startsWith("'") && input.endsWith("'"))) {
-    const str = input.slice(1, -1);
-    if (str.length === 0) { console.error('Empty string'); return; }
-    for (const ch of str) {
-      const kc = charToKeycode(ch);
-      if (!kc) { console.error(`Cannot map character: ${ch}`); return; }
+  // Parse input as inline text with [named_key] and [0xNN] sequences.
+  // Bare text characters are sent as ASCII keycodes.
+  // [enter], [backspace], [up], [0x41], etc. insert named/hex keys inline.
+  let i = 0;
+  while (i < input.length) {
+    if (input[i] === '\\' && i + 1 < input.length && input[i + 1] === 'n') {
+      keys.push({ keycode: 0x0D, modifiers: extraMod });
+      i += 2;
+    } else if (input[i] === '[') {
+      const close = input.indexOf(']', i + 1);
+      if (close === -1) {
+        // No closing bracket — treat '[' as literal char
+        const kc = charToKeycode(input[i]);
+        if (!kc) { console.error(`Cannot map character: ${input[i]}`); return; }
+        keys.push({ keycode: kc.keycode, modifiers: kc.modifiers | extraMod });
+        i++;
+        continue;
+      }
+      const tag = input.slice(i + 1, close);
+      const tagLower = tag.toLowerCase();
+      if (tagLower in NAMED_KEYS) {
+        keys.push({ keycode: NAMED_KEYS[tagLower], modifiers: extraMod });
+      } else {
+        // Try hex keycode: [0x41] or [$41]
+        const addr = parseAddr(tag);
+        if (!isNaN(addr) && addr <= 0xFF) {
+          keys.push({ keycode: addr, modifiers: extraMod });
+        } else {
+          console.error(`Unknown key name: [${tag}]`);
+          return;
+        }
+      }
+      i = close + 1;
+    } else {
+      const kc = charToKeycode(input[i]);
+      if (!kc) { console.error(`Cannot map character: ${input[i]}`); return; }
       keys.push({ keycode: kc.keycode, modifiers: kc.modifiers | extraMod });
+      i++;
     }
   }
-  // Named key
-  else if (input.toLowerCase() in NAMED_KEYS) {
-    keys.push({ keycode: NAMED_KEYS[input.toLowerCase()], modifiers: extraMod });
-  }
-  // Hex keycode
-  else {
-    const addr = parseAddr(input);
-    if (isNaN(addr) || addr > 0xFF) {
-      console.error(`Invalid keycode: ${input}`);
-      return;
-    }
-    keys.push({ keycode: addr, modifiers: extraMod });
-  }
+
+  if (keys.length === 0) { console.error('No keys to inject'); return; }
 
   for (const { keycode, modifiers } of keys) {
     const reply = await client.monitorCommand(`kbd ${hex8(keycode)} ${hex8(modifiers)}`);
@@ -510,6 +535,33 @@ async function cmdKbdInject(client, args) {
   }
   console.log(`Injected ${keys.length} key${keys.length > 1 ? 's' : ''}`);
 }
+
+// ── Resume / Status / Clear-bp ───────────────────────────────────
+
+async function cmdResume(client) {
+  client.continueAsync();
+  console.log('Resumed');
+}
+
+async function cmdStatus(client) {
+  const state = client.wasRunning ? 'Running' : 'Halted';
+  const r = await client.readRegisters();
+  console.log(`CPU: ${state}`);
+  console.log(fmtRegs(r));
+  if (client.wasRunning) client.continueAsync();
+}
+
+async function cmdClearBp(client) {
+  const reply = await client.monitorCommand('clear-bp');
+  console.log(reply === 'OK' ? 'Cleared all breakpoints/watchpoints' : `Failed: ${reply}`);
+}
+
+// ── Auto-resume for read-only commands ──────────────────────────
+
+const autoResumeCommands = new Set([
+  'regs', 'read', 'bp', 'bpc', 'console_text', 'console_video', 'kbd_inject',
+  'clear-bp',
+]);
 
 // ── REPL ────────────────────────────────────────────────────────
 
@@ -549,6 +601,9 @@ async function repl(client) {
         case 'kbd_inject': case 'ki': await cmdKbdInject(client, args); break;
         case 'console_text': case 'ct': await cmdConsoleText(client); break;
         case 'console_video': case 'cv': await cmdConsoleVideo(client, args); break;
+        case 'resume':               await cmdResume(client); break;
+        case 'status':               await cmdStatus(client); break;
+        case 'clear-bp': case 'cbp': await cmdClearBp(client); break;
         case 'detach':              await client.detach(); console.log('Detached'); rl.close(); return;
         case 'quit': case 'q':      client.disconnect(); rl.close(); return;
         case 'help': case '?':
@@ -565,12 +620,15 @@ async function repl(client) {
             '  bp|b <addr|label>       Set breakpoint',
             '  bpc|bc <addr|label>     Clear breakpoint',
             '  run|c [--timeout ms]    Continue execution',
+            '  resume                  Continue and disconnect (fire-and-forget)',
             '  step|s [n]              Single step',
             '  halt|h                  Interrupt execution',
             '  reset                   Reset CPU to reset vector',
-            '  kbd_inject|ki <input>   Inject keystrokes',
+            '  status                  Show CPU state without changing it',
+            '  kbd_inject|ki <text>    Inject keystrokes (text[enter])',
             '  console_text|ct         Read screen as Unicode text',
             '  console_video|cv <path> Save screen as PNG',
+            '  clear-bp|cbp            Clear all breakpoints/watchpoints',
             '  detach                  Detach from target',
             '  quit|q                  Disconnect and exit',
           ].join('\n'));
@@ -617,7 +675,7 @@ async function main() {
   if (!cmd) {
     process.stderr.write([
       'Usage: n8gdb [--host H] [--port P] [--sym FILE] <command> [args...]',
-      'Commands: regs wreg pc goto read write load sym bp bpc run step halt reset detach repl',
+      'Commands: regs wreg pc goto read write load sym bp bpc run resume step halt reset status kbd_inject console_text console_video clear-bp detach repl',
       'Run "n8gdb repl" for interactive mode.',
       '',
     ].join('\n'));
@@ -655,17 +713,26 @@ async function main() {
       case 'bp':      await cmdBp(client, args); break;
       case 'bpc':     await cmdBpc(client, args); break;
       case 'run':     await cmdRun(client, args); break;
+      case 'resume':  await cmdResume(client); break;
       case 'step':    await cmdStep(client, args); break;
       case 'halt':    await cmdHalt(client); break;
       case 'reset':   await cmdReset(client); break;
+      case 'status':  await cmdStatus(client); break;
       case 'kbd_inject': await cmdKbdInject(client, args); break;
       case 'console_text': await cmdConsoleText(client); break;
       case 'console_video': await cmdConsoleVideo(client, args); break;
+      case 'clear-bp': await cmdClearBp(client); break;
       case 'detach':  await client.detach(); break;
       case 'repl':    await repl(client); break;
       default:
         console.error(`Unknown command: ${cmd}`);
         process.exit(2);
+    }
+
+    // Auto-resume: if CPU was running before connect and this is a read-only command,
+    // send continue before disconnecting so the CPU keeps running.
+    if (autoResumeCommands.has(cmd) && client.wasRunning) {
+      client.continueAsync();
     }
   } catch (err) {
     console.error(`Error: ${err.message}`);

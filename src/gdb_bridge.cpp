@@ -157,6 +157,14 @@ static const uint8_t* gdb_screenshot(size_t* out_len) {
     return video_screenshot(out_len);
 }
 
+static void gdb_clear_all_bp(void) {
+    memset(bp_mask, 0, sizeof(bool) * 65536);
+    memset(wp_write_mask, 0, sizeof(bool) * 65536);
+    memset(wp_read_mask, 0, sizeof(bool) * 65536);
+    emulator_enablebp(false);
+    emulator_enablewp(false);
+}
+
 // ---- Public API ----
 
 void gdb_bridge_init() {
@@ -169,7 +177,8 @@ void gdb_bridge_init() {
         gdb_set_watchpoint, gdb_clear_watchpoint,
         gdb_get_pc, gdb_get_stop_reason,
         gdb_reset, gdb_continue_exec, gdb_halt,
-        gdb_kbd_inject, gdb_screenshot
+        gdb_kbd_inject, gdb_screenshot,
+        gdb_clear_all_bp
     };
     static gdb_stub_config_t gdb_cfg = { 3333, true, 16 };
     gdb_stub_init(&gdb_cb, &gdb_cfg);
@@ -193,11 +202,11 @@ void gdb_bridge_poll() {
             break;
         case GDB_POLL_DETACHED:
             emulator_set_gdb_halted(false);
-            memset(bp_mask, 0, sizeof(bool) * 65536);
-            memset(wp_write_mask, 0, sizeof(bool) * 65536);
-            memset(wp_read_mask, 0, sizeof(bool) * 65536);
-            emulator_enablebp(false);
-            emulator_enablewp(false);
+            // Breakpoints/watchpoints persist for reconnect.
+            // Resume CPU if it was running before disconnect.
+            if (gdb_stub_was_running()) {
+                emulator_set_running(true);
+            }
             break;
         case GDB_POLL_KILL:
             emulator_set_gdb_halted(false);

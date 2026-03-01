@@ -87,6 +87,15 @@ static void mock_kbd_inject(uint8_t keycode, uint8_t modifiers) {
     mock_kbd_inject_called = true;
 }
 
+static bool mock_clear_all_bp_called = false;
+
+static void mock_clear_all_bp() {
+    memset(mock_bp, 0, sizeof(mock_bp));
+    memset(mock_wp_write, 0, sizeof(mock_wp_write));
+    memset(mock_wp_read, 0, sizeof(mock_wp_read));
+    mock_clear_all_bp_called = true;
+}
+
 static bool mock_screenshot_called = false;
 static uint8_t mock_png_data[] = { 0x89, 0x50, 0x4E, 0x47, 0xAA, 0xBB };  // fake PNG header
 static size_t mock_png_len = sizeof(mock_png_data);
@@ -114,7 +123,8 @@ static const gdb_stub_callbacks_t mock_cb = {
     mock_reset,
     nullptr, nullptr,  // continue_exec, halt
     mock_kbd_inject,
-    mock_screenshot
+    mock_screenshot,
+    mock_clear_all_bp
 };
 
 // ---- Fixture ----
@@ -134,6 +144,7 @@ struct GdbProtocolFixture {
         mock_kbd_modifiers = 0;
         mock_kbd_inject_called = false;
         mock_screenshot_called = false;
+        mock_clear_all_bp_called = false;
         gdb_stub_reset_state();
         gdb_stub_set_callbacks(&mock_cb);
     }
@@ -897,6 +908,75 @@ TEST_SUITE("gdb_protocol") {
         GdbProtocolFixture f;
         std::string result = gdb_stub_process_packet("qSupported");
         CHECK(result.find("qXfer:n8screen:read+") != std::string::npos);
+    }
+
+    // ---- State persistence tests ----
+
+    TEST_CASE("T300: Disconnect preserves breakpoints") {
+        GdbProtocolFixture f;
+        // Set a breakpoint
+        gdb_stub_process_packet("Z0,d000,1");
+        CHECK(mock_bp[0xD000] == true);
+        // Simulate disconnect
+        gdb_stub_simulate_disconnect();
+        // Breakpoint should still be set
+        CHECK(mock_bp[0xD000] == true);
+    }
+
+    TEST_CASE("T301: First connect signals SIGTRAP") {
+        GdbProtocolFixture f;
+        gdb_stub_simulate_connect();
+        CHECK(gdb_stub_last_signal() == 5);  // SIGTRAP
+    }
+
+    TEST_CASE("T302: Reconnect after running signals 0") {
+        GdbProtocolFixture f;
+        // First connect
+        gdb_stub_simulate_connect();
+        CHECK(gdb_stub_last_signal() == 5);
+        // Continue (sets halted=false)
+        gdb_stub_process_packet("c");
+        // Disconnect while running
+        gdb_stub_simulate_disconnect();
+        CHECK(gdb_stub_get_was_running() == true);
+        // Reconnect
+        gdb_stub_simulate_connect();
+        CHECK(gdb_stub_last_signal() == 0);  // signal 0 = was running
+    }
+
+    TEST_CASE("T303: Reconnect after halted signals 5") {
+        GdbProtocolFixture f;
+        // First connect
+        gdb_stub_simulate_connect();
+        // Stay halted (don't continue)
+        // Disconnect while halted
+        gdb_stub_simulate_disconnect();
+        CHECK(gdb_stub_get_was_running() == false);
+        // Reconnect
+        gdb_stub_simulate_connect();
+        CHECK(gdb_stub_last_signal() == 5);  // SIGTRAP
+    }
+
+    TEST_CASE("T304: monitor clear-bp clears all breakpoints") {
+        GdbProtocolFixture f;
+        // Set some breakpoints and watchpoints
+        gdb_stub_process_packet("Z0,d000,1");
+        gdb_stub_process_packet("Z2,200,1");
+        CHECK(mock_bp[0xD000] == true);
+        CHECK(mock_wp_write[0x0200] == true);
+        // Send clear-bp monitor command: "clear-bp" hex-encoded
+        std::string cmd = "clear-bp";
+        std::string hex;
+        for (char c : cmd) {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02x", (uint8_t)c);
+            hex += buf;
+        }
+        std::string result = gdb_stub_process_packet(("qRcmd," + hex).c_str());
+        CHECK(result == "OK");
+        CHECK(mock_clear_all_bp_called == true);
+        CHECK(mock_bp[0xD000] == false);
+        CHECK(mock_wp_write[0x0200] == false);
     }
 
 } // TEST_SUITE("gdb_protocol")

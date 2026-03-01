@@ -20,6 +20,8 @@ export class RspClient {
   #pendingStop = null;
   /** @type {string} */
   #lastPacket = '';
+  /** @type {string|null} */
+  #haltReason = null;
 
   /**
    * @param {object} [opts]
@@ -71,16 +73,19 @@ export class RspClient {
 
     // Query halt reason
     const reason = await this.#sendCommand('?');
+    this.#haltReason = reason;
     this.#log(`Halt reason: ${reason}`);
   }
 
   disconnect() {
     this.#rejectAll(new Error('Disconnected'));
-    if (this.#socket) { this.#socket.destroy(); this.#socket = null; }
+    if (this.#socket) { this.#socket.end(); this.#socket = null; }
   }
 
   get connected() { return this.#socket !== null && !this.#socket.destroyed; }
   get isRunning() { return this.#running; }
+  get haltReason() { return this.#haltReason; }
+  get wasRunning() { return this.#haltReason !== null && this.#haltReason.startsWith('T00'); }
 
   // ── Registers (6502: A, X, Y, S, P, PC) ────────────────────
 

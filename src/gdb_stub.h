@@ -25,6 +25,7 @@ typedef struct {
     void     (*halt)(void);             // stop execution
     void     (*kbd_inject)(uint8_t keycode, uint8_t modifiers);  // inject keystroke
     const uint8_t* (*screenshot)(size_t* out_len);  // encode screen as PNG, returns data+len
+    void     (*clear_all_bp)(void);  // clear all breakpoints and watchpoints
 } gdb_stub_callbacks_t;
 
 typedef struct {
@@ -54,6 +55,7 @@ static inline void gdb_stub_notify_stop(int) {}
 static inline void gdb_stub_notify_watchpoint(uint16_t, int) {}
 static inline int  gdb_stub_get_step_guard(void) { return 16; }
 static inline bool gdb_interrupt_requested(void) { return false; }
+static inline bool gdb_stub_was_running(void) { return false; }
 
 #else
 
@@ -67,6 +69,7 @@ void gdb_stub_notify_stop(int signal);
 void gdb_stub_notify_watchpoint(uint16_t addr, int type);
 int  gdb_stub_get_step_guard(void);
 bool gdb_interrupt_requested(void);
+bool gdb_stub_was_running(void);
 
 #endif // ENABLE_GDB_STUB
 
@@ -83,5 +86,8 @@ void gdb_stub_reset_state(void);
 int  gdb_stub_last_signal(void);
 bool gdb_stub_interrupt_requested(void);
 void gdb_stub_set_callbacks(const gdb_stub_callbacks_t* cb);
+void gdb_stub_simulate_connect(void);
+void gdb_stub_simulate_disconnect(void);
+bool gdb_stub_get_was_running(void);
 
 #endif // GDB_STUB_TESTING
