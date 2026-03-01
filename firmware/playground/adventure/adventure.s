@@ -39,7 +39,7 @@ NUM_ITEMS = 15
 .import   str_ice_block, str_ice_use, str_already_ice
 .import   str_medkit_use
 .import   str_jack_where, str_jack_nodeck, str_jack_nocable
-.import   str_jack_nolink, str_jack_in
+.import   str_jack_nolink, str_jack_in, str_jack_out
 .import   str_victory, str_victory2
 
 ; Item IDs (must match world.s)
@@ -150,8 +150,15 @@ _main:
         ; Init item locations from ROM table
         JSR init_items
 
-        ; Set starting room
+        ; Clear puzzle flags
         LDA #$00
+        LDX #7
+@clr_pf:
+        STA puzzle_flags,X
+        DEX
+        BPL @clr_pf
+
+        ; Set starting room
         STA cur_room
 
         ; Status bar on row 0
@@ -714,7 +721,7 @@ try_move:
 @chk_vent:
         ; Parking → Vent Shaft requires PF_VENT_OPEN
         CMP #ROOM_VENT_SHAFT
-        BNE @move_ok
+        BNE @chk_ice
         LDA cur_room
         CMP #ROOM_PARKING
         BNE @vent_ok
@@ -732,7 +739,7 @@ try_move:
 @chk_ice:
         ; ICE Wall → Data Vault requires PF_ICE_BROKEN
         CMP #ROOM_DATA_VAULT
-        BNE @move_ok
+        BNE @chk_jackout
         LDA puzzle_flags
         AND #PF_ICE_BROKEN
         BNE @ice_ok
@@ -744,6 +751,25 @@ try_move:
         JMP new_line
 @ice_ok:
         LDA #ROOM_DATA_VAULT
+@chk_jackout:
+        ; Extraction → Data Center: clear jacked-in flag
+        CMP #ROOM_DATA_CENTER
+        BNE @move_ok
+        LDA cur_room
+        CMP #ROOM_EXTRACTION
+        BNE @move_ok
+        ; Clear jacked-in flag
+        LDA puzzle_flags
+        AND #($FF ^ PF_JACKED_IN)
+        STA puzzle_flags
+        ; Print jack-out message
+        LDA #<str_jack_out
+        STA zp_str
+        LDA #>str_jack_out
+        STA zp_str+1
+        JSR print_wrap
+        JSR new_line
+        LDA #ROOM_DATA_CENTER
 @move_ok:
         STA cur_room
         JSR update_status_bar

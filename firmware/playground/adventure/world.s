@@ -30,7 +30,7 @@
 .export   str_ice_block, str_ice_use, str_already_ice
 .export   str_medkit_use
 .export   str_jack_where, str_jack_nodeck, str_jack_nocable
-.export   str_jack_nolink, str_jack_in
+.export   str_jack_nolink, str_jack_in, str_jack_out
 .export   str_victory, str_victory2
 
 ; --- Room IDs ---
@@ -884,6 +884,11 @@ str_jack_in:
         .byte "into blue geometry, the office falling away "
         .byte "like a discarded skin. Cyberspace unfolds "
         .byte "around you, infinite and electric. You're in.", 0
+
+str_jack_out:
+        .byte "The matrix dissolves. Blue geometry folds inward, "
+        .byte "collapsing to a point. Your meat body jolts awake "
+        .byte "in the data center chair, jack cable still warm.", 0
 
 str_victory:
         .byte "The helicopter lifts off the tower roof and "
