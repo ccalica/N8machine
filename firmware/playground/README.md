@@ -17,7 +17,7 @@ Firmware experiments for the N8machine emulator. Each program is a standalone ba
 
 ```
 make mon2
-n8gdb load mon2 0xD000
+n8gdb load mon2 0xE000
 n8gdb reset
 n8gdb run
 ```
@@ -41,9 +41,10 @@ Same as the main firmware:
 $0000-$00FF  Zero Page
 $0100-$01FF  Hardware Stack
 $0200-$BEFF  RAM (BSS variables)
-$C000-$C0FF  Text Display (memory-mapped I/O)
-$C100-$C10F  TTY (memory-mapped I/O)
-$D000-$FFF9  ROM (program code + data)
+$C000-$CFFF  Frame Buffer (4KB)
+$D000-$D7FF  Dev Bank (2KB RAM)
+$D800-$DFFF  Device Registers (slots 0-7)
+$E000-$FFF9  ROM (program code + data)
 $FFFA-$FFFF  Vectors (NMI, RESET, IRQ)
 ```
 
