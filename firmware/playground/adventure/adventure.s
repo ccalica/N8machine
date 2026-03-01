@@ -24,7 +24,7 @@
 .import   item_desc_lo, item_desc_hi
 .import   item_init_loc, item_flags
 ; NUM_ITEMS defined locally (must match world.s)
-NUM_ITEMS = 5
+NUM_ITEMS = 8
 .import   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
 .import   str_not_here, str_cant_take, str_no_have, str_examine_what
 .import   str_take_what, str_drop_what
@@ -32,10 +32,15 @@ NUM_ITEMS = 5
 
 ; Item IDs (must match world.s)
 ITEM_CREDCHIP   = 0
+ITEM_STIMPACK   = 2
 ITEM_ICEBREAKER = 4
 
 ; Room IDs (must match world.s)
 ROOM_MICROSOFTS = 3
+ROOM_CLINIC     = 4
+
+; Puzzle flags
+PF_NEURAL_LINK  = $01           ; bit 0: neural link installed
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -994,9 +999,42 @@ do_use:
         JMP new_line
 
 @wrong_place:
-        LDA #<str_cant_use
+        ; Fall through to @no_puzzle
+
+@no_puzzle_stim:
+        ; --- Puzzle: use stim pack at Clinic → neural link ---
+        LDA zp_item
+        CMP #ITEM_STIMPACK
+        BNE @no_puzzle
+
+        LDA cur_room
+        CMP #ROOM_CLINIC
+        BNE @no_puzzle
+
+        ; Already installed?
+        LDA puzzle_flags
+        AND #PF_NEURAL_LINK
+        BNE @already_linked
+
+        ; Install neural link
+        LDA puzzle_flags
+        ORA #PF_NEURAL_LINK
+        STA puzzle_flags
+        ; Consume stim pack
+        LDX #ITEM_STIMPACK
+        LDA #LOC_GONE
+        STA item_location,X
+        LDA #<str_neural_link
         STA zp_str
-        LDA #>str_cant_use
+        LDA #>str_neural_link
+        STA zp_str+1
+        JSR print_wrap
+        JMP new_line
+
+@already_linked:
+        LDA #<str_already_linked
+        STA zp_str
+        LDA #>str_already_linked
         STA zp_str+1
         JSR print_str
         JMP new_line
@@ -1444,6 +1482,15 @@ str_go_where:
 
 str_already_have:
         .byte "You already have that.", 0
+
+str_neural_link:
+        .byte "You lie back in the chair. The doctor produces a "
+        .byte "microsurgical probe. A quick sting behind your ear "
+        .byte "and it's done. Neural interface installed. You can "
+        .byte "feel the port like a cold coin against your skull.", 0
+
+str_already_linked:
+        .byte "Your neural link is already installed.", 0
 
 str_buy_ice:
         .byte "You slide the credchip across the counter. The vendor "
