@@ -179,26 +179,26 @@ TEST_SUITE("keyboard") {
     }
 
     // -------------------------------------------------------------------------
-    // T162: Extended key code ($80 = Up Arrow) stored correctly
+    // T162: Nav key code (N8_KEY_UP = $01) stored correctly
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T162: Extended key code stored correctly") {
+    TEST_CASE("T162: Nav key code stored correctly") {
         EmulatorFixture f;
-        kbd_inject_key(0x80, 0x00);  // Up Arrow
-        CHECK(kbd_get_data() == 0x80);
+        kbd_inject_key(N8_KEY_UP, 0x00);  // Up Arrow = $01
+        CHECK(kbd_get_data() == N8_KEY_UP);
         uint64_t p = make_read_pins(N8_KBD_BASE + N8_KBD_DATA);
         kbd_decode(p, N8_KBD_DATA);
-        CHECK(M6502_GET_DATA(p) == 0x80);
+        CHECK(M6502_GET_DATA(p) == N8_KEY_UP);
     }
 
     // -------------------------------------------------------------------------
-    // T163: Function key ($90 = F1) stored correctly
+    // T163: Function key (N8_KEY_F1 = $80) stored correctly
     // -------------------------------------------------------------------------
 
     TEST_CASE("T163: Function key stored correctly") {
         EmulatorFixture f;
-        kbd_inject_key(0x90, 0x00);  // F1
-        CHECK(kbd_get_data() == 0x90);
+        kbd_inject_key(N8_KEY_F1, 0x00);  // F1 = $80
+        CHECK(kbd_get_data() == N8_KEY_F1);
     }
 
     // -------------------------------------------------------------------------

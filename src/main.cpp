@@ -50,41 +50,38 @@ static uint8_t sdl_to_n8_keycode(SDL_Keysym keysym) {
     SDL_Keycode key = keysym.sym;
     Uint16 mod = keysym.mod;
 
-    // Ctrl+letter → $01-$1A
-    if ((mod & KMOD_CTRL) && key >= SDLK_a && key <= SDLK_z) {
-        return (uint8_t)(key - SDLK_a + 1);
-    }
-
     // Special keys
     switch (key) {
-        case SDLK_RETURN:    return 0x0D;
-        case SDLK_BACKSPACE: return 0x08;
-        case SDLK_TAB:       return 0x09;
-        case SDLK_ESCAPE:    return 0x1B;
-        case SDLK_DELETE:    return 0x87;
-        // Arrow keys ($80+)
-        case SDLK_UP:        return 0x80;
-        case SDLK_DOWN:      return 0x81;
-        case SDLK_LEFT:      return 0x82;
-        case SDLK_RIGHT:     return 0x83;
-        case SDLK_HOME:      return 0x84;
-        case SDLK_END:       return 0x85;
-        case SDLK_PAGEUP:    return 0x86;
-        case SDLK_PAGEDOWN:  return 0x88;
-        case SDLK_INSERT:    return 0x89;
-        // Function keys ($90+)
-        case SDLK_F1:        return 0x90;
-        case SDLK_F2:        return 0x91;
-        case SDLK_F3:        return 0x92;
-        case SDLK_F4:        return 0x93;
-        case SDLK_F5:        return 0x94;
-        case SDLK_F6:        return 0x95;
-        case SDLK_F7:        return 0x96;
-        case SDLK_F8:        return 0x97;
-        case SDLK_F9:        return 0x98;
-        case SDLK_F10:       return 0x99;
-        case SDLK_F11:       return 0x9A;
-        case SDLK_F12:       return 0x9B;
+        case SDLK_RETURN:    return N8_KEY_ENTER;
+        case SDLK_BACKSPACE: return N8_KEY_BACKSPACE;
+        case SDLK_TAB:       return N8_KEY_TAB;
+        case SDLK_ESCAPE:    return N8_KEY_ESCAPE;
+        case SDLK_DELETE:    return N8_KEY_DELETE;
+        // Arrow keys
+        case SDLK_UP:        return N8_KEY_UP;
+        case SDLK_DOWN:      return N8_KEY_DOWN;
+        case SDLK_LEFT:      return N8_KEY_LEFT;
+        case SDLK_RIGHT:     return N8_KEY_RIGHT;
+        case SDLK_HOME:      return N8_KEY_HOME;
+        case SDLK_END:       return N8_KEY_END;
+        case SDLK_PAGEUP:    return N8_KEY_PAGEUP;
+        case SDLK_PAGEDOWN:  return N8_KEY_PAGEDOWN;
+        case SDLK_INSERT:    return N8_KEY_INSERT;
+        case SDLK_PRINTSCREEN: return N8_KEY_PRINTSCR;
+        case SDLK_PAUSE:     return N8_KEY_PAUSE;
+        // Function keys
+        case SDLK_F1:        return N8_KEY_F1;
+        case SDLK_F2:        return N8_KEY_F1 + 1;
+        case SDLK_F3:        return N8_KEY_F1 + 2;
+        case SDLK_F4:        return N8_KEY_F1 + 3;
+        case SDLK_F5:        return N8_KEY_F1 + 4;
+        case SDLK_F6:        return N8_KEY_F1 + 5;
+        case SDLK_F7:        return N8_KEY_F1 + 6;
+        case SDLK_F8:        return N8_KEY_F1 + 7;
+        case SDLK_F9:        return N8_KEY_F1 + 8;
+        case SDLK_F10:       return N8_KEY_F1 + 9;
+        case SDLK_F11:       return N8_KEY_F1 + 10;
+        case SDLK_F12:       return N8_KEY_F1 + 11;
         default: break;
     }
 

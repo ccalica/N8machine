@@ -1,66 +1,79 @@
 # N8 Machine — Keyboard Key Codes
 
-> Source: *N8Machine Keyboard Register Interface Spec — Phase 1* (Notion)
+KBD_DATA is an 8-bit register. Key codes are divided into three ranges:
+control/nav (`$00-$1F`), printable ASCII (`$20-$7E`), and function keys (`$80-$8B`).
 
-KBD_DATA is an 8-bit register. Bit 7 distinguishes ASCII from extended.
+## No Key (`$00`)
 
-## ASCII Range (`$00–$7F`)
+| Code  | Meaning |
+|------:|---------|
+| `$00` | No key (null) |
 
-Standard 7-bit ASCII. Teensy converts USB HID scancodes to ASCII,
-applying Shift and Caps Lock.
+## Control & Navigation Keys (`$01-$1F`)
 
-**Common control characters:**
+| Code  | Key          |
+|------:|--------------|
+| `$01` | Up Arrow     |
+| `$02` | Down Arrow   |
+| `$03` | Left Arrow   |
+| `$04` | Right Arrow  |
+| `$05` | Home         |
+| `$06` | End          |
+| `$07` | (reserved)   |
+| `$08` | Backspace    |
+| `$09` | Tab          |
+| `$0A` | Page Up      |
+| `$0B` | Page Down    |
+| `$0C` | (reserved)   |
+| `$0D` | Enter (CR)   |
+| `$0E` | Insert       |
+| `$0F` | Delete       |
+| `$10` | Print Screen |
+| `$11` | Pause/Break  |
+| `$12`–`$1A` | (reserved) |
+| `$1B` | Escape       |
+| `$1C`–`$1F` | (reserved) |
 
-| Code  | Key         |
-|------:|-------------|
-| `$01` | Ctrl+A      |
-| `$03` | Ctrl+C      |
-| `$08` | Backspace   |
-| `$09` | Tab         |
-| `$0D` | Enter (CR)  |
-| `$1B` | Escape      |
+Codes `$08`, `$09`, `$0D`, and `$1B` align with their ASCII control character values.
 
-## Extended Range (`$80–$FF`)
+## Printable ASCII (`$20-$7E`)
 
-Non-ASCII keys. Bit 7 is always set.
+Standard ASCII. Shift and Caps Lock are applied by the host before injection.
 
-### Navigation Keys (`$80–$8F`)
+## Reserved (`$7F`)
 
-| Code  | Key        |
-|------:|------------|
-| `$80` | Up Arrow   |
-| `$81` | Down Arrow |
-| `$82` | Left Arrow |
-| `$83` | Right Arrow|
-| `$84` | Home       |
-| `$85` | End        |
-| `$86` | Page Up    |
-| `$87` | Page Down  |
-| `$88` | Insert     |
-| `$89` | Delete     |
-| `$8A` | Print Screen |
-| `$8B` | Pause/Break|
-| `$8C`–`$8F` | Reserved |
+| Code  | Meaning |
+|------:|---------|
+| `$7F` | (reserved) |
 
-### Function Keys (`$90–$9B`)
+## Function Keys (`$80-$8B`)
 
 | Code  | Key |
 |------:|-----|
-| `$90` | F1  |
-| `$91` | F2  |
-| `$92` | F3  |
-| `$93` | F4  |
-| `$94` | F5  |
-| `$95` | F6  |
-| `$96` | F7  |
-| `$97` | F8  |
-| `$98` | F9  |
-| `$99` | F10 |
-| `$9A` | F11 |
-| `$9B` | F12 |
+| `$80` | F1  |
+| `$81` | F2  |
+| `$82` | F3  |
+| `$83` | F4  |
+| `$84` | F5  |
+| `$85` | F6  |
+| `$86` | F7  |
+| `$87` | F8  |
+| `$88` | F9  |
+| `$89` | F10 |
+| `$8A` | F11 |
+| `$8B` | F12 |
 
-### Reserved (`$9C–$FF`)
+## Reserved (`$8C-$FF`)
 
 Reserved for future use.
 
-Code assignments are preliminary — may be adjusted during firmware implementation.
+## Modifier Keys
+
+Modifier keys (Shift, Ctrl, Alt, Caps Lock) do not have dedicated key codes.
+They are reported as modifier bits in the KBD_STATUS register alongside the
+front key's code in KBD_DATA.
+
+Ctrl+letter combinations send the letter's ASCII code (e.g., `$01` for Ctrl+A
+is **not** used — instead KBD_DATA = `$41` with CTRL bit set in KBD_STATUS).
+
+See `keyboard.md` for KBD_STATUS modifier bit definitions.

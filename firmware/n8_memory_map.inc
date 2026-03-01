@@ -86,6 +86,28 @@
 ; KBD_CTRL bits
 .define N8_KBD_CTRL_IRQ_EN    $01
 
+; Key codes — control & nav ($00-$1F)
+.define N8_KEY_NONE        $00
+.define N8_KEY_UP          $01
+.define N8_KEY_DOWN        $02
+.define N8_KEY_LEFT        $03
+.define N8_KEY_RIGHT       $04
+.define N8_KEY_HOME        $05
+.define N8_KEY_END         $06
+.define N8_KEY_BACKSPACE   $08
+.define N8_KEY_TAB         $09
+.define N8_KEY_PAGEUP      $0A
+.define N8_KEY_PAGEDOWN    $0B
+.define N8_KEY_ENTER       $0D
+.define N8_KEY_INSERT      $0E
+.define N8_KEY_DELETE      $0F
+.define N8_KEY_PRINTSCR    $10
+.define N8_KEY_PAUSE       $11
+.define N8_KEY_ESCAPE      $1B
+; Function keys ($80-$8B)
+.define N8_KEY_F1          $80
+.define N8_KEY_F12         $8B
+
 ; --- Frame Buffer ---
 .define N8_FB_BASE        $C000
 .define N8_FB_SIZE        $1000

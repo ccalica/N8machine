@@ -126,6 +126,28 @@
 // KBD_CTRL bits
 #define N8_KBD_CTRL_IRQ_EN   0x01
 
+// Key codes — control & nav ($00-$1F)
+#define N8_KEY_NONE        0x00
+#define N8_KEY_UP          0x01
+#define N8_KEY_DOWN        0x02
+#define N8_KEY_LEFT        0x03
+#define N8_KEY_RIGHT       0x04
+#define N8_KEY_HOME        0x05
+#define N8_KEY_END         0x06
+#define N8_KEY_BACKSPACE   0x08
+#define N8_KEY_TAB         0x09
+#define N8_KEY_PAGEUP      0x0A
+#define N8_KEY_PAGEDOWN    0x0B
+#define N8_KEY_ENTER       0x0D
+#define N8_KEY_INSERT      0x0E
+#define N8_KEY_DELETE      0x0F
+#define N8_KEY_PRINTSCR    0x10
+#define N8_KEY_PAUSE       0x11
+#define N8_KEY_ESCAPE      0x1B
+// Function keys ($80-$8B)
+#define N8_KEY_F1          0x80
+#define N8_KEY_F12         0x8B
+
 // --- Dev Bank ---
 #define N8_DEVBANK_BASE    0xD000
 #define N8_DEVBANK_SIZE    0x0800
