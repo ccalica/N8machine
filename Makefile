@@ -18,7 +18,7 @@ EXE = n8
 IMGUI_DIR = imgui
 SRC_DIR = src
 BUILD_DIR = build
-SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/emulator.cpp $(SRC_DIR)/emu_tty.cpp $(SRC_DIR)/emu_video.cpp $(SRC_DIR)/emu_kbd.cpp $(SRC_DIR)/emu_dis6502.cpp $(SRC_DIR)/emu_display.cpp
+SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/emulator.cpp $(SRC_DIR)/gdb_bridge.cpp $(SRC_DIR)/emu_tty.cpp $(SRC_DIR)/emu_video.cpp $(SRC_DIR)/emu_kbd.cpp $(SRC_DIR)/emu_dis6502.cpp $(SRC_DIR)/emu_display.cpp
 SOURCES +=$(SRC_DIR)/emu_labels.cpp $(SRC_DIR)/gui_console.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/gdb_stub.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl2.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
@@ -115,7 +115,8 @@ TEST_BUILD_DIR = build/test
 TEST_EXE = n8_test
 
 # Production source objects reused by test binary (gdb_stub.o compiled separately with test flags)
-TEST_SRC_OBJS = $(BUILD_DIR)/emulator.o $(BUILD_DIR)/emu_tty.o \
+TEST_SRC_OBJS = $(BUILD_DIR)/emulator.o $(TEST_BUILD_DIR)/gdb_bridge.o \
+                $(BUILD_DIR)/emu_tty.o \
                 $(BUILD_DIR)/emu_video.o $(BUILD_DIR)/emu_kbd.o \
                 $(BUILD_DIR)/emu_dis6502.o $(BUILD_DIR)/emu_labels.o \
                 $(BUILD_DIR)/utils.o $(TEST_BUILD_DIR)/gdb_stub.o
@@ -131,8 +132,11 @@ TEST_CXXFLAGS = -std=c++11 -g -Wall -Wformat -I$(SRC_DIR) -I$(TEST_DIR) -DGDB_ST
 $(TEST_BUILD_DIR):
 	mkdir -p $(TEST_BUILD_DIR)
 
-# gdb_stub compiled with test flags (GDB_STUB_TESTING is in TEST_CXXFLAGS)
+# gdb_stub and gdb_bridge compiled with test flags (no ENABLE_GDB_STUB)
 $(TEST_BUILD_DIR)/gdb_stub.o: $(SRC_DIR)/gdb_stub.cpp | $(TEST_BUILD_DIR)
+	$(CXX) $(TEST_CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
+
+$(TEST_BUILD_DIR)/gdb_bridge.o: $(SRC_DIR)/gdb_bridge.cpp | $(TEST_BUILD_DIR)
 	$(CXX) $(TEST_CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 $(TEST_BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp | $(TEST_BUILD_DIR)
@@ -147,6 +151,7 @@ $(TEST_EXE): $(TEST_SRC_OBJS) $(TEST_OBJS)
 	$(CXX) -o $@ $^
 
 -include $(TEST_BUILD_DIR)/gdb_stub.d
+-include $(TEST_BUILD_DIR)/gdb_bridge.d
 -include $(TEST_OBJS:.o=.d)
 
 clean-test:

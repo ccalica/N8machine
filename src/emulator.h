@@ -55,3 +55,11 @@ void emulator_clear_wp_hit();
 uint16_t emulator_wp_hit_addr();
 int emulator_wp_hit_type();   // returns 2=write, 3=read
 
+// Execution state accessors
+bool emulator_is_running();
+void emulator_set_running(bool run);
+bool emulator_is_stepping();
+void emulator_set_stepping(bool step);
+bool emulator_is_gdb_halted();
+void emulator_set_gdb_halted(bool halted);
+

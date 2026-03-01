@@ -49,6 +49,10 @@ static bool wp_enable = false;
 static bool wp_hit_flag = false;
 static uint16_t wp_addr = 0;
 static int wp_type = 0;  // 2=write, 3=read, 4=access
+static bool run_emulator = false;
+static bool step_emulator = false;
+static bool gdb_halted = false;
+
 bool pc_mask[65536] {false};
 bool label_mask[65536] {false};  // TODO: init via .sym file
 uint16_t cur_instruction = 0x00;
@@ -361,6 +365,13 @@ bool emulator_wp_hit()          { return wp_enable && wp_hit_flag; }
 void emulator_clear_wp_hit()    { wp_hit_flag = false; }
 uint16_t emulator_wp_hit_addr() { return wp_addr; }
 int emulator_wp_hit_type()      { return wp_type; }
+
+bool emulator_is_running()           { return run_emulator; }
+void emulator_set_running(bool run)  { run_emulator = run; }
+bool emulator_is_stepping()          { return step_emulator; }
+void emulator_set_stepping(bool s)   { step_emulator = s; }
+bool emulator_is_gdb_halted()        { return gdb_halted; }
+void emulator_set_gdb_halted(bool h) { gdb_halted = h; }
 
 void emulator_show_memdump_window(bool &show_memmap_window) {
     static bool update_mem_dump = false;
