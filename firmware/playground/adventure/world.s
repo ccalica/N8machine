@@ -12,6 +12,13 @@
 .export   room_exit_n, room_exit_s, room_exit_e, room_exit_w
 .export   room_exit_u, room_exit_d
 .export   NUM_ROOMS
+.export   item_name_lo, item_name_hi
+.export   item_desc_lo, item_desc_hi
+.export   item_init_loc, item_flags
+.export   NUM_ITEMS
+.export   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
+.export   str_not_here, str_cant_take, str_no_have, str_examine_what
+.export   str_take_what, str_drop_what
 
 ; Room IDs
 ROOM_ALLEY      = 0
@@ -22,6 +29,21 @@ ROOM_CLINIC     = 4
 NO_EXIT         = $FF
 
 NUM_ROOMS = 5
+
+; Item IDs
+ITEM_CREDCHIP   = 0
+ITEM_FLASHLIGHT = 1
+ITEM_STIMPACK   = 2
+ITEM_FAKEID     = 3
+
+NUM_ITEMS = 4
+
+; Item locations
+LOC_INVENTORY = $FE
+LOC_GONE      = $FF
+
+; Item flags
+ITEMF_TAKEABLE = $01
 
 .segment "RODATA"
 
@@ -52,11 +74,15 @@ str_quit_msg:
 
 str_help_text:
         .byte "Commands:", $0D
-        .byte "  look (l)     - Look around", $0D
-        .byte "  go <dir>     - Move (n/s/e/w/u/d)", $0D
-        .byte "  n/s/e/w/u/d  - Move shortcut", $0D
-        .byte "  help (?)     - This message", $0D
-        .byte "  quit         - End game", 0
+        .byte "  look (l)        - Look around", $0D
+        .byte "  go <dir>        - Move (n/s/e/w/u/d)", $0D
+        .byte "  n/s/e/w/u/d     - Move shortcut", $0D
+        .byte "  take/get <item> - Pick up item", $0D
+        .byte "  drop <item>     - Drop item", $0D
+        .byte "  examine/x <item>- Examine item", $0D
+        .byte "  inventory (i)   - Show inventory", $0D
+        .byte "  help (?)        - This message", $0D
+        .byte "  quit            - End game", 0
 
 ; Direction names for exit listing
 str_dir_n:  .byte "north", 0
@@ -65,6 +91,19 @@ str_dir_e:  .byte "east", 0
 str_dir_w:  .byte "west", 0
 str_dir_u:  .byte "up", 0
 str_dir_d:  .byte "down", 0
+
+; Item interaction strings
+str_you_see:      .byte "You see: ", 0
+str_taken:        .byte "Taken.", 0
+str_dropped:      .byte "Dropped.", 0
+str_carrying:     .byte "Carrying: ", 0
+str_nothing:      .byte "nothing", 0
+str_not_here:     .byte "You don't see that here.", 0
+str_cant_take:    .byte "You can't take that.", 0
+str_no_have:      .byte "You're not carrying that.", 0
+str_examine_what: .byte "Examine what?", 0
+str_take_what:    .byte "Take what?", 0
+str_drop_what:    .byte "Drop what?", 0
 
 ; =====================================================================
 ; Room name pointer tables
@@ -104,7 +143,6 @@ room_desc_hi:
 
 ; =====================================================================
 ; Room exit tables (destination room ID, or $FF = no exit)
-; Index by room ID
 ; =====================================================================
 
 room_exit_n:
@@ -148,6 +186,48 @@ room_exit_d:
         .byte ROOM_CLINIC       ; Market -> Clinic (down)
         .byte NO_EXIT           ; Microsofts
         .byte NO_EXIT           ; Clinic
+
+; =====================================================================
+; Item tables
+; =====================================================================
+
+item_name_lo:
+        .byte <in_credchip
+        .byte <in_flashlight
+        .byte <in_stimpack
+        .byte <in_fakeid
+
+item_name_hi:
+        .byte >in_credchip
+        .byte >in_flashlight
+        .byte >in_stimpack
+        .byte >in_fakeid
+
+item_desc_lo:
+        .byte <id_credchip
+        .byte <id_flashlight
+        .byte <id_stimpack
+        .byte <id_fakeid
+
+item_desc_hi:
+        .byte >id_credchip
+        .byte >id_flashlight
+        .byte >id_stimpack
+        .byte >id_fakeid
+
+; Initial locations
+item_init_loc:
+        .byte ROOM_BAR          ; credchip - on the bar
+        .byte ROOM_ALLEY        ; flashlight - in the alley
+        .byte ROOM_CLINIC       ; stim pack - at the clinic
+        .byte ROOM_MARKET       ; fake ID - at the market
+
+; Flags (bit 0 = takeable)
+item_flags:
+        .byte ITEMF_TAKEABLE    ; credchip
+        .byte ITEMF_TAKEABLE    ; flashlight
+        .byte ITEMF_TAKEABLE    ; stim pack
+        .byte ITEMF_TAKEABLE    ; fake ID
 
 ; =====================================================================
 ; Room names
@@ -198,3 +278,36 @@ rd_clinic:
         .byte "chair. The walls are lined with jars of bioware. "
         .byte "A woman in a labcoat checks readouts on a cracked "
         .byte "monitor. She looks up expectantly.", 0
+
+; =====================================================================
+; Item names
+; =====================================================================
+
+in_credchip:
+        .byte "credchip", 0
+in_flashlight:
+        .byte "flashlight", 0
+in_stimpack:
+        .byte "stim pack", 0
+in_fakeid:
+        .byte "fake id", 0
+
+; =====================================================================
+; Item descriptions
+; =====================================================================
+
+id_credchip:
+        .byte "A thin plastic wafer loaded with untraceable "
+        .byte "New Yen. Should cover a few black market purchases.", 0
+
+id_flashlight:
+        .byte "A small tactical LED. The lens is cracked but "
+        .byte "it still throws a tight beam.", 0
+
+id_stimpack:
+        .byte "Military-grade endorphin booster. The label says "
+        .byte "Maas Biolabs. One use.", 0
+
+id_fakeid:
+        .byte "Holographic corporate ID. The name reads "
+        .byte "'Armitage, Col. W.' Tessier-Ashpool subsidiary.", 0

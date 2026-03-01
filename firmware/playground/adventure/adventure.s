@@ -20,6 +20,14 @@
 .import   room_exit_n, room_exit_s, room_exit_e, room_exit_w
 .import   room_exit_u, room_exit_d
 .import   NUM_ROOMS
+.import   item_name_lo, item_name_hi
+.import   item_desc_lo, item_desc_hi
+.import   item_init_loc, item_flags
+; NUM_ITEMS defined locally (must match world.s)
+NUM_ITEMS = 4
+.import   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
+.import   str_not_here, str_cant_take, str_no_have, str_examine_what
+.import   str_take_what, str_drop_what
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -49,6 +57,14 @@ BUF_SIZE  = 79                  ; max chars (leave room for null)
 ; Room exit: no exit marker
 NO_EXIT   = $FF
 
+; Item locations
+LOC_INVENTORY = $FE             ; item is in player's inventory
+LOC_GONE      = $FF             ; item is removed from game
+
+; Item flags
+ITEMF_TAKEABLE = $01            ; bit 0: can be picked up
+ITEMF_HIDDEN   = $02            ; bit 1: hidden (not listed)
+
 ; Screen dimensions
 SCR_COLS  = 80
 SCR_ROWS  = 25
@@ -64,12 +80,14 @@ line_len: .res 1               ; current input line length
 cur_room: .res 1               ; current room ID
 zp_ptr2:  .res 2               ; noun pointer (set by parse)
 zp_tmp2:  .res 1               ; second temp
+zp_item:  .res 1               ; resolved item ID ($FF = none)
 
 ; --- BSS (RAM) ---
 .segment "BSS"
-LINE_BUF: .res 80              ; input line buffer
-VERB_BUF: .res 16              ; parsed verb
-NOUN_BUF: .res 40              ; parsed noun (rest of line)
+LINE_BUF:      .res 80         ; input line buffer
+VERB_BUF:      .res 16         ; parsed verb
+NOUN_BUF:      .res 40         ; parsed noun (rest of line)
+item_location: .res 16         ; current location of each item
 
 ; =====================================================================
 .segment "CODE"
@@ -84,6 +102,9 @@ _main:
         STA zp_str+1
         JSR print_str
         JSR new_line
+
+        ; Init item locations from ROM table
+        JSR init_items
 
         ; Set starting room
         LDA #$00
@@ -298,6 +319,24 @@ verb_table:
         .word do_help - 1
         .addr vn_qmark
         .word do_help - 1
+        ; take / get
+        .addr vn_take
+        .word do_take - 1
+        .addr vn_get
+        .word do_take - 1
+        ; drop
+        .addr vn_drop
+        .word do_drop - 1
+        ; inventory / i
+        .addr vn_inventory
+        .word do_inventory - 1
+        .addr vn_i
+        .word do_inventory - 1
+        ; examine / x
+        .addr vn_examine
+        .word do_examine - 1
+        .addr vn_x
+        .word do_examine - 1
         ; quit
         .addr vn_quit
         .word do_quit - 1
@@ -321,9 +360,16 @@ vn_east:  .byte "east", 0
 vn_west:  .byte "west", 0
 vn_up:    .byte "up", 0
 vn_down:  .byte "down", 0
-vn_help:  .byte "help", 0
-vn_qmark: .byte "?", 0
-vn_quit:  .byte "quit", 0
+vn_take:      .byte "take", 0
+vn_get:       .byte "get", 0
+vn_drop:      .byte "drop", 0
+vn_inventory: .byte "inventory", 0
+vn_i:         .byte "i", 0
+vn_examine:   .byte "examine", 0
+vn_x:         .byte "x", 0
+vn_help:      .byte "help", 0
+vn_qmark:     .byte "?", 0
+vn_quit:      .byte "quit", 0
 
 ; =====================================================================
 ; Verb handlers
@@ -352,6 +398,9 @@ do_look:
 
         ; Print exits
         JSR print_exits
+
+        ; List items in room
+        JSR print_room_items
         RTS
 
 ; --- print_exits: list available exits for cur_room ---
@@ -565,6 +614,304 @@ try_move:
         JSR print_str
         JSR new_line
         RTS
+
+; --- init_items: copy item_init_loc → item_location ---
+init_items:
+        LDX #NUM_ITEMS
+        DEX
+@loop:  LDA item_init_loc,X
+        STA item_location,X
+        DEX
+        BPL @loop
+        RTS
+
+; --- print_room_items: list visible items in cur_room ---
+print_room_items:
+        ; First pass: check if any items here
+        LDX #$00
+        LDA #$00
+        STA zp_tmp2             ; found count
+@scan:  CPX #NUM_ITEMS
+        BCS @scan_done
+        LDA item_location,X
+        CMP cur_room
+        BNE @scan_next
+        ; Check not hidden
+        LDA item_flags,X
+        AND #ITEMF_HIDDEN
+        BNE @scan_next
+        INC zp_tmp2
+@scan_next:
+        INX
+        JMP @scan
+@scan_done:
+        LDA zp_tmp2
+        BEQ @no_items
+
+        ; Print "You see: " header
+        LDA #<str_you_see
+        STA zp_str
+        LDA #>str_you_see
+        STA zp_str+1
+        JSR print_str
+
+        ; Second pass: print item names
+        LDX #$00
+        LDA #$00
+        STA zp_tmp2             ; printed count
+@print: CPX #NUM_ITEMS
+        BCS @print_done
+        LDA item_location,X
+        CMP cur_room
+        BNE @print_next
+        LDA item_flags,X
+        AND #ITEMF_HIDDEN
+        BNE @print_next
+        ; Print separator
+        STX zp_item
+        JSR print_exit_sep      ; reuse comma separator
+        LDX zp_item
+        INC zp_tmp2
+        ; Print item name
+        LDA item_name_lo,X
+        STA zp_str
+        LDA item_name_hi,X
+        STA zp_str+1
+        STX zp_item
+        JSR print_str
+        LDX zp_item
+@print_next:
+        INX
+        JMP @print
+@print_done:
+        JSR new_line
+@no_items:
+        RTS
+
+; --- find_noun_item: resolve NOUN_BUF to item ID ---
+; Searches items in current room and inventory.
+; Sets zp_item = item ID, or $FF if not found.
+; Also sets A = item ID or $FF.
+find_noun_item:
+        LDX #$00
+@loop:  CPX #NUM_ITEMS
+        BCS @not_found
+        ; Check if item is in current room or inventory
+        LDA item_location,X
+        CMP cur_room
+        BEQ @check_name
+        CMP #LOC_INVENTORY
+        BEQ @check_name
+        INX
+        JMP @loop
+
+@check_name:
+        ; Compare NOUN_BUF with item name
+        STX zp_item
+        LDA item_name_lo,X
+        STA zp_ptr2
+        LDA item_name_hi,X
+        STA zp_ptr2+1
+        JSR strcmp_noun
+        LDX zp_item
+        BEQ @found
+        INX
+        JMP @loop
+
+@found: STX zp_item
+        TXA
+        RTS
+
+@not_found:
+        LDA #$FF
+        STA zp_item
+        RTS
+
+; --- do_take ---
+do_take:
+        LDA NOUN_BUF
+        BNE @has_noun
+        LDA #<str_take_what
+        STA zp_str
+        LDA #>str_take_what
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@has_noun:
+        JSR find_noun_item
+        CMP #$FF
+        BNE @found_item
+
+        ; Item not found
+        LDA #<str_not_here
+        STA zp_str
+        LDA #>str_not_here
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@found_item:
+        ; Check if item is in current room (not inventory)
+        LDX zp_item
+        LDA item_location,X
+        CMP cur_room
+        BEQ @in_room
+        ; Already carrying it
+        LDA #<str_already_have
+        STA zp_str
+        LDA #>str_already_have
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@in_room:
+        ; Check if takeable
+        LDA item_flags,X
+        AND #ITEMF_TAKEABLE
+        BNE @can_take
+        LDA #<str_cant_take
+        STA zp_str
+        LDA #>str_cant_take
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@can_take:
+        ; Move to inventory
+        LDA #LOC_INVENTORY
+        STA item_location,X
+        LDA #<str_taken
+        STA zp_str
+        LDA #>str_taken
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+; --- do_drop ---
+do_drop:
+        LDA NOUN_BUF
+        BNE @has_noun
+        LDA #<str_drop_what
+        STA zp_str
+        LDA #>str_drop_what
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@has_noun:
+        ; Find item in inventory
+        LDX #$00
+@find:  CPX #NUM_ITEMS
+        BCS @not_carrying
+        LDA item_location,X
+        CMP #LOC_INVENTORY
+        BNE @find_next
+        ; Check name
+        STX zp_item
+        LDA item_name_lo,X
+        STA zp_ptr2
+        LDA item_name_hi,X
+        STA zp_ptr2+1
+        JSR strcmp_noun
+        LDX zp_item
+        BEQ @found
+@find_next:
+        INX
+        JMP @find
+
+@found:
+        ; Drop to current room
+        LDA cur_room
+        STA item_location,X
+        LDA #<str_dropped
+        STA zp_str
+        LDA #>str_dropped
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@not_carrying:
+        LDA #<str_no_have
+        STA zp_str
+        LDA #>str_no_have
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+; --- do_inventory ---
+do_inventory:
+        LDA #<str_carrying
+        STA zp_str
+        LDA #>str_carrying
+        STA zp_str+1
+        JSR print_str
+
+        LDX #$00
+        LDA #$00
+        STA zp_tmp2             ; count
+@loop:  CPX #NUM_ITEMS
+        BCS @done
+        LDA item_location,X
+        CMP #LOC_INVENTORY
+        BNE @next
+        ; Print separator
+        STX zp_item
+        JSR print_exit_sep
+        LDX zp_item
+        INC zp_tmp2
+        ; Print item name
+        LDA item_name_lo,X
+        STA zp_str
+        LDA item_name_hi,X
+        STA zp_str+1
+        STX zp_item
+        JSR print_str
+        LDX zp_item
+@next:  INX
+        JMP @loop
+
+@done:
+        LDA zp_tmp2
+        BNE @has_items
+        LDA #<str_nothing
+        STA zp_str
+        LDA #>str_nothing
+        STA zp_str+1
+        JSR print_str
+@has_items:
+        JMP new_line
+
+; --- do_examine ---
+do_examine:
+        LDA NOUN_BUF
+        BNE @has_noun
+        LDA #<str_examine_what
+        STA zp_str
+        LDA #>str_examine_what
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@has_noun:
+        JSR find_noun_item
+        CMP #$FF
+        BNE @found
+        LDA #<str_not_here
+        STA zp_str
+        LDA #>str_not_here
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@found:
+        LDX zp_item
+        LDA item_desc_lo,X
+        STA zp_str
+        LDA item_desc_hi,X
+        STA zp_str+1
+        JSR print_wrap
+        JMP new_line
 
 ; --- do_help ---
 do_help:
@@ -957,6 +1304,9 @@ kbd_read:
 
 str_go_where:
         .byte "Go where?", 0
+
+str_already_have:
+        .byte "You already have that.", 0
 
 ; Direction lookup table for "go" command: { name_ptr, (handler-1) }
 go_dir_table:
