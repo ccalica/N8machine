@@ -13,7 +13,8 @@
 
 std::list<std::string> labels[65536];
 
-const char *label_file = "N8firmware.sym";
+const char *kernel_label_file = "n8_kernel.sym";
+const char *monitor_label_file = "n8_monitor.sym";
 void emu_labels_add(uint16_t addr, char * label) {
     labels[addr].remove(label);
     labels[addr].emplace_back(label);
@@ -41,14 +42,15 @@ void emu_labels_console_list() {
         }
     }
 }
-void emu_labels_load() {
-    printf("Loading Symbols\r\n");fflush(stdout);
-    FILE *fp = fopen(label_file, "r");
-    if(!fp) {printf("ERROR label load\r\n"); fflush(stdout);exit(-1);}
-    
-    // std::string cmd, args;
-    
-    emu_labels_clear();
+static void load_label_file(const char *path) {
+    printf("Loading Symbols from '%s'\r\n", path);fflush(stdout);
+    FILE *fp = fopen(path, "r");
+    if(!fp) {
+        printf("WARNING: Cannot open symbol file '%s' (skipped)\r\n", path);
+        fflush(stdout);
+        return;
+    }
+
     int len;
     while(1) {
         char *line = NULL;
@@ -58,16 +60,12 @@ void emu_labels_load() {
         char addr[8] {0};
         char label[192] {0};
 
-        // // read line
         if((len = getline(&line,&line_len,fp)) == -1) {
             break;
         }
         if(*(line+len-1) == '\n') *(line+len-1) = 0;
         if(*(line+len-2) == '\r') *(line+len-2) = 0;
 
-        // for(int i =0; i< 256;i++) args[i] = 0;
-
-        // printf("LINE: %s;;;\n", line); fflush(stdout);
         if(sscanf(line,"%8s %196c", cmd, args) <= 0) {
             continue;
         };
@@ -76,7 +74,6 @@ void emu_labels_load() {
                 continue;
             };
             emu_labels_add(htoi(addr), label);
-            // printf("Add label %s == %6.6X (%d)\r\n", label, htoi(addr), htoi(addr));fflush(stdout);
         }
         else {
             printf("unknown cmd: %s\r\n", cmd); fflush(stdout);
@@ -84,6 +81,12 @@ void emu_labels_load() {
 
     }
     fclose(fp);
+}
+
+void emu_labels_load() {
+    emu_labels_clear();
+    load_label_file(kernel_label_file);
+    load_label_file(monitor_label_file);
 }
 
 void emu_labels_init() {

@@ -86,6 +86,17 @@
 #define N8_ROM_SIZE         0x2000
 #define N8_ROM_END          0xFFFF
 
+/* --- Monitor ($E000-$EFFF, 4KB) --- */
+#define N8_MONITOR_BASE     0xE000
+#define N8_MONITOR_SIZE     0x1000
+
+/* --- Kernel ($F000-$FFFF, 4KB) --- */
+#define N8_KERNEL_BASE      0xF000
+#define N8_KERNEL_SIZE      0x1000
+
+/* --- Kernel Entry Jump Table --- */
+#define N8_KENTRY_BASE      0xFE00
+
 /* --- Vectors --- */
 #define N8_VEC_NMI          0xFFFA
 #define N8_VEC_RESET        0xFFFC

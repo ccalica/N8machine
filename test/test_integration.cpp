@@ -1,7 +1,8 @@
 #include "doctest.h"
 #include "test_helpers.h"
 
-extern const char *rom_file;
+extern const char *kernel_file;
+extern const char *monitor_file;
 
 TEST_SUITE("integration") {
 
@@ -171,25 +172,37 @@ TEST_SUITE("integration") {
     // T170: emulator_loadrom places 8KB binary at $E000
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T170: emulator_loadrom places 8KB binary at $E000") {
+    TEST_CASE("T170: emulator_loadrom places kernel at $F000 and monitor at $E000") {
         EmulatorFixture f;
-        // Create a temp ROM file with known content (< 8KB)
-        const char *old_rom = rom_file;
-        rom_file = "/tmp/n8_test_rom_170.bin";
+        const char *old_kernel = kernel_file;
+        const char *old_monitor = monitor_file;
+        kernel_file = "/tmp/n8_test_kernel_170.bin";
+        monitor_file = "/tmp/n8_test_monitor_170.bin";
 
-        // Write a small ROM: 16 bytes
-        FILE *fp = fopen(rom_file, "w");
+        // Write a small kernel ROM: 16 bytes at $F000
+        FILE *fp = fopen(kernel_file, "w");
         REQUIRE(fp != nullptr);
-        uint8_t rom_data[] = {0xA9, 0x42, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA,
+        uint8_t kern_data[] = {0xA9, 0x42, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA,
                                0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA};
-        fwrite(rom_data, 1, sizeof(rom_data), fp);
+        fwrite(kern_data, 1, sizeof(kern_data), fp);
+        fclose(fp);
+
+        // Write a small monitor ROM: 16 bytes at $E000
+        fp = fopen(monitor_file, "w");
+        REQUIRE(fp != nullptr);
+        uint8_t mon_data[] = {0xA2, 0x55, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA,
+                              0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA};
+        fwrite(mon_data, 1, sizeof(mon_data), fp);
         fclose(fp);
 
         emulator_loadrom();
-        CHECK(mem[0xE000] == 0xA9);
-        CHECK(mem[0xE001] == 0x42);
+        CHECK(mem[0xF000] == 0xA9);
+        CHECK(mem[0xF001] == 0x42);
+        CHECK(mem[0xE000] == 0xA2);
+        CHECK(mem[0xE001] == 0x55);
 
-        rom_file = old_rom;
+        kernel_file = old_kernel;
+        monitor_file = old_monitor;
     }
 
     // -------------------------------------------------------------------------
@@ -236,30 +249,38 @@ TEST_SUITE("integration") {
     // T174: Oversized ROM is truncated to 8KB at $E000
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T174: Oversized ROM is truncated to 8KB at $E000") {
+    TEST_CASE("T174: Oversized kernel is truncated to 4KB at $F000") {
         EmulatorFixture f;
-        const char *old_rom = rom_file;
-        rom_file = "/tmp/n8_test_rom_174.bin";
+        const char *old_kernel = kernel_file;
+        const char *old_monitor = monitor_file;
+        kernel_file = "/tmp/n8_test_kernel_174.bin";
+        monitor_file = "/tmp/n8_test_monitor_174_empty.bin";
 
-        // Write a 12KB ROM
-        FILE *fp = fopen(rom_file, "w");
+        // Write an 8KB kernel (oversized — should truncate to 4KB)
+        FILE *fp = fopen(kernel_file, "w");
         REQUIRE(fp != nullptr);
         uint8_t byte = 0xEA;
-        for (int i = 0; i < 12288; i++) fwrite(&byte, 1, 1, fp);
+        for (int i = 0; i < 8192; i++) fwrite(&byte, 1, 1, fp);
         // Put marker at start
         fseek(fp, 0, SEEK_SET);
         uint8_t marker[] = {0xA9, 0xFF};
         fwrite(marker, 1, 2, fp);
         fclose(fp);
 
-        emulator_loadrom();
-        // Loads at $E000, truncated to 8KB
-        CHECK(mem[0xE000] == 0xA9);
-        CHECK(mem[0xE001] == 0xFF);
-        // $D000 should NOT have data (no legacy fallback)
-        CHECK(mem[0xD000] == 0x00);
+        // Write an empty monitor so load doesn't error
+        fp = fopen(monitor_file, "w");
+        REQUIRE(fp != nullptr);
+        fclose(fp);
 
-        rom_file = old_rom;
+        emulator_loadrom();
+        // Kernel loads at $F000, truncated to 4KB
+        CHECK(mem[0xF000] == 0xA9);
+        CHECK(mem[0xF001] == 0xFF);
+        // $E000 should NOT have kernel overflow
+        CHECK(mem[0xE000] == 0x00);
+
+        kernel_file = old_kernel;
+        monitor_file = old_monitor;
     }
 
     // -------------------------------------------------------------------------

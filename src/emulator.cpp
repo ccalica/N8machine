@@ -26,7 +26,8 @@
 #define IRQ_CLR() mem[N8_IRQ_FLAGS] = 0x00;
 #define IRQ_SET(bit) mem[N8_IRQ_FLAGS] = (mem[N8_IRQ_FLAGS] | (0x01 << bit))
 
-const char *rom_file = "N8firmware";
+const char *kernel_file = "n8_kernel";
+const char *monitor_file = "n8_monitor";
 uint64_t tick_count = 0;
 
 // 64 KB zero-initialized memory
@@ -64,10 +65,10 @@ void emu_clr_irq(int bit) {
     mem[N8_IRQ_FLAGS] = (mem[N8_IRQ_FLAGS] & ~(0x01 << bit) );
 }
 
-void emulator_loadrom() {
-    FILE *fp = fopen(rom_file, "r");
+static void load_rom_file(const char *path, uint16_t base, uint16_t max_size) {
+    FILE *fp = fopen(path, "r");
     if (!fp) {
-        printf("ERROR: Cannot open ROM file '%s'\r\n", rom_file);
+        printf("ERROR: Cannot open ROM file '%s'\r\n", path);
         fflush(stdout);
         return;
     }
@@ -76,18 +77,23 @@ void emulator_loadrom() {
     long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (size > N8_ROM_SIZE) {
+    if (size > max_size) {
         printf("WARNING: ROM '%s' is %ld bytes, truncating to %d\r\n",
-               rom_file, size, N8_ROM_SIZE);
+               path, size, max_size);
         fflush(stdout);
-        size = N8_ROM_SIZE;
+        size = max_size;
     }
 
-    printf("Loading ROM at $%04X (%ld bytes)\r\n", N8_ROM_BASE, size);
+    printf("Loading ROM '%s' at $%04X (%ld bytes)\r\n", path, base, size);
     fflush(stdout);
 
-    fread(&mem[N8_ROM_BASE], 1, size, fp);
+    fread(&mem[base], 1, size, fp);
     fclose(fp);
+}
+
+void emulator_loadrom() {
+    load_rom_file(kernel_file, N8_KERNEL_BASE, N8_KERNEL_SIZE);
+    load_rom_file(monitor_file, N8_MONITOR_BASE, N8_MONITOR_SIZE);
 }
 void emulator_init() {
     emulator_loadrom();

@@ -10,8 +10,16 @@ $FFFF ┌───────────────────────�
       │ Vectors (NMI/RESET/IRQ)       │  6 bytes
 $FFFA ├───────────────────────────────┤
       │                               │
-      │ ROM (8 KB)                    │
+      │ Kernel Entry Jump Table       │  512 bytes
+$FE00 ├───────────────────────────────┤
+      │                               │
+      │ Kernel Implementation (4 KB)  │
       │ STARTUP, CODE, RODATA, ONCE   │
+      │                               │
+$F000 ├───────────────────────────────┤
+      │                               │
+      │ Monitor (4 KB)                │
+      │ CODE, RODATA                  │
       │                               │
 $E000 ├───────────────────────────────┤
       │ Device Space ($D800-$DFFF)    │  2 KB
@@ -33,20 +41,44 @@ $0100 ├───────────────────────�
 $0000 └───────────────────────────────┘
 ```
 
-## Linker Segments (n8.cfg)
+## ROM Layout
 
-ROM is loaded at `$E000` (8 KB). DATA is loaded in ROM but runs in RAM
-(copied by `copydata` at boot).
+The 8KB ROM region ($E000-$FFFF) is split into two separately-built binaries:
+
+| Binary       | Range           | Size | Linker Config  |
+|-------------|-----------------|------|----------------|
+| `n8_monitor` | `$E000-$EFFF`  | 4 KB | `monitor.cfg`  |
+| `n8_kernel`  | `$F000-$FFFF`  | 4 KB | `kernel.cfg`   |
+
+### Kernel Segments (kernel.cfg)
 
 | Segment   | Load | Run | Contents                                    |
 |-----------|------|-----|---------------------------------------------|
 | `STARTUP` | ROM  | ROM | Boot code (`_init`), constructor tables      |
 | `ONCE`    | ROM  | ROM | One-time initialization (currently unused)   |
-| `CODE`    | ROM  | ROM | Main program, TTY driver, interrupt handlers |
+| `CODE`    | ROM  | ROM | TTY driver, interrupt handlers               |
 | `RODATA`  | ROM  | ROM | Read-only data (string literals)             |
 | `DATA`    | ROM  | RAM | Initialized data (copied to RAM at boot)     |
 | `BSS`     | —    | RAM | Zero-initialized at boot (`zerobss`)         |
+| `KENTRY`  | ROM  | ROM | Kernel entry jump table at `$FE00`           |
 | `VECTORS` | ROM  | ROM | NMI/RESET/IRQ vectors at `$FFFA`             |
+
+### Monitor Segments (monitor.cfg)
+
+| Segment   | Load | Run | Contents                    |
+|-----------|------|-----|-----------------------------|
+| `CODE`    | ROM  | ROM | Interactive echo shell       |
+| `RODATA`  | ROM  | ROM | Banner string                |
+
+### Kernel Entry Jump Table ($FE00)
+
+The monitor calls kernel services through fixed entry points:
+
+| Address | Function       | Description            |
+|---------|---------------|------------------------|
+| `$FE00` | `K_TTY_PUTC`  | Print character (A)    |
+| `$FE03` | `K_TTY_GETC`  | Get character → A      |
+| `$FE06` | `K_TTY_PEEKC` | Peek char count → A    |
 
 ## Zero Page ($0000-$00FF)
 
