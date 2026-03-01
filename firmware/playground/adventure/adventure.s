@@ -24,7 +24,7 @@
 .import   item_desc_lo, item_desc_hi
 .import   item_init_loc, item_flags
 ; NUM_ITEMS defined locally (must match world.s)
-NUM_ITEMS = 13
+NUM_ITEMS = 15
 .import   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
 .import   str_not_here, str_cant_take, str_no_have, str_examine_what
 .import   str_take_what, str_drop_what
@@ -35,8 +35,12 @@ ITEM_CREDCHIP   = 0
 ITEM_STIMPACK   = 2
 ITEM_FAKEID     = 3
 ITEM_ICEBREAKER = 4
+ITEM_CYBERDECK  = 5
+ITEM_JACKCABLE  = 6
 ITEM_KEYCARD    = 8
 ITEM_CROWBAR    = 9
+ITEM_CONSTRUCT  = 13
+ITEM_MEDKIT     = 14
 
 ; Room IDs (must match world.s)
 ROOM_MICROSOFTS  = 3
@@ -48,13 +52,21 @@ ROOM_SECURITY    = 12
 ROOM_ELEVATOR    = 13
 ROOM_PARKING     = 14
 ROOM_SERVER      = 15
+ROOM_DATA_CENTER = 16
 ROOM_VENT_SHAFT  = 19
+ROOM_MATRIX_GW   = 20
+ROOM_ICE_WALL    = 21
+ROOM_DATA_VAULT  = 22
+ROOM_EXTRACTION  = 23
+ROOM_HELIPAD     = 24
 
 ; Puzzle flags
 PF_NEURAL_LINK   = $01          ; bit 0: neural link installed
 PF_TOWER_ACCESS  = $02          ; bit 1: tower lobby → security unlocked
 PF_ELEVATOR_KEY  = $04          ; bit 2: elevator unlocked
 PF_VENT_OPEN     = $08          ; bit 3: vent shaft pried open
+PF_JACKED_IN     = $10          ; bit 4: jacked into matrix
+PF_ICE_BROKEN    = $20          ; bit 5: ICE wall breached
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -123,6 +135,22 @@ puzzle_flags:  .res 8          ; puzzle state flags
 _main:
         JSR clear_screen
 
+        ; Init item locations from ROM table
+        JSR init_items
+
+        ; Set starting room
+        LDA #$00
+        STA cur_room
+
+        ; Status bar on row 0
+        JSR update_status_bar
+
+        ; Start text output at row 1
+        LDA #$01
+        STA zp_row
+        LDA #$00
+        STA zp_col
+
         ; Print banner
         LDA #<str_banner
         STA zp_str
@@ -131,20 +159,8 @@ _main:
         JSR print_str
         JSR new_line
 
-        ; Init item locations from ROM table
-        JSR init_items
-
-        ; Set starting room
-        LDA #$00
-        STA cur_room
-
-        ; Start text output at row 1 (row 0 = status bar)
-        LDA #$01
-        STA zp_row
-
         ; Auto-look at start
         JSR do_look
-        JSR update_status_bar
 
 main_loop:
         ; Print prompt
@@ -375,6 +391,9 @@ verb_table:
         .word do_examine - 1
         .addr vn_x
         .word do_examine - 1
+        ; jack (jack in at data center)
+        .addr vn_jack
+        .word do_jack - 1
         ; quit
         .addr vn_quit
         .word do_quit - 1
@@ -408,6 +427,7 @@ vn_examine:   .byte "examine", 0
 vn_x:         .byte "x", 0
 vn_help:      .byte "help", 0
 vn_qmark:     .byte "?", 0
+vn_jack:      .byte "jack", 0
 vn_quit:      .byte "quit", 0
 
 ; =====================================================================
@@ -642,7 +662,9 @@ do_down:
 ; --- try_move: A = destination room, $FF = no exit ---
 try_move:
         CMP #NO_EXIT
-        BEQ @blocked
+        BNE @not_blocked
+        JMP @blocked
+@not_blocked:
 
         ; Check for locked exits
         ; Tower Lobby → Security requires PF_TOWER_ACCESS
@@ -695,11 +717,27 @@ try_move:
         JMP new_line
 @vent_ok:
         LDA #ROOM_VENT_SHAFT
+@chk_ice:
+        ; ICE Wall → Data Vault requires PF_ICE_BROKEN
+        CMP #ROOM_DATA_VAULT
+        BNE @move_ok
+        LDA puzzle_flags
+        AND #PF_ICE_BROKEN
+        BNE @ice_ok
+        LDA #<str_ice_block
+        STA zp_str
+        LDA #>str_ice_block
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@ice_ok:
+        LDA #ROOM_DATA_VAULT
 @move_ok:
         STA cur_room
         JSR update_status_bar
         JSR new_line
         JSR do_look
+        JSR check_victory
         RTS
 @blocked:
         LDA #<str_no_exit
@@ -1061,6 +1099,10 @@ do_use:
         BEQ @use_keycard
         CMP #ITEM_CROWBAR
         BEQ @use_crowbar
+        CMP #ITEM_ICEBREAKER
+        BEQ @use_ice
+        CMP #ITEM_MEDKIT
+        BEQ @use_medkit
         JMP use_no_puzzle
 
 @use_credchip:  JMP use_puzzle_credchip
@@ -1068,6 +1110,8 @@ do_use:
 @use_fakeid:    JMP use_puzzle_fakeid
 @use_keycard:   JMP use_puzzle_keycard
 @use_crowbar:   JMP use_puzzle_crowbar
+@use_ice:       JMP use_puzzle_icebreaker
+@use_medkit:    JMP use_puzzle_medkit
 
 ; --- Individual puzzle handlers (separate routines, no branch range issues) ---
 
@@ -1196,6 +1240,137 @@ use_puzzle_crowbar:
         STA zp_str+1
         JSR print_str
         JMP new_line
+
+use_puzzle_icebreaker:
+        LDA cur_room
+        CMP #ROOM_ICE_WALL
+        BEQ @ok
+        JMP use_no_puzzle
+@ok:
+        LDA puzzle_flags
+        AND #PF_ICE_BROKEN
+        BNE @already
+        LDA puzzle_flags
+        ORA #PF_ICE_BROKEN
+        STA puzzle_flags
+        LDX #ITEM_ICEBREAKER
+        LDA #LOC_GONE
+        STA item_location,X
+        LDA #<str_ice_use
+        STA zp_str
+        LDA #>str_ice_use
+        STA zp_str+1
+        JSR print_wrap
+        JMP new_line
+@already:
+        LDA #<str_already_ice
+        STA zp_str
+        LDA #>str_already_ice
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+use_puzzle_medkit:
+        ; Medkit heals — flavor text, consumable
+        LDX #ITEM_MEDKIT
+        LDA #LOC_GONE
+        STA item_location,X
+        LDA #<str_medkit_use
+        STA zp_str
+        LDA #>str_medkit_use
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+; --- do_jack: jack into cyberspace at Data Center ---
+do_jack:
+        LDA cur_room
+        CMP #ROOM_DATA_CENTER
+        BEQ @right_room
+        LDA #<str_jack_where
+        STA zp_str
+        LDA #>str_jack_where
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@right_room:
+        ; Check requirements: cyberdeck, jack cable, neural link
+        LDX #ITEM_CYBERDECK
+        LDA item_location,X
+        CMP #LOC_INVENTORY
+        BEQ @has_deck
+        LDA #<str_jack_nodeck
+        STA zp_str
+        LDA #>str_jack_nodeck
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@has_deck:
+        LDX #ITEM_JACKCABLE
+        LDA item_location,X
+        CMP #LOC_INVENTORY
+        BEQ @has_cable
+        LDA #<str_jack_nocable
+        STA zp_str
+        LDA #>str_jack_nocable
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@has_cable:
+        LDA puzzle_flags
+        AND #PF_NEURAL_LINK
+        BNE @has_link
+        LDA #<str_jack_nolink
+        STA zp_str
+        LDA #>str_jack_nolink
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@has_link:
+        ; Jack in!
+        LDA puzzle_flags
+        ORA #PF_JACKED_IN
+        STA puzzle_flags
+        LDA #<str_jack_in
+        STA zp_str
+        LDA #>str_jack_in
+        STA zp_str+1
+        JSR print_wrap
+        JSR new_line
+        LDA #ROOM_MATRIX_GW
+        STA cur_room
+        JSR update_status_bar
+        JSR new_line
+        JSR do_look
+        RTS
+
+; --- Victory check (called when entering Helipad) ---
+check_victory:
+        LDA cur_room
+        CMP #ROOM_HELIPAD
+        BNE @no
+        ; Check for data construct
+        LDX #ITEM_CONSTRUCT
+        LDA item_location,X
+        CMP #LOC_INVENTORY
+        BNE @no
+        ; Victory!
+        JSR new_line
+        LDA #<str_victory
+        STA zp_str
+        LDA #>str_victory
+        STA zp_str+1
+        JSR print_wrap
+        JSR new_line
+        JSR new_line
+        LDA #<str_victory2
+        STA zp_str
+        LDA #>str_victory2
+        STA zp_str+1
+        JSR print_str
+        JSR new_line
+@halt:  JMP @halt
+@no:    RTS
 
 use_no_puzzle:
         LDA #<str_cant_use
@@ -1562,6 +1737,7 @@ advance_row:
         CMP #25
         BCC @done
         JSR scroll_up
+        JSR update_status_bar
         LDA #24
         STA zp_row
 @done:  RTS
@@ -1642,17 +1818,14 @@ str_already_have:
         .byte "You already have that.", 0
 
 str_neural_link:
-        .byte "You lie back in the chair. The doctor produces a "
-        .byte "microsurgical probe. A quick sting behind your ear "
-        .byte "and it's done. Neural interface installed. You can "
-        .byte "feel the port like a cold coin against your skull.", 0
+        .byte "Quick sting behind the ear. Done. Neural "
+        .byte "interface installed. Cold coin against skull.", 0
 
 str_already_linked:
         .byte "Your neural link is already installed.", 0
 
 str_fakeid_use:
-        .byte "You flash the Tessier-Ashpool ID at the lobby guard. "
-        .byte "He nods and waves you toward the security office.", 0
+        .byte "Flash the T-A ID. Guard nods. Security cleared.", 0
 
 str_already_access:
         .byte "The guard already cleared you.", 0
@@ -1667,10 +1840,8 @@ str_guard_block:
         .byte "A guard blocks the way. You need clearance.", 0
 
 str_buy_ice:
-        .byte "You slide the credchip across the counter. The vendor "
-        .byte "palms it, checks the balance, and produces a black "
-        .byte "ROM chip from under the counter. 'Military-grade ICE "
-        .byte "breaker. Don't ask where I got it.'", 0
+        .byte "Credchip slides across. Vendor palms it, "
+        .byte "produces a black ROM. 'Don't ask.'", 0
 
 str_elev_locked:
         .byte "The panel is dark. You need a keycard.", 0
@@ -1679,12 +1850,47 @@ str_vent_locked:
         .byte "A heavy grate covers the vent shaft.", 0
 
 str_crowbar_use:
-        .byte "You wedge the crowbar under the vent grate and "
-        .byte "lever it free. Rusty bolts snap. Cold air rushes up "
-        .byte "from below.", 0
+        .byte "Crowbar under the grate. Bolts snap. Cold "
+        .byte "air from below.", 0
 
 str_already_vent:
         .byte "The vent is already open.", 0
+
+str_ice_block:
+        .byte "A wall of black ICE blocks the path. Lethal.", 0
+
+str_ice_use:
+        .byte "ICE breaker slots in. Wall fragments into "
+        .byte "static. Path clear.", 0
+
+str_already_ice:
+        .byte "The ICE is already down.", 0
+
+str_medkit_use:
+        .byte "The endorphin rush hits instantly. Pain recedes.", 0
+
+str_jack_where:
+        .byte "There's nothing to jack into here.", 0
+
+str_jack_nodeck:
+        .byte "You need a cyberdeck to jack in.", 0
+
+str_jack_nocable:
+        .byte "You need a jack cable.", 0
+
+str_jack_nolink:
+        .byte "You need a neural interface.", 0
+
+str_jack_in:
+        .byte "Cable clicks. World dissolves. Blue geometry. "
+        .byte "You're in.", 0
+
+str_victory:
+        .byte "Helicopter lifts off. The Sprawl recedes below. "
+        .byte "Wintermute sends. You delivered.", 0
+
+str_victory2:
+        .byte "*** YOU WIN ***", 0
 
 ; Direction lookup table for "go" command: { name_ptr, (handler-1) }
 go_dir_table:

@@ -42,9 +42,14 @@ ROOM_DATA_CENTER = 16
 ROOM_CORNER_OFF  = 17
 ROOM_SVC_TUNNEL  = 18
 ROOM_VENT_SHAFT  = 19
+ROOM_MATRIX_GW   = 20
+ROOM_ICE_WALL    = 21
+ROOM_DATA_VAULT  = 22
+ROOM_EXTRACTION  = 23
+ROOM_HELIPAD     = 24
 NO_EXIT          = $FF
 
-NUM_ROOMS = 20
+NUM_ROOMS = 25
 
 ; --- Item IDs ---
 ITEM_CREDCHIP    = 0
@@ -60,8 +65,10 @@ ITEM_CROWBAR     = 9
 ITEM_MAGAZINE    = 10
 ITEM_ENCCHIP     = 11
 ITEM_SVCMAP      = 12
+ITEM_CONSTRUCT   = 13
+ITEM_MEDKIT      = 14
 
-NUM_ITEMS = 13
+NUM_ITEMS = 15
 
 LOC_INVENTORY = $FE
 LOC_GONE      = $FF
@@ -86,17 +93,9 @@ str_exits_hdr:  .byte "Exits: ", 0
 str_quit_msg:   .byte "The neon fades to black.", 0
 
 str_help_text:
-        .byte "Commands:", $0D
-        .byte "  look (l)        - Look around", $0D
-        .byte "  go <dir>        - Move (n/s/e/w/u/d)", $0D
-        .byte "  n/s/e/w/u/d     - Move shortcut", $0D
-        .byte "  take/get <item> - Pick up item", $0D
-        .byte "  drop <item>     - Drop item", $0D
-        .byte "  use <item>      - Use item", $0D
-        .byte "  examine/x <item>- Examine item", $0D
-        .byte "  inventory (i)   - Show inventory", $0D
-        .byte "  help (?)        - This message", $0D
-        .byte "  quit            - End game", 0
+        .byte "look(l) go n/s/e/w/u/d take/get", $0D
+        .byte "drop use examine(x) inventory(i)", $0D
+        .byte "jack help(?) quit", 0
 
 str_dir_n:  .byte "north", 0
 str_dir_s:  .byte "south", 0
@@ -131,6 +130,8 @@ room_name_lo:
         .byte <rn_elevator, <rn_parking
         .byte <rn_server, <rn_data_center, <rn_corner_off
         .byte <rn_svc_tunnel, <rn_vent_shaft
+        .byte <rn_matrix_gw, <rn_ice_wall, <rn_data_vault
+        .byte <rn_extraction, <rn_helipad
 
 room_name_hi:
         .byte >rn_alley, >rn_bar, >rn_market, >rn_microsofts, >rn_clinic
@@ -140,6 +141,8 @@ room_name_hi:
         .byte >rn_elevator, >rn_parking
         .byte >rn_server, >rn_data_center, >rn_corner_off
         .byte >rn_svc_tunnel, >rn_vent_shaft
+        .byte >rn_matrix_gw, >rn_ice_wall, >rn_data_vault
+        .byte >rn_extraction, >rn_helipad
 
 ; =====================================================================
 ; Room description pointer tables
@@ -153,6 +156,8 @@ room_desc_lo:
         .byte <rd_elevator, <rd_parking
         .byte <rd_server, <rd_data_center, <rd_corner_off
         .byte <rd_svc_tunnel, <rd_vent_shaft
+        .byte <rd_matrix_gw, <rd_ice_wall, <rd_data_vault
+        .byte <rd_extraction, <rd_helipad
 
 room_desc_hi:
         .byte >rd_alley, >rd_bar, >rd_market, >rd_microsofts, >rd_clinic
@@ -162,6 +167,8 @@ room_desc_hi:
         .byte >rd_elevator, >rd_parking
         .byte >rd_server, >rd_data_center, >rd_corner_off
         .byte >rd_svc_tunnel, >rd_vent_shaft
+        .byte >rd_matrix_gw, >rd_ice_wall, >rd_data_vault
+        .byte >rd_extraction, >rd_helipad
 
 ; =====================================================================
 ; Room exit tables
@@ -188,6 +195,11 @@ room_exit_n:
         .byte NO_EXIT            ; 17 Corner Office
         .byte ROOM_SERVER        ; 18 Service Tunnel -> Server Floor
         .byte ROOM_SVC_TUNNEL    ; 19 Vent Shaft -> Service Tunnel
+        .byte ROOM_ICE_WALL      ; 20 Matrix Gateway -> ICE Wall
+        .byte ROOM_DATA_VAULT    ; 21 ICE Wall -> Data Vault (locked)
+        .byte NO_EXIT            ; 22 Data Vault
+        .byte NO_EXIT            ; 23 Extraction Point
+        .byte NO_EXIT            ; 24 Helipad
 
 room_exit_s:
         .byte NO_EXIT            ; 0  Alley
@@ -210,6 +222,11 @@ room_exit_s:
         .byte NO_EXIT            ; 17 Corner Office
         .byte ROOM_VENT_SHAFT    ; 18 Service Tunnel -> Vent Shaft
         .byte NO_EXIT            ; 19 Vent Shaft
+        .byte NO_EXIT            ; 20 Matrix Gateway
+        .byte ROOM_MATRIX_GW     ; 21 ICE Wall -> Matrix Gateway
+        .byte ROOM_EXTRACTION    ; 22 Data Vault -> Extraction Point
+        .byte ROOM_DATA_CENTER   ; 23 Extraction Point -> Data Center (jack out)
+        .byte NO_EXIT            ; 24 Helipad
 
 room_exit_e:
         .byte NO_EXIT            ; 0  Alley
@@ -232,6 +249,11 @@ room_exit_e:
         .byte NO_EXIT            ; 17 Corner Office
         .byte NO_EXIT            ; 18 Service Tunnel
         .byte NO_EXIT            ; 19 Vent Shaft
+        .byte NO_EXIT            ; 20 Matrix Gateway
+        .byte NO_EXIT            ; 21 ICE Wall
+        .byte NO_EXIT            ; 22 Data Vault
+        .byte NO_EXIT            ; 23 Extraction Point
+        .byte NO_EXIT            ; 24 Helipad
 
 room_exit_w:
         .byte NO_EXIT            ; 0  Alley
@@ -254,6 +276,11 @@ room_exit_w:
         .byte ROOM_SERVER        ; 17 Corner Office -> Server Floor
         .byte NO_EXIT            ; 18 Service Tunnel
         .byte NO_EXIT            ; 19 Vent Shaft
+        .byte NO_EXIT            ; 20 Matrix Gateway
+        .byte NO_EXIT            ; 21 ICE Wall
+        .byte ROOM_ICE_WALL      ; 22 Data Vault -> ICE Wall
+        .byte NO_EXIT            ; 23 Extraction Point
+        .byte NO_EXIT            ; 24 Helipad
 
 room_exit_u:
         .byte NO_EXIT            ; 0  Alley
@@ -276,6 +303,11 @@ room_exit_u:
         .byte NO_EXIT            ; 17 Corner Office
         .byte NO_EXIT            ; 18 Service Tunnel
         .byte ROOM_SVC_TUNNEL    ; 19 Vent Shaft -> Service Tunnel
+        .byte NO_EXIT            ; 20 Matrix Gateway
+        .byte NO_EXIT            ; 21 ICE Wall
+        .byte NO_EXIT            ; 22 Data Vault
+        .byte ROOM_HELIPAD       ; 23 Extraction Point -> Helipad
+        .byte NO_EXIT            ; 24 Helipad
 
 room_exit_d:
         .byte NO_EXIT            ; 0  Alley
@@ -298,6 +330,11 @@ room_exit_d:
         .byte NO_EXIT            ; 17 Corner Office
         .byte ROOM_VENT_SHAFT    ; 18 Service Tunnel -> Vent Shaft
         .byte ROOM_PARKING       ; 19 Vent Shaft -> Parking
+        .byte NO_EXIT            ; 20 Matrix Gateway
+        .byte NO_EXIT            ; 21 ICE Wall
+        .byte NO_EXIT            ; 22 Data Vault
+        .byte NO_EXIT            ; 23 Extraction Point
+        .byte NO_EXIT            ; 24 Helipad
 
 ; =====================================================================
 ; Item tables
@@ -309,6 +346,7 @@ item_name_lo:
         .byte <in_cyberdeck, <in_jackcable, <in_uplink
         .byte <in_keycard, <in_crowbar, <in_magazine
         .byte <in_encchip, <in_svcmap
+        .byte <in_construct, <in_medkit
 
 item_name_hi:
         .byte >in_credchip, >in_flashlight, >in_stimpack, >in_fakeid
@@ -316,6 +354,7 @@ item_name_hi:
         .byte >in_cyberdeck, >in_jackcable, >in_uplink
         .byte >in_keycard, >in_crowbar, >in_magazine
         .byte >in_encchip, >in_svcmap
+        .byte >in_construct, >in_medkit
 
 item_desc_lo:
         .byte <id_credchip, <id_flashlight, <id_stimpack, <id_fakeid
@@ -323,6 +362,7 @@ item_desc_lo:
         .byte <id_cyberdeck, <id_jackcable, <id_uplink
         .byte <id_keycard, <id_crowbar, <id_magazine
         .byte <id_encchip, <id_svcmap
+        .byte <id_construct, <id_medkit
 
 item_desc_hi:
         .byte >id_credchip, >id_flashlight, >id_stimpack, >id_fakeid
@@ -330,6 +370,7 @@ item_desc_hi:
         .byte >id_cyberdeck, >id_jackcable, >id_uplink
         .byte >id_keycard, >id_crowbar, >id_magazine
         .byte >id_encchip, >id_svcmap
+        .byte >id_construct, >id_medkit
 
 item_init_loc:
         .byte ROOM_BAR           ; credchip
@@ -345,6 +386,8 @@ item_init_loc:
         .byte ROOM_TOWER_LOBBY   ; magazine
         .byte ROOM_CORNER_OFF    ; encrypted chip
         .byte ROOM_SVC_TUNNEL    ; service map
+        .byte ROOM_DATA_VAULT    ; data construct
+        .byte ROOM_EXTRACTION    ; medkit
 
 item_flags:
         .byte ITEMF_TAKEABLE     ; credchip
@@ -360,6 +403,8 @@ item_flags:
         .byte ITEMF_TAKEABLE     ; magazine
         .byte ITEMF_TAKEABLE     ; encrypted chip
         .byte ITEMF_TAKEABLE     ; service map
+        .byte ITEMF_TAKEABLE     ; data construct
+        .byte ITEMF_TAKEABLE     ; medkit
 
 ; =====================================================================
 ; Room names
@@ -385,104 +430,114 @@ rn_data_center:  .byte "Data Center", 0
 rn_corner_off:   .byte "Corner Office", 0
 rn_svc_tunnel:   .byte "Service Tunnel", 0
 rn_vent_shaft:   .byte "Ventilation Shaft", 0
+rn_matrix_gw:    .byte "Matrix Gateway", 0
+rn_ice_wall:     .byte "ICE Wall", 0
+rn_data_vault:   .byte "Data Vault", 0
+rn_extraction:   .byte "Extraction Point", 0
+rn_helipad:      .byte "Rooftop Helipad", 0
 
 ; =====================================================================
 ; Room descriptions
 ; =====================================================================
 
 rd_alley:
-        .byte "Neon stutters overhead, reflections smeared across wet "
-        .byte "concrete. A dead payphone leans against the wall. "
-        .byte "The alley narrows north toward music and breaking glass.", 0
+        .byte "Neon stutters on wet concrete. Dead payphone. "
+        .byte "Music and glass north.", 0
 
 rd_bar:
-        .byte "Ratz tends bar with his prosthetic arm. Razorgirls "
-        .byte "in the booths. Smoke hangs in the black light. "
-        .byte "The night market sprawls east.", 0
+        .byte "Ratz tends bar, prosthetic arm. Razorgirls in "
+        .byte "the booths. Market east.", 0
 
 rd_market:
-        .byte "Open-air stalls hawking knockoff tech and black market "
-        .byte "software. Drones scan overhead. Stairs down to a clinic. "
-        .byte "Microsofts east. Cheap hotel south.", 0
+        .byte "Stalls hawk knockoff tech. Drones overhead. "
+        .byte "Clinic down. Microsofts east. Hotel south.", 0
 
 rd_microsofts:
-        .byte "Cramped stall overflowing with software chips and "
-        .byte "grey-market neuralware. The vendor watches through "
-        .byte "mirrored lenses. WE BUY / SELL / TRADE.", 0
+        .byte "Software chips, grey-market neuralware. Vendor "
+        .byte "watches. WE BUY / SELL / TRADE.", 0
 
 rd_clinic:
-        .byte "Fluorescent buzz over a surgical chair. Jars of "
-        .byte "bioware on the walls. A woman in a labcoat checks "
+        .byte "Surgical chair. Bioware in jars. Doctor checks "
         .byte "readouts on a cracked monitor.", 0
 
 rd_hotel_lobby:
-        .byte "Capsule hotel lobby. Unmanned desk. Hourly rates. "
-        .byte "Stairs north to rooms. Metro station east.", 0
+        .byte "Capsule hotel. Unmanned desk. Hourly rates. "
+        .byte "Rooms north. Metro east.", 0
 
 rd_room203:
-        .byte "Narrow capsule with a fold-down cot. Someone stashed "
-        .byte "gear behind a loose ceiling panel. Fire escape up.", 0
+        .byte "Narrow capsule, fold-down cot. Gear stashed "
+        .byte "behind a loose ceiling panel. Escape up.", 0
 
 rd_hotel_roof:
-        .byte "Wind whips across the roof. Satellite dishes and "
-        .byte "jury-rigged antennas cluster around a rusted vent. "
-        .byte "The skyline: neon canyon.", 0
+        .byte "Wind. Satellite dishes and jury-rigged antennas. "
+        .byte "Neon canyon skyline.", 0
 
 rd_metro_plat:
-        .byte "Underground platform, stuttering fluorescents. A maglev "
-        .byte "car waits eastbound, doors open. Hotel west.", 0
+        .byte "Underground platform. Maglev waits east, doors "
+        .byte "open. Hotel west.", 0
 
 rd_metro_car:
-        .byte "Empty maglev interior. Route map shows one stop: "
-        .byte "CORP PLAZA. 'Doors closing.'", 0
+        .byte "Empty maglev. Route map: one stop. CORP PLAZA.", 0
 
 rd_corp_plaza:
-        .byte "Glass and steel canyon. The Tessier-Ashpool tower "
-        .byte "rises north, its logo pulsing against the clouds. "
-        .byte "Metro west. Parking garage east.", 0
+        .byte "Glass canyon. T-A tower north, logo pulsing. "
+        .byte "Metro west. Parking east.", 0
 
 rd_tower_lobby:
-        .byte "Marble floors, holographic directory. Armed guards "
-        .byte "check IDs at the security gate north. Elevators "
-        .byte "east. The plaza is south.", 0
+        .byte "Marble and holograms. Guards check IDs at the "
+        .byte "gate north. Elevators east.", 0
 
 rd_security:
-        .byte "Banks of monitors show camera feeds. A guard's "
-        .byte "coffee grows cold. A keycard rack hangs on the wall, "
-        .byte "one card remaining.", 0
+        .byte "Monitor banks, camera feeds. Cold coffee. One "
+        .byte "keycard left on the rack.", 0
 
 rd_elevator:
-        .byte "Corporate elevator. Brushed steel walls. A card "
-        .byte "reader glows red beside the control panel. The "
-        .byte "lobby is west.", 0
+        .byte "Corporate elevator. Card reader glows red. "
+        .byte "Lobby west.", 0
 
 rd_parking:
-        .byte "Underground parking level. Rows of black town cars "
-        .byte "under buzzing sodium lights. Oil stains and "
-        .byte "echoing concrete.", 0
+        .byte "Black town cars under sodium light. Oil stains. "
+        .byte "Echoing concrete.", 0
 
 rd_server:
-        .byte "Rows of black server racks hum in cold air. Status "
-        .byte "LEDs blink green and amber. A data center lies north. "
-        .byte "Corner office east. Service tunnel south.", 0
+        .byte "Server racks hum in cold air. LEDs blink. "
+        .byte "Data center north. Office east. Tunnel south.", 0
 
 rd_data_center:
-        .byte "The mainframe core. Cables thick as wrists feed into "
-        .byte "a central processing column. A neural jack port glows "
-        .byte "blue on the console.", 0
+        .byte "Mainframe core. Cables feed a processing column. "
+        .byte "Neural jack port glows blue.", 0
 
 rd_corner_off:
-        .byte "Executive suite. Floor-to-ceiling windows overlooking "
-        .byte "the Sprawl. A desk terminal displays encrypted files.", 0
+        .byte "Executive suite. Windows over the Sprawl. "
+        .byte "Terminal shows encrypted files.", 0
 
 rd_svc_tunnel:
-        .byte "Narrow maintenance corridor. Pipes and conduits line "
-        .byte "the walls. The air smells of ozone and machine oil. "
-        .byte "Ventilation shaft drops down.", 0
+        .byte "Maintenance corridor. Pipes and conduits. "
+        .byte "Ozone smell. Vent shaft down.", 0
 
 rd_vent_shaft:
-        .byte "Vertical shaft with metal rungs bolted to the wall. "
-        .byte "Cold air rushes upward. Service tunnel above.", 0
+        .byte "Vertical shaft, metal rungs. Cold air rises. "
+        .byte "Tunnel above.", 0
+
+rd_matrix_gw:
+        .byte "Blue wireframe grid. Your chrome icon forms. "
+        .byte "T-A fortress north: black geometry.", 0
+
+rd_ice_wall:
+        .byte "Black ICE. Lethal to the unprotected. Code "
+        .byte "spirals. Data vault beyond.", 0
+
+rd_data_vault:
+        .byte "Geometric data objects orbit a central core. "
+        .byte "The construct glows like a star.", 0
+
+rd_extraction:
+        .byte "Jack-out node. Ghost images of meatspace. "
+        .byte "Helipad up. Data center east.", 0
+
+rd_helipad:
+        .byte "Tower roof. Black helicopter idles on the pad. "
+        .byte "The city burns neon below.", 0
 
 ; =====================================================================
 ; Item names
@@ -501,56 +556,55 @@ in_crowbar:     .byte "crowbar", 0
 in_magazine:    .byte "magazine", 0
 in_encchip:     .byte "encrypted chip", 0
 in_svcmap:      .byte "service map", 0
+in_construct:   .byte "data construct", 0
+in_medkit:      .byte "medkit", 0
 
 ; =====================================================================
 ; Item descriptions
 ; =====================================================================
 
 id_credchip:
-        .byte "Thin plastic wafer loaded with untraceable New Yen.", 0
+        .byte "Plastic wafer. Untraceable New Yen.", 0
 
 id_flashlight:
-        .byte "Small tactical LED. Cracked lens, tight beam.", 0
+        .byte "Tactical LED. Cracked lens.", 0
 
 id_stimpack:
-        .byte "Maas Biolabs endorphin booster. Military grade.", 0
+        .byte "Endorphin booster. Military grade.", 0
 
 id_fakeid:
-        .byte "Holographic corporate ID. 'Armitage, Col. W.' "
-        .byte "Tessier-Ashpool subsidiary.", 0
+        .byte "Holo ID. 'Armitage, Col. W.' T-A subsidiary.", 0
 
 id_icebreaker:
-        .byte "Black ROM chip. Military-grade ICE penetration "
-        .byte "firmware.", 0
+        .byte "Black ROM. Military ICE penetration.", 0
 
 id_cyberdeck:
-        .byte "Ono-Sendai Cyberspace VII. Battered case, custom "
-        .byte "firmware. Standard neural jack port.", 0
+        .byte "Ono-Sendai VII. Battered, custom firmware.", 0
 
 id_jackcable:
-        .byte "Fiber-optic patch cable. Neural interface one end, "
-        .byte "data port the other.", 0
+        .byte "Fiber-optic patch cable. Neural to data.", 0
 
 id_uplink:
-        .byte "Crumpled sticky note with hex digits. Corporate "
-        .byte "uplink access code.", 0
+        .byte "Sticky note. Hex digits. Uplink code.", 0
 
 id_keycard:
-        .byte "Tessier-Ashpool security keycard. Level 3 access.", 0
+        .byte "T-A security keycard. Level 3.", 0
 
 id_crowbar:
-        .byte "Heavy steel crowbar. Rust-spotted but solid.", 0
+        .byte "Steel crowbar. Rust-spotted, solid.", 0
 
 id_magazine:
-        .byte "Dog-eared copy of Node magazine. An article is "
-        .byte "circled: 'T-A Tower: Service tunnels run parallel "
-        .byte "to the elevator shaft.'", 0
+        .byte "Node mag. 'T-A: tunnels parallel the "
+        .byte "elevator shaft.'", 0
 
 id_encchip:
-        .byte "Data chip with Tessier-Ashpool proprietary encryption. "
-        .byte "Contents unknown without a decryption key.", 0
+        .byte "T-A encrypted data chip. Contents unknown.", 0
 
 id_svcmap:
-        .byte "Laminated building schematic. Service routes, "
-        .byte "ventilation access points, and emergency exits "
-        .byte "marked in red.", 0
+        .byte "Building schematic. Service routes in red.", 0
+
+id_construct:
+        .byte "Digitized personality construct. Priceless.", 0
+
+id_medkit:
+        .byte "Military medkit. Synth-skin, endorphin.", 0
