@@ -29,6 +29,18 @@ NUM_ITEMS = 15
 .import   str_not_here, str_cant_take, str_no_have, str_examine_what
 .import   str_take_what, str_drop_what
 .import   str_use_what, str_cant_use
+.import   str_go_where, str_already_have
+.import   str_neural_link, str_already_linked
+.import   str_fakeid_use, str_already_access
+.import   str_keycard_use, str_already_elev
+.import   str_guard_block, str_buy_ice
+.import   str_elev_locked, str_vent_locked
+.import   str_crowbar_use, str_already_vent
+.import   str_ice_block, str_ice_use, str_already_ice
+.import   str_medkit_use
+.import   str_jack_where, str_jack_nodeck, str_jack_nocable
+.import   str_jack_nolink, str_jack_in
+.import   str_victory, str_victory2
 
 ; Item IDs (must match world.s)
 ITEM_CREDCHIP   = 0
@@ -1382,10 +1394,18 @@ use_no_puzzle:
 
 ; --- update_status_bar: draw room name on row 0 ---
 update_status_bar:
-        ; Save cursor position
+        ; Save all ZP state used by print_str/print_wrap callers
         LDA zp_col
         PHA
         LDA zp_row
+        PHA
+        LDA zp_str
+        PHA
+        LDA zp_str+1
+        PHA
+        LDA zp_tmp
+        PHA
+        LDA zp_tmp2
         PHA
 
         ; Clear row 0
@@ -1410,7 +1430,15 @@ update_status_bar:
         STA zp_str+1
         JSR print_str
 
-        ; Restore cursor position
+        ; Restore all ZP state
+        PLA
+        STA zp_tmp2
+        PLA
+        STA zp_tmp
+        PLA
+        STA zp_str+1
+        PLA
+        STA zp_str
         PLA
         STA zp_row
         PLA
@@ -1463,7 +1491,8 @@ print_wrap:
         BNE @no_skip
         INY
         BNE @loop
-        BEQ @done
+        INC zp_str+1
+        JMP @loop
 
 @no_skip:
         ; Check if we need to wrap
@@ -1498,7 +1527,9 @@ print_wrap:
 
         ; Word won't fit — wrap
         INY                     ; skip the space
-        STY zp_tmp
+        BNE :+
+        INC zp_str+1
+:       STY zp_tmp
         JSR new_line
         LDY zp_tmp
         JMP @loop
@@ -1510,7 +1541,8 @@ print_wrap:
         LDY zp_tmp
         INY
         BNE @loop
-        BEQ @done
+        INC zp_str+1
+        JMP @loop
 
 @nl:
         STY zp_tmp
@@ -1518,16 +1550,22 @@ print_wrap:
         LDY zp_tmp
         INY
         BNE @loop
+        INC zp_str+1
+        JMP @loop
 
 @done:  RTS
 
 ; --- word_len_ahead: count chars until next space or null ---
 ; Y = current position (on the space). Count starts from Y+1.
-; Returns A = word length.
+; Returns A = word length. Preserves zp_str (no side effects).
 word_len_ahead:
+        LDA zp_str+1
+        PHA                     ; save page pointer
         LDY zp_tmp
         INY                     ; skip current space
-        LDA #$00
+        BNE :+
+        INC zp_str+1
+:       LDA #$00
         STA zp_tmp2             ; length counter
 @wl:    LDA (zp_str),Y
         BEQ @wl_done
@@ -1538,7 +1576,11 @@ word_len_ahead:
         INC zp_tmp2
         INY
         BNE @wl
+        INC zp_str+1
+        JMP @wl
 @wl_done:
+        PLA
+        STA zp_str+1            ; restore page pointer
         LDA zp_tmp2
         RTS
 
@@ -1624,12 +1666,16 @@ print_str:
         LDY zp_tmp
         INY
         BNE @loop
+        INC zp_str+1
+        JMP @loop
 @done:  RTS
 @nl:    STY zp_tmp
         JSR new_line
         LDY zp_tmp
         INY
         BNE @loop
+        INC zp_str+1
+        JMP @loop
 
 ; --- Put character A at cursor position, advance cursor ---
 put_char:
@@ -1805,92 +1851,6 @@ kbd_read:
         STA KBD_ACK
         PLA
         RTS
-
-; =====================================================================
-; Local string data
-; =====================================================================
-.segment "RODATA"
-
-str_go_where:
-        .byte "Go where?", 0
-
-str_already_have:
-        .byte "You already have that.", 0
-
-str_neural_link:
-        .byte "Quick sting behind the ear. Done. Neural "
-        .byte "interface installed. Cold coin against skull.", 0
-
-str_already_linked:
-        .byte "Your neural link is already installed.", 0
-
-str_fakeid_use:
-        .byte "Flash the T-A ID. Guard nods. Security cleared.", 0
-
-str_already_access:
-        .byte "The guard already cleared you.", 0
-
-str_keycard_use:
-        .byte "The keycard reader chirps. The elevator hums to life.", 0
-
-str_already_elev:
-        .byte "The elevator is already active.", 0
-
-str_guard_block:
-        .byte "A guard blocks the way. You need clearance.", 0
-
-str_buy_ice:
-        .byte "Credchip slides across. Vendor palms it, "
-        .byte "produces a black ROM. 'Don't ask.'", 0
-
-str_elev_locked:
-        .byte "The panel is dark. You need a keycard.", 0
-
-str_vent_locked:
-        .byte "A heavy grate covers the vent shaft.", 0
-
-str_crowbar_use:
-        .byte "Crowbar under the grate. Bolts snap. Cold "
-        .byte "air from below.", 0
-
-str_already_vent:
-        .byte "The vent is already open.", 0
-
-str_ice_block:
-        .byte "A wall of black ICE blocks the path. Lethal.", 0
-
-str_ice_use:
-        .byte "ICE breaker slots in. Wall fragments into "
-        .byte "static. Path clear.", 0
-
-str_already_ice:
-        .byte "The ICE is already down.", 0
-
-str_medkit_use:
-        .byte "The endorphin rush hits instantly. Pain recedes.", 0
-
-str_jack_where:
-        .byte "There's nothing to jack into here.", 0
-
-str_jack_nodeck:
-        .byte "You need a cyberdeck to jack in.", 0
-
-str_jack_nocable:
-        .byte "You need a jack cable.", 0
-
-str_jack_nolink:
-        .byte "You need a neural interface.", 0
-
-str_jack_in:
-        .byte "Cable clicks. World dissolves. Blue geometry. "
-        .byte "You're in.", 0
-
-str_victory:
-        .byte "Helicopter lifts off. The Sprawl recedes below. "
-        .byte "Wintermute sends. You delivered.", 0
-
-str_victory2:
-        .byte "*** YOU WIN ***", 0
 
 ; Direction lookup table for "go" command: { name_ptr, (handler-1) }
 go_dir_table:

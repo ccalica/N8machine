@@ -1,17 +1,19 @@
 # Makefile for Sprawl Adventure
 #
 # Multi-file build: adventure.s (engine) + world.s (data)
-# Uses shared playground config and startup files from parent dir.
+# Uses adventure.cfg to produce two output files:
+#   adventure       ROM engine (8KB at $E000)
+#   adventure_data  RAM game data (~47KB at $0500)
 #
 # Usage:
-#   make              Build adventure binary + symbol file
+#   make              Build adventure + adventure_data
 #   make clean        Remove build artifacts
 
 CL65    = cl65
 CA65    = ca65
 LD65    = ld65
 CAFLAGS = -t none --cpu 6502
-CFG     = ../playground.cfg
+CFG     = adventure.cfg
 COMMON  = ../common_init.s ../common_vectors.s
 
 TARGET  = adventure
@@ -42,4 +44,4 @@ $(TARGET): $(OBJECTS) $(CFG)
 	$(LD65) -C $(CFG) -m $(TARGET).map -Ln $(TARGET).sym --dbgfile $(TARGET).dbg -o $(TARGET) $(OBJECTS)
 
 clean:
-	-rm -f $(TARGET) *.o *.map *.sym *.dbg
+	-rm -f $(TARGET) adventure_data *.o *.map *.sym *.dbg

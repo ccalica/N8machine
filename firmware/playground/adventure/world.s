@@ -20,6 +20,18 @@
 .export   str_not_here, str_cant_take, str_no_have, str_examine_what
 .export   str_take_what, str_drop_what
 .export   str_use_what, str_cant_use
+.export   str_go_where, str_already_have
+.export   str_neural_link, str_already_linked
+.export   str_fakeid_use, str_already_access
+.export   str_keycard_use, str_already_elev
+.export   str_guard_block, str_buy_ice
+.export   str_elev_locked, str_vent_locked
+.export   str_crowbar_use, str_already_vent
+.export   str_ice_block, str_ice_use, str_already_ice
+.export   str_medkit_use
+.export   str_jack_where, str_jack_nodeck, str_jack_nocable
+.export   str_jack_nolink, str_jack_in
+.export   str_victory, str_victory2
 
 ; --- Room IDs ---
 ROOM_ALLEY       = 0
@@ -74,7 +86,7 @@ LOC_INVENTORY = $FE
 LOC_GONE      = $FF
 ITEMF_TAKEABLE = $01
 
-.segment "RODATA"
+.segment "GAMEDATA"
 
 ; =====================================================================
 ; System strings
@@ -82,7 +94,13 @@ ITEMF_TAKEABLE = $01
 
 str_banner:
         .byte "SPRAWL ADVENTURE", $0D
-        .byte "Chiba City, 2058", $0D
+        .byte "A Neuromancer Story", $0D
+        .byte $0D
+        .byte "Chiba City, 2058. The sky above the port is the color of "
+        .byte "television, tuned to a dead channel. You wake in an alley "
+        .byte "behind Ratz's bar, rain on your face, a job in your head. "
+        .byte "Wintermute wants a construct pulled from Tessier-Ashpool "
+        .byte "ice. The pay is enough to buy new eyes.", $0D
         .byte $0D
         .byte "Type 'help' for commands.", 0
 
@@ -90,7 +108,9 @@ str_prompt:     .byte "> ", 0
 str_unknown:    .byte "What?", 0
 str_no_exit:    .byte "You can't go that way.", 0
 str_exits_hdr:  .byte "Exits: ", 0
-str_quit_msg:   .byte "The neon fades to black.", 0
+str_quit_msg:
+        .byte "The neon fades to black. Somewhere in the matrix, "
+        .byte "Wintermute waits. It always waits.", 0
 
 str_help_text:
         .byte "look(l) go n/s/e/w/u/d take/get", $0D
@@ -441,103 +461,195 @@ rn_helipad:      .byte "Rooftop Helipad", 0
 ; =====================================================================
 
 rd_alley:
-        .byte "Neon stutters on wet concrete. Dead payphone. "
-        .byte "Music and glass north.", 0
+        .byte "Rain drips from fire escapes into pools of neon "
+        .byte "reflection. A dead payphone hangs off the hook, "
+        .byte "its cord cut clean. The air smells of ozone and "
+        .byte "frying krill. Graffiti tags the walls in "
+        .byte "kanji and pidgin English. The sound of breaking "
+        .byte "glass and jazz drifts from somewhere north.", 0
 
 rd_bar:
-        .byte "Ratz tends bar, prosthetic arm. Razorgirls in "
-        .byte "the booths. Market east.", 0
+        .byte "Ratz tends bar with his prosthetic arm, the "
+        .byte "pink manipulator whining as he polishes glasses "
+        .byte "that will never be clean. Razorgirls occupy the "
+        .byte "back booths, silver lenses reflecting the Fuji "
+        .byte "Electric logo that rotates above the bar. "
+        .byte "A Braun coffee maker hisses behind the counter. "
+        .byte "The night market lies east.", 0
 
 rd_market:
-        .byte "Stalls hawk knockoff tech. Drones overhead. "
-        .byte "Clinic down. Microsofts east. Hotel south.", 0
+        .byte "Stalls crowd the narrow street, hawking knockoff "
+        .byte "tech under strings of colored bulbs. Microsofts, "
+        .byte "cheap RAM, black-market biologicals. Drones buzz "
+        .byte "overhead recording everything. A body clinic "
+        .byte "operates below street level. Microsofts stall "
+        .byte "east. Capsule hotel south.", 0
 
 rd_microsofts:
-        .byte "Software chips, grey-market neuralware. Vendor "
-        .byte "watches. WE BUY / SELL / TRADE.", 0
+        .byte "A narrow stall crammed with trays of software "
+        .byte "chips and grey-market neuralware. The vendor is "
+        .byte "a thin Vietnamese kid with military-surplus "
+        .byte "optics bolted to his face. A hand-painted sign: "
+        .byte "WE BUY / SELL / TRADE. He watches your hands "
+        .byte "carefully.", 0
 
 rd_clinic:
-        .byte "Surgical chair. Bioware in jars. Doctor checks "
-        .byte "readouts on a cracked monitor.", 0
+        .byte "Underground clinic, white tile stained yellow. A "
+        .byte "surgical chair sits under a bank of halogen "
+        .byte "lights. Bioware floats in labeled jars along the "
+        .byte "walls. The doctor, a Russian ex-military medic, "
+        .byte "checks readouts on a cracked monitor without "
+        .byte "looking up.", 0
 
 rd_hotel_lobby:
-        .byte "Capsule hotel. Unmanned desk. Hourly rates. "
-        .byte "Rooms north. Metro east.", 0
+        .byte "The Cheap Hotel, capsule-style. An unmanned desk "
+        .byte "collects payment through a slot. Hourly, daily, "
+        .byte "weekly. The carpet was red once. A drunk salary- "
+        .byte "man snores on a vinyl couch. Rooms north, metro "
+        .byte "platform east.", 0
 
 rd_room203:
-        .byte "Narrow capsule, fold-down cot. Gear stashed "
-        .byte "behind a loose ceiling panel. Escape up.", 0
+        .byte "Your capsule. Narrow as a coffin, fold-down cot, "
+        .byte "one thin blanket. A cracked mirror. Behind a "
+        .byte "loose ceiling panel you keep your gear stashed "
+        .byte "where the cleaning drones never look. A fire "
+        .byte "escape leads up to the roof.", 0
 
 rd_hotel_roof:
-        .byte "Wind. Satellite dishes and jury-rigged antennas. "
-        .byte "Neon canyon skyline.", 0
+        .byte "Wind tears across the rooftop. Satellite dishes "
+        .byte "and jury-rigged antennas sprout like chrome "
+        .byte "mushrooms. The neon canyon of Chiba stretches in "
+        .byte "every direction, holographic billboards painting "
+        .byte "the clouds. You can see the port from here, "
+        .byte "container ships like floating cities.", 0
 
 rd_metro_plat:
-        .byte "Underground platform. Maglev waits east, doors "
-        .byte "open. Hotel west.", 0
+        .byte "An underground platform, fluorescent tubes "
+        .byte "buzzing overhead. A maglev train waits with "
+        .byte "doors open, the route map showing one stop to "
+        .byte "the corporate sector. Graffiti covers the "
+        .byte "support columns. Hotel lobby west.", 0
 
 rd_metro_car:
-        .byte "Empty maglev. Route map: one stop. CORP PLAZA.", 0
+        .byte "Empty maglev car, seats worn smooth. The route "
+        .byte "map glows on the wall: one stop, CORP PLAZA. "
+        .byte "Advertisements cycle on the overhead screens. "
+        .byte "T-A recruitment. Hosaka consumer electronics. "
+        .byte "Sense/Net programming. The doors chime.", 0
 
 rd_corp_plaza:
-        .byte "Glass canyon. T-A tower north, logo pulsing. "
-        .byte "Metro west. Parking east.", 0
+        .byte "A canyon of glass and polished granite. The "
+        .byte "Tessier-Ashpool tower rises north, its logo "
+        .byte "pulsing blue-white against the dark sky. "
+        .byte "Corporate drones in matching suits flow around "
+        .byte "you like water around a stone. Surveillance "
+        .byte "cameras track from every ledge. Metro west, "
+        .byte "parking garage east.", 0
 
 rd_tower_lobby:
-        .byte "Marble and holograms. Guards check IDs at the "
-        .byte "gate north. Elevators east.", 0
+        .byte "Marble floors, holographic art installations "
+        .byte "that shift as you move. Armed guards in "
+        .byte "T-A security uniforms check IDs at a gate "
+        .byte "north. A directory lists floors you have no "
+        .byte "clearance to visit. The elevator bank is east. "
+        .byte "A discarded magazine lies near a planter.", 0
 
 rd_security:
-        .byte "Monitor banks, camera feeds. Cold coffee. One "
-        .byte "keycard left on the rack.", 0
+        .byte "Banks of monitors show camera feeds from every "
+        .byte "floor. Cold coffee in paper cups. The night "
+        .byte "shift guard left in a hurry. One keycard sits "
+        .byte "on the rack by the door, still warm from the "
+        .byte "proximity reader.", 0
 
 rd_elevator:
-        .byte "Corporate elevator. Card reader glows red. "
-        .byte "Lobby west.", 0
+        .byte "Corporate elevator, brushed steel and indirect "
+        .byte "lighting. A card reader glows red on the panel. "
+        .byte "The floor indicator shows sub-levels and upper "
+        .byte "floors, all locked out. Lobby west.", 0
 
 rd_parking:
-        .byte "Black town cars under sodium light. Oil stains. "
-        .byte "Echoing concrete.", 0
+        .byte "Underground parking level. Black town cars sit "
+        .byte "under sodium lights, waxed and waiting for "
+        .byte "executives who work through the night. Oil "
+        .byte "stains pattern the concrete like Rorschach "
+        .byte "blots. An air vent is set into the ceiling.", 0
 
 rd_server:
-        .byte "Server racks hum in cold air. LEDs blink. "
-        .byte "Data center north. Office east. Tunnel south.", 0
+        .byte "Rows of server racks hum in refrigerated air. "
+        .byte "Status LEDs blink in cascading patterns, "
+        .byte "processing transactions for half of Chiba. The "
+        .byte "floor vibrates with the power draw. Data center "
+        .byte "north. Corner office east. Service tunnel south "
+        .byte "through a maintenance door.", 0
 
 rd_data_center:
-        .byte "Mainframe core. Cables feed a processing column. "
-        .byte "Neural jack port glows blue.", 0
+        .byte "The mainframe core. Thick fiber-optic cables "
+        .byte "feed a central processing column that rises "
+        .byte "floor to ceiling, cooling fans roaring. A "
+        .byte "neural jack port glows steady blue on the main "
+        .byte "console, waiting for a connection. This is "
+        .byte "where the ice starts.", 0
 
 rd_corner_off:
-        .byte "Executive suite. Windows over the Sprawl. "
-        .byte "Terminal shows encrypted files.", 0
+        .byte "An executive corner office, floor-to-ceiling "
+        .byte "windows overlooking the Sprawl. The desk is "
+        .byte "real wood, imported. A terminal displays "
+        .byte "encrypted files, T-A proprietary headers "
+        .byte "scrolling past. Someone left in a hurry. The "
+        .byte "chair is still warm.", 0
 
 rd_svc_tunnel:
-        .byte "Maintenance corridor. Pipes and conduits. "
-        .byte "Ozone smell. Vent shaft down.", 0
+        .byte "A maintenance corridor that runs behind the "
+        .byte "main structure. Pipes and fiber conduits line "
+        .byte "the walls, color-coded and labeled in Japanese. "
+        .byte "The air tastes of ozone and machine oil. A vent "
+        .byte "shaft descends into darkness.", 0
 
 rd_vent_shaft:
-        .byte "Vertical shaft, metal rungs. Cold air rises. "
-        .byte "Tunnel above.", 0
+        .byte "A vertical shaft lined with metal rungs, cold "
+        .byte "air rising from somewhere below. The walls are "
+        .byte "corrugated steel, riveted and sweating "
+        .byte "condensation. Service tunnel above, parking "
+        .byte "level below.", 0
 
 rd_matrix_gw:
-        .byte "Blue wireframe grid. Your chrome icon forms. "
-        .byte "T-A fortress north: black geometry.", 0
+        .byte "The matrix unfolds around you, an infinite blue "
+        .byte "wireframe grid stretching to a false horizon. "
+        .byte "Your chrome icon takes shape, hands becoming "
+        .byte "tool-clusters. The T-A data fortress rises "
+        .byte "north: black geometry, beautiful and lethal, "
+        .byte "sheathed in corporate ice.", 0
 
 rd_ice_wall:
-        .byte "Black ICE. Lethal to the unprotected. Code "
-        .byte "spirals. Data vault beyond.", 0
+        .byte "A wall of black ICE, Intrusion Countermeasures "
+        .byte "Electronics, lethal to any unprotected deck. "
+        .byte "Code spirals across its surface in patterns "
+        .byte "that hurt to look at. Military-grade. The kind "
+        .byte "that flatlines cowboys and leaves their meat "
+        .byte "behind. The data vault lies beyond.", 0
 
 rd_data_vault:
-        .byte "Geometric data objects orbit a central core. "
-        .byte "The construct glows like a star.", 0
+        .byte "Geometric data objects orbit a central core "
+        .byte "like electrons around a nucleus. Financial "
+        .byte "records, research data, personnel files. And "
+        .byte "there, glowing like a captured star, the "
+        .byte "construct. A digitized human personality, "
+        .byte "trapped in T-A ice for years.", 0
 
 rd_extraction:
-        .byte "Jack-out node. Ghost images of meatspace. "
-        .byte "Helipad up. Data center east.", 0
+        .byte "A jack-out node, the boundary between matrix "
+        .byte "and meatspace. Ghost images of the real world "
+        .byte "bleed through the wireframe. Your meat body "
+        .byte "waits in the data center, slumped in a chair. "
+        .byte "Helipad access up. Data center south.", 0
 
 rd_helipad:
-        .byte "Tower roof. Black helicopter idles on the pad. "
-        .byte "The city burns neon below.", 0
+        .byte "The tower roof, wind screaming across the "
+        .byte "landing pad. A black Hughes-Boeing helicopter "
+        .byte "idles on the pad, rotors turning. The pilot "
+        .byte "flashes a thumbs-up through armored glass. The "
+        .byte "city burns neon below, the Sprawl stretching "
+        .byte "to the horizon in every direction.", 0
 
 ; =====================================================================
 ; Item names
@@ -564,47 +676,226 @@ in_medkit:      .byte "medkit", 0
 ; =====================================================================
 
 id_credchip:
-        .byte "Plastic wafer. Untraceable New Yen.", 0
+        .byte "A thin plastic wafer loaded with untraceable "
+        .byte "New Yen. Street currency, pre-paid and "
+        .byte "anonymous. Enough to buy what you need if you "
+        .byte "know where to shop.", 0
 
 id_flashlight:
-        .byte "Tactical LED. Cracked lens.", 0
+        .byte "A tactical LED flashlight, matte black, lens "
+        .byte "cracked from impact. Still throws a solid beam. "
+        .byte "Military surplus, probably lifted from a dead "
+        .byte "soldier's kit.", 0
 
 id_stimpack:
-        .byte "Endorphin booster. Military grade.", 0
+        .byte "A military-grade endorphin booster in a spring-"
+        .byte "loaded syrette. One hit numbs pain for hours. "
+        .byte "The label reads EMERGENCY USE ONLY in three "
+        .byte "languages.", 0
 
 id_fakeid:
-        .byte "Holo ID. 'Armitage, Col. W.' T-A subsidiary.", 0
+        .byte "A holographic ID card, expert forgery. 'Col. "
+        .byte "Willis Armitage, Tessier-Ashpool Biomedical "
+        .byte "Division.' The holo shifts convincingly when "
+        .byte "you tilt it. Good enough to fool a guard.", 0
 
 id_icebreaker:
-        .byte "Black ROM. Military ICE penetration.", 0
+        .byte "A black ROM chip, military ICE penetration "
+        .byte "software. The kind of thing that gets you "
+        .byte "killed if the wrong people find it on you. No "
+        .byte "manufacturer markings. Pure contraband.", 0
 
 id_cyberdeck:
-        .byte "Ono-Sendai VII. Battered, custom firmware.", 0
+        .byte "An Ono-Sendai Cyberspace VII. Battered, custom "
+        .byte "firmware, the case held together with electrical "
+        .byte "tape. Modified trodes and a cranked signal "
+        .byte "amplifier. It smells faintly of solder.", 0
 
 id_jackcable:
-        .byte "Fiber-optic patch cable. Neural to data.", 0
+        .byte "A fiber-optic patch cable with a neural jack on "
+        .byte "one end and a standard data port on the other. "
+        .byte "The connector is gold-plated, milspec. Bridge "
+        .byte "between meat and machine.", 0
 
 id_uplink:
-        .byte "Sticky note. Hex digits. Uplink code.", 0
+        .byte "A yellow sticky note with hex digits scrawled "
+        .byte "in ballpoint. An uplink authorization code for "
+        .byte "the building's satellite array. Someone left "
+        .byte "it on the antenna housing.", 0
 
 id_keycard:
-        .byte "T-A security keycard. Level 3.", 0
+        .byte "A Tessier-Ashpool security keycard, Level 3 "
+        .byte "clearance. Matte grey with the T-A logo "
+        .byte "embossed in silver. The magnetic strip still "
+        .byte "reads clean.", 0
 
 id_crowbar:
-        .byte "Steel crowbar. Rust-spotted, solid.", 0
+        .byte "A steel crowbar, rust-spotted but solid. "
+        .byte "Heavy enough to pry open anything short of "
+        .byte "a bank vault. The kind of tool that doubles "
+        .byte "as a weapon in the wrong neighborhood.", 0
 
 id_magazine:
-        .byte "Node mag. 'T-A: tunnels parallel the "
-        .byte "elevator shaft.'", 0
+        .byte "A dog-eared copy of Node magazine. One article "
+        .byte "is circled in red: 'Tessier-Ashpool Tower: "
+        .byte "service tunnels run parallel to the main "
+        .byte "elevator shaft. Architectural oversight or "
+        .byte "deliberate backdoor?'", 0
 
 id_encchip:
-        .byte "T-A encrypted data chip. Contents unknown.", 0
+        .byte "A T-A encrypted data chip, corporate markings "
+        .byte "lasered into the casing. Contents unknown but "
+        .byte "valuable enough to lock behind three layers of "
+        .byte "physical security.", 0
 
 id_svcmap:
-        .byte "Building schematic. Service routes in red.", 0
+        .byte "A laminated building schematic, probably left "
+        .byte "by a maintenance crew. Service routes marked in "
+        .byte "red ink, access panels circled. Shows a path "
+        .byte "from the parking level to the server floor.", 0
 
 id_construct:
-        .byte "Digitized personality construct. Priceless.", 0
+        .byte "A digitized personality construct, a human mind "
+        .byte "encoded in crystalline memory. It pulses with "
+        .byte "faint light, warm to the touch. Someone lived "
+        .byte "in here once. Priceless to the right buyer. "
+        .byte "Priceless to Wintermute.", 0
 
 id_medkit:
-        .byte "Military medkit. Synth-skin, endorphin.", 0
+        .byte "A military field medkit, olive drab. Contains "
+        .byte "synth-skin patches, endorphin boosters, and an "
+        .byte "auto-suture unit. Everything you need to keep "
+        .byte "moving when your body wants to quit.", 0
+
+; =====================================================================
+; Puzzle / system messages
+; =====================================================================
+
+str_go_where:
+        .byte "Go where? Specify a direction.", 0
+
+str_already_have:
+        .byte "You already have that.", 0
+
+str_neural_link:
+        .byte "Quick sting behind the ear as the doctor's "
+        .byte "hands move with practiced speed. The world "
+        .byte "flickers. Done. Neural interface installed, a "
+        .byte "cold coin of metal flush against your skull. "
+        .byte "The matrix is one cable away now.", 0
+
+str_already_linked:
+        .byte "You touch the metal disc behind your ear. "
+        .byte "Your neural link is already installed.", 0
+
+str_fakeid_use:
+        .byte "You flash the T-A holographic ID. The guard "
+        .byte "squints, checks it against his screen, nods "
+        .byte "curtly. 'Go ahead, Colonel.' Security north "
+        .byte "is cleared.", 0
+
+str_already_access:
+        .byte "The guard recognizes you. 'Already cleared, "
+        .byte "Colonel.' He waves you through.", 0
+
+str_keycard_use:
+        .byte "The keycard slides into the reader with a soft "
+        .byte "click. Green light. The elevator hums to life, "
+        .byte "floor indicators cycling as it descends to "
+        .byte "your level.", 0
+
+str_already_elev:
+        .byte "The elevator panel already glows green. "
+        .byte "It's waiting for you.", 0
+
+str_guard_block:
+        .byte "A T-A security guard blocks the way north, "
+        .byte "one hand on a stun baton. 'Authorized "
+        .byte "personnel only. Show ID or leave.'", 0
+
+str_buy_ice:
+        .byte "The credchip slides across the counter. The "
+        .byte "Vietnamese kid palms it without looking, "
+        .byte "reaches under the counter and produces a "
+        .byte "featureless black ROM chip. 'Military grade. "
+        .byte "Don't ask where I got it. Don't come back.'", 0
+
+str_elev_locked:
+        .byte "The elevator panel is dark. A card reader "
+        .byte "slot glows red, waiting for authorization.", 0
+
+str_vent_locked:
+        .byte "A heavy steel grate covers the vent shaft, "
+        .byte "bolted to the concrete. Cold air whispers "
+        .byte "through the slats from below.", 0
+
+str_crowbar_use:
+        .byte "You wedge the crowbar under the grate and "
+        .byte "lever hard. Bolts snap one by one, pinging "
+        .byte "off the walls. The grate swings open. Cold "
+        .byte "air rushes up from the shaft below.", 0
+
+str_already_vent:
+        .byte "The vent grate hangs open, bolts sheared "
+        .byte "clean.", 0
+
+str_ice_block:
+        .byte "A wall of black ICE blocks the northern "
+        .byte "path, code spiraling across its surface in "
+        .byte "patterns designed to kill. Military grade. "
+        .byte "Touch it without protection and you flatline.", 0
+
+str_ice_use:
+        .byte "The ICE breaker ROM slots into your deck. "
+        .byte "Code spears into the black wall. For three "
+        .byte "seconds nothing happens. Then the ICE "
+        .byte "fragments into static and dissolves. The "
+        .byte "path to the data vault lies open.", 0
+
+str_already_ice:
+        .byte "The ICE is already down, nothing but fading "
+        .byte "static where the wall stood.", 0
+
+str_medkit_use:
+        .byte "You crack the syrette and jam it against "
+        .byte "your thigh. The endorphin rush hits like a "
+        .byte "freight train. Pain recedes to a distant "
+        .byte "memory. You feel ready for anything.", 0
+
+str_jack_where:
+        .byte "There's nothing to jack into here. You need "
+        .byte "a neural jack port to enter the matrix.", 0
+
+str_jack_nodeck:
+        .byte "You need a cyberdeck to jack into the matrix. "
+        .byte "Without one, the port is just a hole in the "
+        .byte "wall.", 0
+
+str_jack_nocable:
+        .byte "You need a jack cable to bridge the neural "
+        .byte "interface to the data port.", 0
+
+str_jack_nolink:
+        .byte "You need a neural interface first. The body "
+        .byte "clinic in Chiba could install one.", 0
+
+str_jack_in:
+        .byte "The cable clicks home. The world dissolves "
+        .byte "into blue geometry, the office falling away "
+        .byte "like a discarded skin. Cyberspace unfolds "
+        .byte "around you, infinite and electric. You're in.", 0
+
+str_victory:
+        .byte "The helicopter lifts off the tower roof and "
+        .byte "banks hard over the Sprawl. Below, Chiba City "
+        .byte "burns neon against the dark. The construct "
+        .byte "pulses warm in your jacket. Somewhere in the "
+        .byte "matrix, Wintermute acknowledges delivery. The "
+        .byte "pay hits your account before you cross the bay.", 0
+
+str_victory2:
+        .byte $0D
+        .byte "*** YOU WIN ***", $0D
+        .byte $0D
+        .byte "The sky above the port was the color of "
+        .byte "television, tuned to a dead channel.", 0
