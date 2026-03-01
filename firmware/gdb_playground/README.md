@@ -12,7 +12,7 @@ make clean    # remove build artifacts
 Requires `cc65` (cl65/ca65/ld65). No cc65 runtime dependency — programs use a minimal startup (`common_init.s`).
 
 Each build produces:
-- `test_<name>` — 12KB ROM binary (loads at $D000)
+- `test_<name>` — 8KB ROM binary (loads at $E000)
 - `test_<name>.sym` — cc65 symbol file (for n8gdb `sym` command)
 - `test_<name>.dbg` — debug info
 
@@ -22,7 +22,7 @@ Start the N8machine emulator, then use the REPL to load a binary and interact:
 
 ```
 n8gdb repl
-n8> load test_regs 0xD000
+n8> load test_regs 0xE000
 n8> sym test_regs.sym
 n8> reset
 ```
@@ -31,7 +31,7 @@ Or with `--sym` to pre-load symbols:
 
 ```
 n8gdb repl --sym test_regs.sym
-n8> load test_regs 0xD000
+n8> load test_regs 0xE000
 n8> reset
 ```
 
@@ -44,7 +44,7 @@ n8> reset
 Loads known values into A, X, Y and manipulates flags. NOP padding between operations makes single-stepping easy to follow.
 
 ```
-n8> load test_regs 0xD000
+n8> load test_regs 0xE000
 n8> sym test_regs.sym
 n8> reset
 n8> bp final_state
@@ -60,7 +60,7 @@ n8> regs                  # A=$DE X=$AD Y=$42
 Four subroutines (`func_a`–`func_d`) called in a loop. Set and clear breakpoints to verify the stub handles multiple breakpoints and clearing correctly.
 
 ```
-n8> load test_breakpoints 0xD000
+n8> load test_breakpoints 0xE000
 n8> sym test_breakpoints.sym
 n8> reset
 n8> bp func_a
@@ -78,7 +78,7 @@ n8> run                   # stops at func_c again
 Fills RAM regions with known patterns, then spins. Inspect and modify memory after the fill completes.
 
 ```
-n8> load test_memory 0xD000
+n8> load test_memory 0xE000
 n8> sym test_memory.sym
 n8> reset
 n8> bp fill_done
@@ -98,7 +98,7 @@ n8> read 0300 10          # verify the write took effect
 Push/pop sequences and 3-deep nested JSR/RTS. Watch the stack pointer change and inspect the hardware stack page.
 
 ```
-n8> load test_stack 0xD000
+n8> load test_stack 0xE000
 n8> sym test_stack.sym
 n8> reset
 n8> bp push_start
@@ -119,7 +119,7 @@ n8> regs                  # SP=$F9 (6 bytes of return addresses)
 A tight 16-bit counting loop. Let it run freely, interrupt with `halt`, inspect the counter in RAM.
 
 ```
-n8> load test_counter 0xD000
+n8> load test_counter 0xE000
 n8> sym test_counter.sym
 n8> reset
 n8> run                   # let it run
@@ -141,7 +141,7 @@ n8> read 0200 3           # lo=00 hi=00 overflow about to increment
 Uses zero page pointers ($E0–$E3) with `(zp),Y` indirect indexed addressing to copy a data table. Modify ZP pointers via `write` to redirect where data goes.
 
 ```
-n8> load test_zeropage 0xD000
+n8> load test_zeropage 0xE000
 n8> sym test_zeropage.sym
 n8> reset
 n8> bp zp_sum
@@ -161,7 +161,7 @@ n8> read 00F0 1           # zp_tmp = $10+$20+$30+$40 = $A0
 Sends three strings to the TTY device via memory-mapped I/O at $C100. Includes its own `tty_putc`/`tty_puts` routines (no firmware link needed).
 
 ```
-n8> load test_tty 0xD000
+n8> load test_tty 0xE000
 n8> sym test_tty.sym
 n8> reset
 n8> bp send_done
@@ -181,9 +181,10 @@ All programs use the same memory map as the main firmware:
 $0000-$00FF  Zero Page (ZP pointers at $E0-$E7, scratch at $F0-$F3)
 $0100-$01FF  Hardware Stack
 $0200-$BEFF  RAM (BSS variables)
-$C000-$C0FF  Text Display (memory-mapped I/O)
-$C100-$C10F  TTY (memory-mapped I/O)
-$D000-$FFF9  ROM (test program code + data)
+$C000-$CFFF  Frame Buffer (4KB)
+$D000-$D7FF  Dev Bank (2KB RAM)
+$D800-$DFFF  Device Registers (slots 0-7)
+$E000-$FFF9  ROM (test program code + data)
 $FFFA-$FFFF  Vectors (NMI, RESET, IRQ)
 ```
 
