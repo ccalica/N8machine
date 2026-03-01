@@ -19,6 +19,7 @@
 .export   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
 .export   str_not_here, str_cant_take, str_no_have, str_examine_what
 .export   str_take_what, str_drop_what
+.export   str_use_what, str_cant_use
 
 ; Room IDs
 ROOM_ALLEY      = 0
@@ -35,8 +36,9 @@ ITEM_CREDCHIP   = 0
 ITEM_FLASHLIGHT = 1
 ITEM_STIMPACK   = 2
 ITEM_FAKEID     = 3
+ITEM_ICEBREAKER = 4
 
-NUM_ITEMS = 4
+NUM_ITEMS = 5
 
 ; Item locations
 LOC_INVENTORY = $FE
@@ -79,6 +81,7 @@ str_help_text:
         .byte "  n/s/e/w/u/d     - Move shortcut", $0D
         .byte "  take/get <item> - Pick up item", $0D
         .byte "  drop <item>     - Drop item", $0D
+        .byte "  use <item>      - Use item", $0D
         .byte "  examine/x <item>- Examine item", $0D
         .byte "  inventory (i)   - Show inventory", $0D
         .byte "  help (?)        - This message", $0D
@@ -104,6 +107,8 @@ str_no_have:      .byte "You're not carrying that.", 0
 str_examine_what: .byte "Examine what?", 0
 str_take_what:    .byte "Take what?", 0
 str_drop_what:    .byte "Drop what?", 0
+str_use_what:     .byte "Use what?", 0
+str_cant_use:     .byte "That doesn't work here.", 0
 
 ; =====================================================================
 ; Room name pointer tables
@@ -196,24 +201,28 @@ item_name_lo:
         .byte <in_flashlight
         .byte <in_stimpack
         .byte <in_fakeid
+        .byte <in_icebreaker
 
 item_name_hi:
         .byte >in_credchip
         .byte >in_flashlight
         .byte >in_stimpack
         .byte >in_fakeid
+        .byte >in_icebreaker
 
 item_desc_lo:
         .byte <id_credchip
         .byte <id_flashlight
         .byte <id_stimpack
         .byte <id_fakeid
+        .byte <id_icebreaker
 
 item_desc_hi:
         .byte >id_credchip
         .byte >id_flashlight
         .byte >id_stimpack
         .byte >id_fakeid
+        .byte >id_icebreaker
 
 ; Initial locations
 item_init_loc:
@@ -221,6 +230,7 @@ item_init_loc:
         .byte ROOM_ALLEY        ; flashlight - in the alley
         .byte ROOM_CLINIC       ; stim pack - at the clinic
         .byte ROOM_MARKET       ; fake ID - at the market
+        .byte LOC_GONE          ; ICE breaker - obtained via puzzle
 
 ; Flags (bit 0 = takeable)
 item_flags:
@@ -228,6 +238,7 @@ item_flags:
         .byte ITEMF_TAKEABLE    ; flashlight
         .byte ITEMF_TAKEABLE    ; stim pack
         .byte ITEMF_TAKEABLE    ; fake ID
+        .byte ITEMF_TAKEABLE    ; ICE breaker
 
 ; =====================================================================
 ; Room names
@@ -291,6 +302,8 @@ in_stimpack:
         .byte "stim pack", 0
 in_fakeid:
         .byte "fake id", 0
+in_icebreaker:
+        .byte "ice breaker", 0
 
 ; =====================================================================
 ; Item descriptions
@@ -311,3 +324,8 @@ id_stimpack:
 id_fakeid:
         .byte "Holographic corporate ID. The name reads "
         .byte "'Armitage, Col. W.' Tessier-Ashpool subsidiary.", 0
+
+id_icebreaker:
+        .byte "Black ROM chip etched with military firmware. "
+        .byte "Designed to penetrate corporate intrusion "
+        .byte "countermeasures.", 0

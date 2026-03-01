@@ -24,10 +24,18 @@
 .import   item_desc_lo, item_desc_hi
 .import   item_init_loc, item_flags
 ; NUM_ITEMS defined locally (must match world.s)
-NUM_ITEMS = 4
+NUM_ITEMS = 5
 .import   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
 .import   str_not_here, str_cant_take, str_no_have, str_examine_what
 .import   str_take_what, str_drop_what
+.import   str_use_what, str_cant_use
+
+; Item IDs (must match world.s)
+ITEM_CREDCHIP   = 0
+ITEM_ICEBREAKER = 4
+
+; Room IDs (must match world.s)
+ROOM_MICROSOFTS = 3
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -88,6 +96,7 @@ LINE_BUF:      .res 80         ; input line buffer
 VERB_BUF:      .res 16         ; parsed verb
 NOUN_BUF:      .res 40         ; parsed noun (rest of line)
 item_location: .res 16         ; current location of each item
+puzzle_flags:  .res 8          ; puzzle state flags
 
 ; =====================================================================
 .segment "CODE"
@@ -110,8 +119,13 @@ _main:
         LDA #$00
         STA cur_room
 
+        ; Start text output at row 1 (row 0 = status bar)
+        LDA #$01
+        STA zp_row
+
         ; Auto-look at start
         JSR do_look
+        JSR update_status_bar
 
 main_loop:
         ; Print prompt
@@ -319,6 +333,9 @@ verb_table:
         .word do_help - 1
         .addr vn_qmark
         .word do_help - 1
+        ; use
+        .addr vn_use
+        .word do_use - 1
         ; take / get
         .addr vn_take
         .word do_take - 1
@@ -360,6 +377,7 @@ vn_east:  .byte "east", 0
 vn_west:  .byte "west", 0
 vn_up:    .byte "up", 0
 vn_down:  .byte "down", 0
+vn_use:       .byte "use", 0
 vn_take:      .byte "take", 0
 vn_get:       .byte "get", 0
 vn_drop:      .byte "drop", 0
@@ -603,6 +621,7 @@ try_move:
         CMP #NO_EXIT
         BEQ @blocked
         STA cur_room
+        JSR update_status_bar
         JSR new_line
         JSR do_look
         RTS
@@ -912,6 +931,124 @@ do_examine:
         STA zp_str+1
         JSR print_wrap
         JMP new_line
+
+; --- do_use: use an item (puzzle interactions) ---
+do_use:
+        LDA NOUN_BUF
+        BNE @has_noun
+        LDA #<str_use_what
+        STA zp_str
+        LDA #>str_use_what
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@has_noun:
+        ; Find item in inventory
+        JSR find_noun_item
+        CMP #$FF
+        BNE @found
+        LDA #<str_not_here
+        STA zp_str
+        LDA #>str_not_here
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@found:
+        ; Check if item is in inventory
+        LDX zp_item
+        LDA item_location,X
+        CMP #LOC_INVENTORY
+        BEQ @in_inv
+        LDA #<str_no_have
+        STA zp_str
+        LDA #>str_no_have
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@in_inv:
+        ; --- Puzzle: use credchip at Microsofts → get ICE breaker ---
+        LDA zp_item
+        CMP #ITEM_CREDCHIP
+        BNE @no_puzzle
+
+        LDA cur_room
+        CMP #ROOM_MICROSOFTS
+        BNE @wrong_place
+
+        ; Success: consume credchip, place ICE breaker in inventory
+        LDX #ITEM_CREDCHIP
+        LDA #LOC_GONE
+        STA item_location,X
+        LDX #ITEM_ICEBREAKER
+        LDA #LOC_INVENTORY
+        STA item_location,X
+
+        LDA #<str_buy_ice
+        STA zp_str
+        LDA #>str_buy_ice
+        STA zp_str+1
+        JSR print_wrap
+        JMP new_line
+
+@wrong_place:
+        LDA #<str_cant_use
+        STA zp_str
+        LDA #>str_cant_use
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@no_puzzle:
+        LDA #<str_cant_use
+        STA zp_str
+        LDA #>str_cant_use
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+; --- update_status_bar: draw room name on row 0 ---
+update_status_bar:
+        ; Save cursor position
+        LDA zp_col
+        PHA
+        LDA zp_row
+        PHA
+
+        ; Clear row 0
+        LDA #$00
+        STA zp_col
+        STA zp_row
+        JSR calc_fb_addr
+        LDY #79
+        LDA #$20
+@clr:   STA (zp_fb),Y
+        DEY
+        BPL @clr
+
+        ; Print room name at row 0
+        LDA #$00
+        STA zp_col
+        STA zp_row
+        LDX cur_room
+        LDA room_name_lo,X
+        STA zp_str
+        LDA room_name_hi,X
+        STA zp_str+1
+        JSR print_str
+
+        ; Restore cursor position
+        PLA
+        STA zp_row
+        PLA
+        STA zp_col
+        LDA zp_col
+        STA VID_CURCOL
+        LDA zp_row
+        STA VID_CURROW
+        RTS
 
 ; --- do_help ---
 do_help:
@@ -1307,6 +1444,12 @@ str_go_where:
 
 str_already_have:
         .byte "You already have that.", 0
+
+str_buy_ice:
+        .byte "You slide the credchip across the counter. The vendor "
+        .byte "palms it, checks the balance, and produces a black "
+        .byte "ROM chip from under the counter. 'Military-grade ICE "
+        .byte "breaker. Don't ask where I got it.'", 0
 
 ; Direction lookup table for "go" command: { name_ptr, (handler-1) }
 go_dir_table:
