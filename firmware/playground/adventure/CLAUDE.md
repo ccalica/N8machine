@@ -13,10 +13,11 @@ n8gdb run
 ## n8gdb Console & Keyboard
 
 ### Keyboard injection
-- String mode: `n8gdb kbd_inject '"look"'` (outer single-quotes preserve inner doubles)
-- Enter key: `n8gdb kbd_inject enter`
-- Named keys: enter, backspace, escape, tab, up, down, left, right, f1-f12, etc.
-- Single chars are sent as ASCII keycodes ($20-$7E). No auto-SHIFT.
+- Inline syntax: `n8gdb kbd_inject 'look[enter]'`
+- Named keys in brackets: `[enter]`, `[backspace]`, `[esc]`, `[tab]`, `[up]`, `[down]`, `[left]`, `[right]`, `[f1]`-`[f12]`
+- Hex keycodes: `[0x41]`
+- Bare text chars sent as ASCII keycodes ($20-$7E). No auto-SHIFT.
+- Max 32 keys per injection (half of 64-entry hardware buffer).
 
 ### Console output
 - `n8gdb console_text` — renders frame buffer as text (80x25 grid)
@@ -26,9 +27,9 @@ n8gdb run
 Each n8gdb CLI call opens/closes a TCP connection. New connections auto-halt the CPU.
 The working pattern for scripted testing:
 1. Inject keys (CPU halted, keys queue in 64-entry keyboard buffer)
-2. `n8gdb run` — resumes CPU, processes queued keys, times out (expected)
+2. `n8gdb resume` — resumes CPU (fire-and-forget), processes queued keys
 3. `n8gdb console_text` — check results
-Keep batches under 64 total keys to avoid keyboard buffer overflow.
+Max 32 keys per kbd_inject call (enforced client-side).
 
 ### REPL mode
 For interactive debugging with persistent breakpoints:

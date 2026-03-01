@@ -420,6 +420,7 @@ function cmdHelp() {
     '              up down left right home end pageup pagedown',
     '              insert f1-f12',
     '  Modifier flags: --shift --ctrl --alt --caps --mod 0xNN',
+    '  Max 32 keys per injection (half of 64-entry hardware buffer).',
     '',
     'Addresses: hex with 0x or $ prefix, or bare hex. Decimal with # prefix.',
     'Labels: if a .sym file is loaded (--sym), label names resolve to addresses.',
@@ -525,6 +526,10 @@ async function cmdKbdInject(client, args) {
   }
 
   if (keys.length === 0) { console.error('No keys to inject'); return; }
+  if (keys.length > 32) {
+    console.error(`Too many keys (${keys.length}): limit is 32 to avoid keyboard buffer overflow`);
+    return;
+  }
 
   for (const { keycode, modifiers } of keys) {
     const reply = await client.monitorCommand(`kbd ${hex8(keycode)} ${hex8(modifiers)}`);
