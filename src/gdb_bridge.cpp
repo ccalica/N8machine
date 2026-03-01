@@ -49,7 +49,7 @@ static uint8_t gdb_read_mem(uint16_t addr) {
     if (addr >= N8_FB_BASE && addr <= N8_FB_END)
         return frame_buffer[addr - N8_FB_BASE];
     // Video registers live in emu_video.cpp statics, not mem[]
-    if (addr >= N8_VID_BASE && addr <= N8_VID_BASE + N8_VID_VSYNC) {
+    if (addr >= N8_VID_BASE && addr < N8_VID_BASE + N8_VID_REG_COUNT) {
         switch (addr - N8_VID_BASE) {
             case N8_VID_MODE:   return video_get_mode();
             case N8_VID_WIDTH:  return video_get_width();
@@ -59,6 +59,10 @@ static uint8_t gdb_read_mem(uint16_t addr) {
             case N8_VID_CURSOR: return video_get_cursor_style();
             case N8_VID_CURCOL: return video_get_cursor_col();
             case N8_VID_CURROW: return video_get_cursor_row();
+            case N8_VID_VSYNC:  return 0x00;  // frame counter, not meaningful via GDB
+            case N8_VID_CTRL:   return video_get_ctrl();
+            case N8_VID_DATA:   return 0x00;  // side-effect register, don't trigger via GDB
+            case N8_VID_STATUS: return video_get_status();
             default:            return 0x00;
         }
     }

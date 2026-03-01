@@ -34,7 +34,7 @@ Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` 
 - `$D000-$D7FF` Dev Bank (2KB RAM)
 - `$D800-$D81F` System/IRQ (slot 0) — `mem[$D800]` = IRQ flags
 - `$D820-$D83F` TTY (slot 1) — `emu_tty.cpp`
-- `$D840-$D85F` Video Control (slot 2) — `emu_video.cpp`
+- `$D840-$D85F` Video Control (slot 2, 12 regs) — `emu_video.cpp`
 - `$D860-$D87F` Keyboard (slot 3) — `emu_kbd.cpp`
 - `$D880-$DFFF` Reserved device slots
 - `$E000-$FFFF` ROM (8KB firmware binary)
@@ -61,14 +61,13 @@ Two test fixtures in `test/test_helpers.h`:
 
 `bin/n8gdb/n8gdb.mjs` — Node.js ESM, zero dependencies. Connects to port 3333.
 
-**Important:** Each CLI invocation creates a separate TCP connection. Breakpoints are cleared on disconnect (`GDB_POLL_DETACHED` zeroes `bp_mask[]`). Use REPL mode for multi-step workflows:
+Each CLI invocation creates a separate TCP connection. Breakpoints and watchpoints persist across connections, so individual commands can be chained:
 
 ```bash
-node bin/n8gdb/n8gdb.mjs repl --sym firmware/gdb_playground/test_regs.sym
-n8> load firmware/gdb_playground/test_regs 0xE000
-n8> reset
-n8> bp final_state
-n8> run
+node bin/n8gdb/n8gdb.mjs --sym firmware/gdb_playground/test_regs.sym load firmware/gdb_playground/test_regs 0xE000
+node bin/n8gdb/n8gdb.mjs reset
+node bin/n8gdb/n8gdb.mjs --sym firmware/gdb_playground/test_regs.sym bp final_state
+node bin/n8gdb/n8gdb.mjs run
 ```
 
 Address syntax: `0x` or `$` prefix for hex, `#` prefix for decimal, bare hex, or label name (if `.sym` loaded). Env vars: `N8GDB_HOST`, `N8GDB_PORT`, `N8GDB_SYM`, `N8GDB_DEBUG=1`.
@@ -79,7 +78,7 @@ cc65 toolchain (`cl65 -t none --cpu 6502`). Linker config: `firmware/n8.cfg`. Cu
 
 - `firmware/` — main firmware (boot, TTY driver, echo loop)
 - `firmware/playground/` — experimental firmware programs
-- `firmware/gdb_playground/` — GDB RSP stub validation tests (7 test programs)
+- `firmware/gdb_playground/` — GDB RSP stub validation tests (10 test programs)
 
 Playground programs build to 8KB ROM binaries at $E000 with `.sym` files for n8gdb label resolution.
 
@@ -92,7 +91,7 @@ Playground programs build to 8KB ROM binaries at $E000 with `.sym` files for n8g
 | `src/n8_memory_map.h` | All hardware address constants and register definitions |
 | `src/gdb_stub.cpp` | GDB RSP protocol handler + TCP transport thread |
 | `src/emu_tty.cpp` | TTY memory-mapped device (raw terminal I/O) |
-| `src/emu_video.cpp` | Video control registers, scroll operations |
+| `src/emu_video.cpp` | Video control registers, scroll, VID_DATA streaming |
 | `src/emu_kbd.cpp` | Keyboard registers, IRQ reassertion, key injection |
 | `src/m6502.h` | Vendored 6502 CPU emulator (do not edit) |
 | `bin/n8gdb/rsp.mjs` | Low-level GDB RSP TCP client |

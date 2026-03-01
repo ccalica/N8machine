@@ -8,7 +8,7 @@ Device registers at `$D800–$DFFF` (2 KB), 32-byte spacing per device.
 | -------:| ---------------- | --------------:| -------------------------------- |
 | `$D800` | System / IRQ     | 1              | IRQ flags, system status         |
 | `$D820` | TTY              | 4              | Serial I/O                       |
-| `$D840` | Video Control    | 9              | Mode, dimensions, cursor, scroll |
+| `$D840` | Video Control    | 12             | Mode, dimensions, cursor, scroll, VID_DATA streaming |
 | `$D860` | Keyboard         | 3              | ASCII + extended, IRQ, Phase 1   |
 | `$D880` | Math Coprocessor | TBD            | RPN stack window                 |
 | `$D8A0` | Storage          | TBD            |                                  |
@@ -52,17 +52,23 @@ and asserts IRQ bit 1 when data is available.
 
 ## Video Control — `$D840`
 
+12 registers (offsets `$00`–`$0B`). Remaining 20 bytes (`$D84C`–`$D85F`)
+are phantom registers (read `$00`, write no-op).
+
 | Address | R/W | Name       | Description                               |
 | -------:| --- | ---------- | ----------------------------------------- |
 | `$D840` | R/W | VID_MODE   | `$00` = Text Default, `$01` = Text Custom |
 | `$D841` | R/W | VID_WIDTH  | Display width (columns)                   |
 | `$D842` | R/W | VID_HEIGHT | Display height (rows)                     |
 | `$D843` | R/W | VID_STRIDE | Row stride                                |
-| `$D844` | W   | VID_OPER   | Scroll operation (write-once trigger)     |
+| `$D844` | W   | VID_OPER   | Operation trigger (write-once, does not latch) |
 | `$D845` | R/W | VID_CURSOR | Cursor style and flash rate               |
 | `$D846` | R/W | VID_CURCOL | Cursor column (0-based)                   |
 | `$D847` | R/W | VID_CURROW | Cursor row (0-based)                      |
 | `$D848` | R   | VID_VSYNC  | Frame counter (increments each frame)     |
+| `$D849` | R/W | VID_CTRL   | VID_DATA behavior control                 |
+| `$D84A` | R/W | VID_DATA   | Character read/write at cursor            |
+| `$D84B` | R   | VID_STATUS | Status flags                              |
 
 **VID_MODE values:**
 
@@ -76,15 +82,21 @@ to the mode's defaults. VID_STRIDE defaults to same as VID_WIDTH.
 
 **VID_OPER values (write-only):**
 
-Write triggers an immediate one-time scroll. Register does not latch.
+Write triggers an immediate one-time operation. Register does not latch.
 
-| Value | Operation    |
-| -----:| ------------ |
-| `$00` | No operation |
-| `$01` | Scroll up    |
-| `$02` | Scroll down  |
-| `$03` | Scroll left  |
-| `$04` | Scroll right |
+| Value | Operation    | Description                                          |
+| -----:| ------------ | ---------------------------------------------------- |
+| `$00` | NOP          | No operation                                         |
+| `$01` | SCROLL_UP    | Scroll frame buffer up one row                       |
+| `$02` | SCROLL_DOWN  | Scroll frame buffer down one row                     |
+| `$03` | SCROLL_LEFT  | Scroll frame buffer left one column                  |
+| `$04` | SCROLL_RIGHT | Scroll frame buffer right one column                 |
+| `$05` | CLEAR        | Fill FB with `$20` (stride×height), cursor to (0,0), clear OVERFLOW |
+| `$06` | CURSOR_UP    | row = max(0, row − 1), clear OVERFLOW                |
+| `$07` | CURSOR_DOWN  | row = min(height − 1, row + 1), clear OVERFLOW       |
+| `$08` | CURSOR_LEFT  | col = max(0, col − 1), clear OVERFLOW                |
+| `$09` | CURSOR_RIGHT | col = min(width − 1, col + 1), clear OVERFLOW        |
+| `$0A` | CURSOR_HOME  | col = 0, row = 0, clear OVERFLOW                     |
 
 **VID_CURSOR bits:**
 
@@ -94,9 +106,93 @@ Write triggers an immediate one-time scroll. Register does not latch.
 | 2–3  | SHAPE | `00` = underline, `01` = block                                |
 | 4–7  | RATE  | Frames per toggle (`0` = cursor not displayed)                 |
 
+### VID_CTRL — `$D849`
+
+Persistent bitmask controlling VID_DATA read/write behavior.
+
+| Bit | Name    | Description                                         |
+| ---:| ------- | --------------------------------------------------- |
+| 0   | ADVANCE | Auto-increment column after VID_DATA access         |
+| 1   | WRAP    | Auto-wrap to next row when column reaches width     |
+| 2   | SCROLL  | Auto-scroll up when row reaches height (writes only)|
+| 3–7 | —       | Reserved (read 0, writes ignored)                   |
+
+Default on reset: `$07` (ADVANCE + WRAP + SCROLL). Writing VID_CTRL
+clears OVERFLOW in VID_STATUS. Only bits 0–2 are stored; bits 3–7 are
+masked off.
+
+### VID_DATA — `$D84A`
+
+Character at cursor position. Hardware-accelerated put_char / get_char.
+
+**Write:** Stores byte at `frame_buffer[row × stride + col]`, sets
+fb_dirty. Then applies cursor advance per VID_CTRL:
+
+1. If ADVANCE: col++
+2. If WRAP and col ≥ width: col = 0, row++
+3. If !WRAP and col ≥ width: col = width − 1, set OVERFLOW
+4. If SCROLL and row ≥ height: scroll_up(), row = height − 1
+5. If !SCROLL and row ≥ height: row = height − 1, set OVERFLOW
+6. Update VID_CURCOL and VID_CURROW
+
+Bounds guard: if `row × stride + col ≥ 4096` (FB_SIZE), write is a
+no-op and OVERFLOW is set.
+
+**Read:** Returns `frame_buffer[row × stride + col]`. Then applies
+the same advance logic **except SCROLL is always ignored** (reads never
+scroll). Out-of-bounds reads return `$00` and set OVERFLOW.
+
+### VID_STATUS — `$D84B`
+
+Read-only status flags. Writes are ignored.
+
+| Bit | Name     | Description                                    |
+| ---:| -------- | ---------------------------------------------- |
+| 0   | OVERFLOW | Cursor advance was clamped (boundary reached)  |
+| 1–7 | —        | Reserved (read 0)                              |
+
+OVERFLOW is set when VID_DATA advance hits a boundary (no-wrap column
+clamp, no-scroll row clamp, or out-of-bounds access).
+
+Cleared by: writing VID_CTRL, writing VID_CURCOL, writing VID_CURROW,
+or any CURSOR_* / CLEAR VID_OPER code.
+
+### Firmware Streaming Patterns
+
+```asm
+; Stream-write: fill row with 'A' (stop on OVERFLOW)
+        LDA #$0A                ; CURSOR_HOME
+        STA VID_OPER
+        LDA #$01                ; ADVANCE only (no wrap/scroll)
+        STA VID_CTRL
+        LDA #'A'
+@loop:  STA VID_DATA
+        LDA VID_STATUS
+        AND #$01
+        BNE @done               ; OVERFLOW = hit col boundary
+        LDA #'A'
+        JMP @loop
+@done:
+
+; Stream-read: dump screen to buffer
+        LDA #$0A                ; CURSOR_HOME
+        STA VID_OPER
+        LDA #$03                ; ADVANCE + WRAP (no scroll)
+        STA VID_CTRL
+        LDY #$00
+@loop:  LDA VID_DATA            ; read + auto-advance
+        STA (ptr),Y
+        INY
+        LDA VID_STATUS
+        AND #$01
+        BNE @done               ; hit bottom-right corner
+        JMP @loop
+@done:
+```
+
 **Reset state:** VID_MODE = `$00`, VID_WIDTH = 80, VID_HEIGHT = 25,
-VID_STRIDE = 80. VID_CURSOR = `$00` (cursor off). VID_CURCOL = 0,
-VID_CURROW = 0.
+VID_STRIDE = 80, VID_CTRL = `$07`, VID_CURSOR = `$00` (cursor off),
+VID_CURCOL = 0, VID_CURROW = 0, VID_STATUS = `$00`.
 
 **Font:** Baked into the emulator from `docs/charset/`. Swappable font
 ROM deferred to future work (likely via bank switching into a Dev Bank).

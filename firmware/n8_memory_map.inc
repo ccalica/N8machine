@@ -22,6 +22,9 @@
 .define N8_VID_CURCOL     $D846
 .define N8_VID_CURROW     $D847
 .define N8_VID_VSYNC      $D848
+.define N8_VID_CTRL       $D849
+.define N8_VID_DATA       $D84A
+.define N8_VID_STATUS     $D84B
 
 ; VID_MODE values
 .define N8_VIDMODE_TEXT_DEFAULT  $00
@@ -33,6 +36,21 @@
 .define N8_VIDOP_SCROLL_DOWN    $02
 .define N8_VIDOP_SCROLL_LEFT    $03
 .define N8_VIDOP_SCROLL_RIGHT   $04
+.define N8_VIDOP_CLEAR          $05
+.define N8_VIDOP_CURSOR_UP      $06
+.define N8_VIDOP_CURSOR_DOWN    $07
+.define N8_VIDOP_CURSOR_LEFT    $08
+.define N8_VIDOP_CURSOR_RIGHT   $09
+.define N8_VIDOP_CURSOR_HOME    $0A
+
+; VID_CTRL bit fields
+.define N8_VIDCTRL_ADVANCE   $01
+.define N8_VIDCTRL_WRAP      $02
+.define N8_VIDCTRL_SCROLL    $04
+.define N8_VIDCTRL_DEFAULT   $07
+
+; VID_STATUS bit fields
+.define N8_VIDSTAT_OVERFLOW  $01
 
 ; VID_CURSOR bit fields
 ;   bits 0-1: mode (0=off, 1=steady, 2=flash)

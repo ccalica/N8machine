@@ -54,6 +54,10 @@
 #define N8_VID_CURCOL      0x06
 #define N8_VID_CURROW      0x07
 #define N8_VID_VSYNC       0x08
+#define N8_VID_CTRL        0x09
+#define N8_VID_DATA        0x0A
+#define N8_VID_STATUS      0x0B
+#define N8_VID_REG_COUNT   12       // 0x00-0x0B
 #define N8_VID_SLOT        2
 
 // VID_MODE values
@@ -66,6 +70,22 @@
 #define N8_VIDOP_SCROLL_DOWN    0x02
 #define N8_VIDOP_SCROLL_LEFT    0x03
 #define N8_VIDOP_SCROLL_RIGHT   0x04
+#define N8_VIDOP_CLEAR          0x05
+#define N8_VIDOP_CURSOR_UP      0x06
+#define N8_VIDOP_CURSOR_DOWN    0x07
+#define N8_VIDOP_CURSOR_LEFT    0x08
+#define N8_VIDOP_CURSOR_RIGHT   0x09
+#define N8_VIDOP_CURSOR_HOME    0x0A
+
+// VID_CTRL bit fields
+#define N8_VIDCTRL_ADVANCE   0x01
+#define N8_VIDCTRL_WRAP      0x02
+#define N8_VIDCTRL_SCROLL    0x04
+#define N8_VIDCTRL_MASK      0x07    // valid bits mask
+#define N8_VIDCTRL_DEFAULT   0x07    // all enabled on reset
+
+// VID_STATUS bit fields
+#define N8_VIDSTAT_OVERFLOW  0x01
 
 // VID_CURSOR bit fields
 //   bits 0-1: mode (0=off, 1=steady, 2=flash)

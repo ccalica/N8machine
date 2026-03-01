@@ -35,7 +35,9 @@ n8> load test_regs 0xE000
 n8> reset
 ```
 
-**Important:** Use REPL mode for multi-step workflows (bp + run, step sequences, etc.). Each one-shot command (`n8gdb bp ...`, `n8gdb run`) creates a separate TCP connection, and breakpoints are cleared on disconnect.
+Breakpoints and watchpoints persist across connections, so individual CLI
+commands can be chained (`n8gdb bp ...`, `n8gdb run`, `n8gdb read ...`).
+REPL mode is available for interactive exploration.
 
 ## Test Programs
 
@@ -172,6 +174,62 @@ n8> read C100 4           # TTY registers (last char in data reg)
 Strings sent: `"Hello, world!"`, `"0123456789"`, `"=== N8machine GDB test ===\nTTY output working."`
 
 **Tests:** `step` through I/O, `bp` on output routines, `read` on I/O region ($C100), `run`
+
+### test_monitor — Keyboard + video terminal
+
+Interactive terminal: polls keyboard, echoes to frame buffer. Tests keyboard polling, frame buffer writes, video cursor, scroll, printable ASCII, backspace, enter.
+
+```
+n8gdb load test_monitor 0xE000
+n8gdb reset
+n8gdb run
+(type in emulator window — text appears on Screen)
+```
+
+**Tests:** `kbd_inject`, `console_text`, keyboard IRQ, video scroll
+
+### test_benchmark — 6502 cycle benchmark
+
+Measures CPU cycles/frame using two methods across 10 instruction groups. Results displayed on the frame buffer.
+
+```
+n8gdb load test_benchmark 0xE000
+n8gdb reset
+n8gdb run
+n8gdb console_text            # results table on screen
+```
+
+**Tests:** `VID_VSYNC` timing, frame buffer direct writes, `console_text`
+
+### test_viddata — VID_DATA / VID_CTRL / VID_STATUS validation
+
+10-phase test exercising all new video registers and VID_OPER codes. Each phase stores results in zero page (`$00`–`$0F`) for GDB inspection at labeled breakpoints.
+
+| Phase | Test                                 | Key Registers         |
+|------:|--------------------------------------|-----------------------|
+| 1     | VID_OPER CLEAR                       | VID_OPER, VID_STATUS  |
+| 2     | VID_DATA write + ADVANCE             | VID_DATA, VID_CTRL    |
+| 3     | ADVANCE + WRAP across row boundary   | VID_CTRL              |
+| 4     | ADVANCE + WRAP + SCROLL at corner    | VID_CTRL, VID_DATA    |
+| 5     | No-WRAP overflow + CTRL clear        | VID_STATUS            |
+| 6     | VID_DATA read + ADVANCE              | VID_DATA (read path)  |
+| 7     | Read never scrolls                   | VID_DATA, VID_STATUS  |
+| 8     | Cursor movement ops + clamping       | VID_OPER (new codes)  |
+| 9     | Stream write (fill row, OVERFLOW)    | VID_DATA, VID_STATUS  |
+| 10    | Stream read (read row, OVERFLOW)     | VID_DATA, VID_STATUS  |
+
+```
+n8gdb --sym test_viddata.sym load test_viddata 0xE000
+n8gdb reset
+n8gdb --sym test_viddata.sym bp phase1_done
+n8gdb --sym test_viddata.sym bp all_done
+n8gdb run                     # stops at phase1_done
+n8gdb read $00 6              # verify phase 1 results
+n8gdb run                     # continue to all_done
+n8gdb console_text            # "VID_DATA TEST: ALL 10 PHASES PASSED"
+```
+
+**Tests:** `VID_CTRL`, `VID_DATA` (read/write), `VID_STATUS`, `VID_OPER` (CLEAR, cursor movement, HOME), streaming patterns with OVERFLOW detection
 
 ## Memory Layout
 

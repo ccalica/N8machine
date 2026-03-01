@@ -10,8 +10,9 @@
 #define STBI_WRITE_NO_STDIO
 #include "stb_image_write.h"
 
-static uint8_t vid_regs[8] = { 0 };
+static uint8_t vid_regs[N8_VID_REG_COUNT] = { 0 };
 static uint8_t vsync_counter = 0;
+static bool overflow_flag = false;
 
 // Pixel buffer for the display module
 static uint32_t screen_pixels[N8_SCREEN_MAX_W * N8_SCREEN_MAX_H];
@@ -25,6 +26,8 @@ void video_reset() {
     vid_regs[N8_VID_WIDTH]  = N8_VID_DEFAULT_WIDTH;
     vid_regs[N8_VID_HEIGHT] = N8_VID_DEFAULT_HEIGHT;
     vid_regs[N8_VID_STRIDE] = N8_VID_DEFAULT_WIDTH;
+    vid_regs[N8_VID_CTRL]   = N8_VIDCTRL_DEFAULT;
+    overflow_flag = false;
     vsync_counter = 0;
     memset(screen_pixels, 0, sizeof(screen_pixels));
     screen.width  = N8_VID_DEFAULT_WIDTH * N8_FONT_WIDTH;
@@ -90,27 +93,86 @@ static void video_scroll_right() {
     }
 }
 
+static void video_clear_overflow() { overflow_flag = false; }
+
+// Shared cursor advance logic for VID_DATA read/write.
+// allow_scroll: true for writes (SCROLL bit honored), false for reads (never scroll).
+static void video_advance_cursor(bool allow_scroll) {
+    uint8_t ctrl = vid_regs[N8_VID_CTRL];
+    if (!(ctrl & N8_VIDCTRL_ADVANCE)) return;
+
+    uint8_t col = vid_regs[N8_VID_CURCOL];
+    uint8_t row = vid_regs[N8_VID_CURROW];
+    uint8_t width = vid_regs[N8_VID_WIDTH];
+    uint8_t height = vid_regs[N8_VID_HEIGHT];
+
+    col++;
+
+    if (col >= width) {
+        if (ctrl & N8_VIDCTRL_WRAP) {
+            col = 0;
+            row++;
+        } else {
+            col = width > 0 ? width - 1 : 0;
+            overflow_flag = true;
+        }
+    }
+
+    if (row >= height) {
+        if (allow_scroll && (ctrl & N8_VIDCTRL_SCROLL)) {
+            video_scroll_up();
+            row = height > 0 ? height - 1 : 0;
+        } else {
+            row = height > 0 ? height - 1 : 0;
+            overflow_flag = true;
+        }
+    }
+
+    vid_regs[N8_VID_CURCOL] = col;
+    vid_regs[N8_VID_CURROW] = row;
+}
+
 void video_decode(uint64_t& pins, uint8_t reg) {
     if (reg == N8_VID_VSYNC) {
         // VID_VSYNC: read-only frame counter
         if (pins & M6502_RW) M6502_SET_DATA(pins, vsync_counter);
         return;
     }
-    if (reg > N8_VID_VSYNC) {
+    if (reg >= N8_VID_REG_COUNT) {
         // Phantom registers: read 0, write no-op
         if (pins & M6502_RW) M6502_SET_DATA(pins, 0x00);
         return;
     }
 
     if (pins & M6502_RW) {
-        // Read
-        if (reg == N8_VID_OPER) {
-            M6502_SET_DATA(pins, 0x00);  // Write-only; reads return 0
-        } else {
-            M6502_SET_DATA(pins, vid_regs[reg]);
+        // ---- Read path ----
+        switch (reg) {
+            case N8_VID_OPER:
+                M6502_SET_DATA(pins, 0x00);  // Write-only; reads return 0
+                break;
+            case N8_VID_STATUS:
+                M6502_SET_DATA(pins, overflow_flag ? N8_VIDSTAT_OVERFLOW : 0x00);
+                break;
+            case N8_VID_DATA: {
+                uint8_t row = vid_regs[N8_VID_CURROW];
+                uint8_t col = vid_regs[N8_VID_CURCOL];
+                int stride = vid_regs[N8_VID_STRIDE];
+                int offset = row * stride + col;
+                if (offset >= N8_FB_SIZE) {
+                    M6502_SET_DATA(pins, 0x00);
+                    overflow_flag = true;
+                } else {
+                    M6502_SET_DATA(pins, frame_buffer[offset]);
+                    video_advance_cursor(false);  // never scroll on read
+                }
+                break;
+            }
+            default:
+                M6502_SET_DATA(pins, vid_regs[reg]);
+                break;
         }
     } else {
-        // Write
+        // ---- Write path ----
         uint8_t val = M6502_GET_DATA(pins);
         switch (reg) {
             case N8_VID_MODE:
@@ -120,12 +182,80 @@ void video_decode(uint64_t& pins, uint8_t reg) {
             case N8_VID_OPER:
                 // Write-once trigger, does not latch
                 switch (val) {
-                    case N8_VIDOP_NOP:          /* no-op */           break;
+                    case N8_VIDOP_NOP:          break;
                     case N8_VIDOP_SCROLL_UP:    video_scroll_up();    break;
                     case N8_VIDOP_SCROLL_DOWN:  video_scroll_down();  break;
                     case N8_VIDOP_SCROLL_LEFT:  video_scroll_left();  break;
                     case N8_VIDOP_SCROLL_RIGHT: video_scroll_right(); break;
+                    case N8_VIDOP_CLEAR: {
+                        int stride = vid_regs[N8_VID_STRIDE];
+                        int height = vid_regs[N8_VID_HEIGHT];
+                        int bytes = stride * height;
+                        if (bytes > N8_FB_SIZE) bytes = N8_FB_SIZE;
+                        memset(frame_buffer, 0x20, bytes);
+                        vid_regs[N8_VID_CURCOL] = 0;
+                        vid_regs[N8_VID_CURROW] = 0;
+                        fb_dirty = true;
+                        video_clear_overflow();
+                        break;
+                    }
+                    case N8_VIDOP_CURSOR_UP:
+                        if (vid_regs[N8_VID_CURROW] > 0) vid_regs[N8_VID_CURROW]--;
+                        video_clear_overflow();
+                        break;
+                    case N8_VIDOP_CURSOR_DOWN: {
+                        uint8_t h = vid_regs[N8_VID_HEIGHT];
+                        if (h > 0 && vid_regs[N8_VID_CURROW] < h - 1)
+                            vid_regs[N8_VID_CURROW]++;
+                        video_clear_overflow();
+                        break;
+                    }
+                    case N8_VIDOP_CURSOR_LEFT:
+                        if (vid_regs[N8_VID_CURCOL] > 0) vid_regs[N8_VID_CURCOL]--;
+                        video_clear_overflow();
+                        break;
+                    case N8_VIDOP_CURSOR_RIGHT: {
+                        uint8_t w = vid_regs[N8_VID_WIDTH];
+                        if (w > 0 && vid_regs[N8_VID_CURCOL] < w - 1)
+                            vid_regs[N8_VID_CURCOL]++;
+                        video_clear_overflow();
+                        break;
+                    }
+                    case N8_VIDOP_CURSOR_HOME:
+                        vid_regs[N8_VID_CURCOL] = 0;
+                        vid_regs[N8_VID_CURROW] = 0;
+                        video_clear_overflow();
+                        break;
                 }
+                break;
+            case N8_VID_CTRL:
+                vid_regs[reg] = val & N8_VIDCTRL_MASK;
+                video_clear_overflow();
+                break;
+            case N8_VID_DATA: {
+                uint8_t row = vid_regs[N8_VID_CURROW];
+                uint8_t col = vid_regs[N8_VID_CURCOL];
+                int stride = vid_regs[N8_VID_STRIDE];
+                int offset = row * stride + col;
+                if (offset >= N8_FB_SIZE) {
+                    overflow_flag = true;
+                } else {
+                    frame_buffer[offset] = val;
+                    fb_dirty = true;
+                    video_advance_cursor(true);  // allow scroll on write
+                }
+                break;
+            }
+            case N8_VID_STATUS:
+                // Read-only — writes ignored
+                break;
+            case N8_VID_CURCOL:
+                vid_regs[reg] = val;
+                video_clear_overflow();
+                break;
+            case N8_VID_CURROW:
+                vid_regs[reg] = val;
+                video_clear_overflow();
                 break;
             default:
                 vid_regs[reg] = val;
@@ -141,6 +271,8 @@ uint8_t video_get_stride()       { return vid_regs[N8_VID_STRIDE]; }
 uint8_t video_get_cursor_style() { return vid_regs[N8_VID_CURSOR]; }
 uint8_t video_get_cursor_col()   { return vid_regs[N8_VID_CURCOL]; }
 uint8_t video_get_cursor_row()   { return vid_regs[N8_VID_CURROW]; }
+uint8_t video_get_ctrl()         { return vid_regs[N8_VID_CTRL]; }
+uint8_t video_get_status()       { return overflow_flag ? N8_VIDSTAT_OVERFLOW : 0x00; }
 
 const n8_screen_t* video_get_screen() { return &screen; }
 

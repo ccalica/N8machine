@@ -20,3 +20,5 @@ uint8_t video_get_stride();
 uint8_t video_get_cursor_style();
 uint8_t video_get_cursor_col();
 uint8_t video_get_cursor_row();
+uint8_t video_get_ctrl();
+uint8_t video_get_status();

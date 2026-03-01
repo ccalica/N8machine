@@ -88,7 +88,7 @@ This spec covers two tasks:
 |-----:|-----:|:-------|:----------|
 | `$D800` | 0 | System/IRQ | 1 (IRQ_FLAGS) |
 | `$D820` | 1 | TTY | 4 (OUT_STATUS, OUT_DATA, IN_STATUS, IN_DATA) |
-| `$D840` | 2 | Video Control | 9 (MODE, WIDTH, HEIGHT, STRIDE, OPER, CURSOR, CURCOL, CURROW, VSYNC) |
+| `$D840` | 2 | Video Control | 12 (MODE, WIDTH, HEIGHT, STRIDE, OPER, CURSOR, CURCOL, CURROW, VSYNC, CTRL, DATA, STATUS) |
 | `$D860` | 3 | Keyboard | 3 (KBD_DATA, KBD_STATUS/ACK, KBD_CTRL) |
 
 ### Phase Summary
