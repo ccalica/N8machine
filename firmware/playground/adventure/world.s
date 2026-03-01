@@ -37,9 +37,14 @@ ROOM_TOWER_LOBBY = 11
 ROOM_SECURITY    = 12
 ROOM_ELEVATOR    = 13
 ROOM_PARKING     = 14
+ROOM_SERVER      = 15
+ROOM_DATA_CENTER = 16
+ROOM_CORNER_OFF  = 17
+ROOM_SVC_TUNNEL  = 18
+ROOM_VENT_SHAFT  = 19
 NO_EXIT          = $FF
 
-NUM_ROOMS = 15
+NUM_ROOMS = 20
 
 ; --- Item IDs ---
 ITEM_CREDCHIP    = 0
@@ -53,8 +58,10 @@ ITEM_UPLINK      = 7
 ITEM_KEYCARD     = 8
 ITEM_CROWBAR     = 9
 ITEM_MAGAZINE    = 10
+ITEM_ENCCHIP     = 11
+ITEM_SVCMAP      = 12
 
-NUM_ITEMS = 11
+NUM_ITEMS = 13
 
 LOC_INVENTORY = $FE
 LOC_GONE      = $FF
@@ -122,6 +129,8 @@ room_name_lo:
         .byte <rn_metro_plat, <rn_metro_car
         .byte <rn_corp_plaza, <rn_tower_lobby, <rn_security
         .byte <rn_elevator, <rn_parking
+        .byte <rn_server, <rn_data_center, <rn_corner_off
+        .byte <rn_svc_tunnel, <rn_vent_shaft
 
 room_name_hi:
         .byte >rn_alley, >rn_bar, >rn_market, >rn_microsofts, >rn_clinic
@@ -129,6 +138,8 @@ room_name_hi:
         .byte >rn_metro_plat, >rn_metro_car
         .byte >rn_corp_plaza, >rn_tower_lobby, >rn_security
         .byte >rn_elevator, >rn_parking
+        .byte >rn_server, >rn_data_center, >rn_corner_off
+        .byte >rn_svc_tunnel, >rn_vent_shaft
 
 ; =====================================================================
 ; Room description pointer tables
@@ -140,6 +151,8 @@ room_desc_lo:
         .byte <rd_metro_plat, <rd_metro_car
         .byte <rd_corp_plaza, <rd_tower_lobby, <rd_security
         .byte <rd_elevator, <rd_parking
+        .byte <rd_server, <rd_data_center, <rd_corner_off
+        .byte <rd_svc_tunnel, <rd_vent_shaft
 
 room_desc_hi:
         .byte >rd_alley, >rd_bar, >rd_market, >rd_microsofts, >rd_clinic
@@ -147,6 +160,8 @@ room_desc_hi:
         .byte >rd_metro_plat, >rd_metro_car
         .byte >rd_corp_plaza, >rd_tower_lobby, >rd_security
         .byte >rd_elevator, >rd_parking
+        .byte >rd_server, >rd_data_center, >rd_corner_off
+        .byte >rd_svc_tunnel, >rd_vent_shaft
 
 ; =====================================================================
 ; Room exit tables
@@ -168,6 +183,11 @@ room_exit_n:
         .byte NO_EXIT            ; 12 Security
         .byte NO_EXIT            ; 13 Elevator
         .byte NO_EXIT            ; 14 Parking
+        .byte ROOM_DATA_CENTER   ; 15 Server Floor -> Data Center
+        .byte NO_EXIT            ; 16 Data Center
+        .byte NO_EXIT            ; 17 Corner Office
+        .byte ROOM_SERVER        ; 18 Service Tunnel -> Server Floor
+        .byte ROOM_SVC_TUNNEL    ; 19 Vent Shaft -> Service Tunnel
 
 room_exit_s:
         .byte NO_EXIT            ; 0  Alley
@@ -185,6 +205,11 @@ room_exit_s:
         .byte ROOM_TOWER_LOBBY   ; 12 Security -> Tower Lobby
         .byte NO_EXIT            ; 13 Elevator
         .byte ROOM_CORP_PLAZA    ; 14 Parking -> Corp Plaza
+        .byte ROOM_SVC_TUNNEL    ; 15 Server Floor -> Service Tunnel
+        .byte ROOM_SERVER        ; 16 Data Center -> Server Floor
+        .byte NO_EXIT            ; 17 Corner Office
+        .byte ROOM_VENT_SHAFT    ; 18 Service Tunnel -> Vent Shaft
+        .byte NO_EXIT            ; 19 Vent Shaft
 
 room_exit_e:
         .byte NO_EXIT            ; 0  Alley
@@ -202,6 +227,11 @@ room_exit_e:
         .byte NO_EXIT            ; 12 Security
         .byte NO_EXIT            ; 13 Elevator
         .byte NO_EXIT            ; 14 Parking
+        .byte ROOM_CORNER_OFF    ; 15 Server Floor -> Corner Office
+        .byte NO_EXIT            ; 16 Data Center
+        .byte NO_EXIT            ; 17 Corner Office
+        .byte NO_EXIT            ; 18 Service Tunnel
+        .byte NO_EXIT            ; 19 Vent Shaft
 
 room_exit_w:
         .byte NO_EXIT            ; 0  Alley
@@ -219,6 +249,11 @@ room_exit_w:
         .byte NO_EXIT            ; 12 Security
         .byte ROOM_TOWER_LOBBY   ; 13 Elevator -> Tower Lobby
         .byte ROOM_CORP_PLAZA    ; 14 Parking -> Corp Plaza
+        .byte NO_EXIT            ; 15 Server Floor
+        .byte NO_EXIT            ; 16 Data Center
+        .byte ROOM_SERVER        ; 17 Corner Office -> Server Floor
+        .byte NO_EXIT            ; 18 Service Tunnel
+        .byte NO_EXIT            ; 19 Vent Shaft
 
 room_exit_u:
         .byte NO_EXIT            ; 0  Alley
@@ -234,8 +269,13 @@ room_exit_u:
         .byte NO_EXIT            ; 10 Corp Plaza
         .byte NO_EXIT            ; 11 Tower Lobby
         .byte NO_EXIT            ; 12 Security
-        .byte NO_EXIT            ; 13 Elevator (up = locked, handled by engine)
-        .byte NO_EXIT            ; 14 Parking
+        .byte ROOM_SERVER        ; 13 Elevator -> Server Floor (locked)
+        .byte ROOM_VENT_SHAFT    ; 14 Parking -> Vent Shaft (locked)
+        .byte NO_EXIT            ; 15 Server Floor
+        .byte NO_EXIT            ; 16 Data Center
+        .byte NO_EXIT            ; 17 Corner Office
+        .byte NO_EXIT            ; 18 Service Tunnel
+        .byte ROOM_SVC_TUNNEL    ; 19 Vent Shaft -> Service Tunnel
 
 room_exit_d:
         .byte NO_EXIT            ; 0  Alley
@@ -251,8 +291,13 @@ room_exit_d:
         .byte NO_EXIT            ; 10 Corp Plaza
         .byte NO_EXIT            ; 11 Tower Lobby
         .byte NO_EXIT            ; 12 Security
-        .byte ROOM_TOWER_LOBBY   ; 13 Elevator -> Tower Lobby (always works)
+        .byte ROOM_TOWER_LOBBY   ; 13 Elevator -> Tower Lobby
         .byte NO_EXIT            ; 14 Parking
+        .byte ROOM_ELEVATOR      ; 15 Server Floor -> Elevator
+        .byte NO_EXIT            ; 16 Data Center
+        .byte NO_EXIT            ; 17 Corner Office
+        .byte ROOM_VENT_SHAFT    ; 18 Service Tunnel -> Vent Shaft
+        .byte ROOM_PARKING       ; 19 Vent Shaft -> Parking
 
 ; =====================================================================
 ; Item tables
@@ -263,24 +308,28 @@ item_name_lo:
         .byte <in_icebreaker
         .byte <in_cyberdeck, <in_jackcable, <in_uplink
         .byte <in_keycard, <in_crowbar, <in_magazine
+        .byte <in_encchip, <in_svcmap
 
 item_name_hi:
         .byte >in_credchip, >in_flashlight, >in_stimpack, >in_fakeid
         .byte >in_icebreaker
         .byte >in_cyberdeck, >in_jackcable, >in_uplink
         .byte >in_keycard, >in_crowbar, >in_magazine
+        .byte >in_encchip, >in_svcmap
 
 item_desc_lo:
         .byte <id_credchip, <id_flashlight, <id_stimpack, <id_fakeid
         .byte <id_icebreaker
         .byte <id_cyberdeck, <id_jackcable, <id_uplink
         .byte <id_keycard, <id_crowbar, <id_magazine
+        .byte <id_encchip, <id_svcmap
 
 item_desc_hi:
         .byte >id_credchip, >id_flashlight, >id_stimpack, >id_fakeid
         .byte >id_icebreaker
         .byte >id_cyberdeck, >id_jackcable, >id_uplink
         .byte >id_keycard, >id_crowbar, >id_magazine
+        .byte >id_encchip, >id_svcmap
 
 item_init_loc:
         .byte ROOM_BAR           ; credchip
@@ -294,6 +343,8 @@ item_init_loc:
         .byte ROOM_SECURITY      ; keycard
         .byte ROOM_PARKING       ; crowbar
         .byte ROOM_TOWER_LOBBY   ; magazine
+        .byte ROOM_CORNER_OFF    ; encrypted chip
+        .byte ROOM_SVC_TUNNEL    ; service map
 
 item_flags:
         .byte ITEMF_TAKEABLE     ; credchip
@@ -307,6 +358,8 @@ item_flags:
         .byte ITEMF_TAKEABLE     ; keycard
         .byte ITEMF_TAKEABLE     ; crowbar
         .byte ITEMF_TAKEABLE     ; magazine
+        .byte ITEMF_TAKEABLE     ; encrypted chip
+        .byte ITEMF_TAKEABLE     ; service map
 
 ; =====================================================================
 ; Room names
@@ -327,6 +380,11 @@ rn_tower_lobby:  .byte "Tower Lobby", 0
 rn_security:     .byte "Security Office", 0
 rn_elevator:     .byte "Elevator", 0
 rn_parking:      .byte "Parking Garage", 0
+rn_server:       .byte "Server Floor", 0
+rn_data_center:  .byte "Data Center", 0
+rn_corner_off:   .byte "Corner Office", 0
+rn_svc_tunnel:   .byte "Service Tunnel", 0
+rn_vent_shaft:   .byte "Ventilation Shaft", 0
 
 ; =====================================================================
 ; Room descriptions
@@ -403,6 +461,29 @@ rd_parking:
         .byte "under buzzing sodium lights. Oil stains and "
         .byte "echoing concrete.", 0
 
+rd_server:
+        .byte "Rows of black server racks hum in cold air. Status "
+        .byte "LEDs blink green and amber. A data center lies north. "
+        .byte "Corner office east. Service tunnel south.", 0
+
+rd_data_center:
+        .byte "The mainframe core. Cables thick as wrists feed into "
+        .byte "a central processing column. A neural jack port glows "
+        .byte "blue on the console.", 0
+
+rd_corner_off:
+        .byte "Executive suite. Floor-to-ceiling windows overlooking "
+        .byte "the Sprawl. A desk terminal displays encrypted files.", 0
+
+rd_svc_tunnel:
+        .byte "Narrow maintenance corridor. Pipes and conduits line "
+        .byte "the walls. The air smells of ozone and machine oil. "
+        .byte "Ventilation shaft drops down.", 0
+
+rd_vent_shaft:
+        .byte "Vertical shaft with metal rungs bolted to the wall. "
+        .byte "Cold air rushes upward. Service tunnel above.", 0
+
 ; =====================================================================
 ; Item names
 ; =====================================================================
@@ -418,6 +499,8 @@ in_uplink:      .byte "uplink code", 0
 in_keycard:     .byte "keycard", 0
 in_crowbar:     .byte "crowbar", 0
 in_magazine:    .byte "magazine", 0
+in_encchip:     .byte "encrypted chip", 0
+in_svcmap:      .byte "service map", 0
 
 ; =====================================================================
 ; Item descriptions
@@ -462,3 +545,12 @@ id_magazine:
         .byte "Dog-eared copy of Node magazine. An article is "
         .byte "circled: 'T-A Tower: Service tunnels run parallel "
         .byte "to the elevator shaft.'", 0
+
+id_encchip:
+        .byte "Data chip with Tessier-Ashpool proprietary encryption. "
+        .byte "Contents unknown without a decryption key.", 0
+
+id_svcmap:
+        .byte "Laminated building schematic. Service routes, "
+        .byte "ventilation access points, and emergency exits "
+        .byte "marked in red.", 0

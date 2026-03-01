@@ -24,7 +24,7 @@
 .import   item_desc_lo, item_desc_hi
 .import   item_init_loc, item_flags
 ; NUM_ITEMS defined locally (must match world.s)
-NUM_ITEMS = 11
+NUM_ITEMS = 13
 .import   str_you_see, str_taken, str_dropped, str_carrying, str_nothing
 .import   str_not_here, str_cant_take, str_no_have, str_examine_what
 .import   str_take_what, str_drop_what
@@ -46,11 +46,15 @@ ROOM_CORP_PLAZA  = 10
 ROOM_TOWER_LOBBY = 11
 ROOM_SECURITY    = 12
 ROOM_ELEVATOR    = 13
+ROOM_PARKING     = 14
+ROOM_SERVER      = 15
+ROOM_VENT_SHAFT  = 19
 
 ; Puzzle flags
 PF_NEURAL_LINK   = $01          ; bit 0: neural link installed
 PF_TOWER_ACCESS  = $02          ; bit 1: tower lobby → security unlocked
 PF_ELEVATOR_KEY  = $04          ; bit 2: elevator unlocked
+PF_VENT_OPEN     = $08          ; bit 3: vent shaft pried open
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -656,8 +660,42 @@ try_move:
 @chk_elev_ok:
         LDA #ROOM_SECURITY      ; restore A
 @chk_elev:
-        ; (Elevator lock checked in Phase 7 via up exit)
-
+        ; Elevator → Server Floor requires PF_ELEVATOR_KEY
+        CMP #ROOM_SERVER
+        BNE @chk_vent
+        LDA cur_room
+        CMP #ROOM_ELEVATOR
+        BNE @elev_ok              ; not from elevator, allow
+        LDA puzzle_flags
+        AND #PF_ELEVATOR_KEY
+        BNE @elev_ok
+        LDA #<str_elev_locked
+        STA zp_str
+        LDA #>str_elev_locked
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@elev_ok:
+        LDA #ROOM_SERVER
+@chk_vent:
+        ; Parking → Vent Shaft requires PF_VENT_OPEN
+        CMP #ROOM_VENT_SHAFT
+        BNE @move_ok
+        LDA cur_room
+        CMP #ROOM_PARKING
+        BNE @vent_ok
+        LDA puzzle_flags
+        AND #PF_VENT_OPEN
+        BNE @vent_ok
+        LDA #<str_vent_locked
+        STA zp_str
+        LDA #>str_vent_locked
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+@vent_ok:
+        LDA #ROOM_VENT_SHAFT
+@move_ok:
         STA cur_room
         JSR update_status_bar
         JSR new_line
@@ -1134,8 +1172,30 @@ use_puzzle_keycard:
         JMP new_line
 
 use_puzzle_crowbar:
-        ; Placeholder — crowbar puzzle in Phase 7
+        LDA cur_room
+        CMP #ROOM_PARKING
+        BEQ @ok
         JMP use_no_puzzle
+@ok:
+        LDA puzzle_flags
+        AND #PF_VENT_OPEN
+        BNE @already
+        LDA puzzle_flags
+        ORA #PF_VENT_OPEN
+        STA puzzle_flags
+        LDA #<str_crowbar_use
+        STA zp_str
+        LDA #>str_crowbar_use
+        STA zp_str+1
+        JSR print_wrap
+        JMP new_line
+@already:
+        LDA #<str_already_vent
+        STA zp_str
+        LDA #>str_already_vent
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
 
 use_no_puzzle:
         LDA #<str_cant_use
@@ -1611,6 +1671,20 @@ str_buy_ice:
         .byte "palms it, checks the balance, and produces a black "
         .byte "ROM chip from under the counter. 'Military-grade ICE "
         .byte "breaker. Don't ask where I got it.'", 0
+
+str_elev_locked:
+        .byte "The panel is dark. You need a keycard.", 0
+
+str_vent_locked:
+        .byte "A heavy grate covers the vent shaft.", 0
+
+str_crowbar_use:
+        .byte "You wedge the crowbar under the vent grate and "
+        .byte "lever it free. Rusty bolts snap. Cold air rushes up "
+        .byte "from below.", 0
+
+str_already_vent:
+        .byte "The vent is already open.", 0
 
 ; Direction lookup table for "go" command: { name_ptr, (handler-1) }
 go_dir_table:
