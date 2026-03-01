@@ -105,6 +105,9 @@ static std::string hex_decode(const char* hex, size_t len) {
 
 // ---- Embedded XML blobs ----
 
+// ---- Screenshot hex buffer (populated on demand by qXfer:n8screen:read) ----
+static std::string screenshot_hex;
+
 static const char target_xml[] =
     "<?xml version=\"1.0\"?>\n"
     "<!DOCTYPE target SYSTEM \"gdb-target.dtd\">\n"
@@ -439,7 +442,7 @@ static std::string handle_D() {
 }
 
 static std::string handle_qSupported(const char* /*data*/) {
-    return "PacketSize=20000;QStartNoAckMode+;qXfer:features:read+;qXfer:memory-map:read+";
+    return "PacketSize=20000;QStartNoAckMode+;qXfer:features:read+;qXfer:memory-map:read+;qXfer:n8screen:read+";
 }
 
 static std::string handle_query(const char* data) {
@@ -459,6 +462,27 @@ static std::string handle_query(const char* data) {
         return handle_qxfer_read(memory_map_xml, strlen(memory_map_xml), data + 22);
     }
 
+    // qXfer:n8screen:read::offset,length — screenshot as hex-encoded PNG
+    if (strncmp(data, "Xfer:n8screen:read::", 20) == 0) {
+        const char* params = data + 20;
+        const char* comma = strchr(params, ',');
+        if (!comma) return "E03";
+        int64_t offset = parse_hex(params, comma - params, 0xFFFFFFFF);
+        if (offset == 0 && cb && cb->screenshot) {
+            // First chunk: trigger screenshot and hex-encode
+            size_t png_len = 0;
+            const uint8_t* png = cb->screenshot(&png_len);
+            screenshot_hex.clear();
+            if (png && png_len > 0) {
+                screenshot_hex.reserve(png_len * 2);
+                for (size_t i = 0; i < png_len; i++) {
+                    screenshot_hex += to_hex_byte(png[i]);
+                }
+            }
+        }
+        return handle_qxfer_read(screenshot_hex.c_str(), screenshot_hex.size(), params);
+    }
+
     if (strcmp(data, "fThreadInfo") == 0) return "m01";
     if (strcmp(data, "sThreadInfo") == 0) return "l";
     if (strcmp(data, "C") == 0) return "QC01";
@@ -470,6 +494,22 @@ static std::string handle_query(const char* data) {
 
         if (cmd == "reset") {
             if (cb && cb->reset) cb->reset();
+            return "OK";
+        }
+        if (strncmp(cmd.c_str(), "kbd ", 4) == 0) {
+            const char* args = cmd.c_str() + 4;
+            const char* space = strchr(args, ' ');
+            if (!space) {
+                // keycode only, modifiers = 0
+                int64_t kc = parse_hex(args, strlen(args), 0xFF);
+                if (kc < 0) return "E03";
+                if (cb && cb->kbd_inject) cb->kbd_inject((uint8_t)kc, 0);
+                return "OK";
+            }
+            int64_t kc = parse_hex(args, space - args, 0xFF);
+            int64_t mod = parse_hex(space + 1, strlen(space + 1), 0xFF);
+            if (kc < 0 || mod < 0) return "E03";
+            if (cb && cb->kbd_inject) cb->kbd_inject((uint8_t)kc, (uint8_t)mod);
             return "OK";
         }
         // Unknown monitor command

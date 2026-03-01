@@ -77,6 +77,26 @@ static void mock_reset() {
     mock_reset_called = true;
 }
 
+static uint8_t mock_kbd_keycode = 0;
+static uint8_t mock_kbd_modifiers = 0;
+static bool mock_kbd_inject_called = false;
+
+static void mock_kbd_inject(uint8_t keycode, uint8_t modifiers) {
+    mock_kbd_keycode = keycode;
+    mock_kbd_modifiers = modifiers;
+    mock_kbd_inject_called = true;
+}
+
+static bool mock_screenshot_called = false;
+static uint8_t mock_png_data[] = { 0x89, 0x50, 0x4E, 0x47, 0xAA, 0xBB };  // fake PNG header
+static size_t mock_png_len = sizeof(mock_png_data);
+
+static const uint8_t* mock_screenshot(size_t* out_len) {
+    mock_screenshot_called = true;
+    *out_len = mock_png_len;
+    return mock_png_data;
+}
+
 static const gdb_stub_callbacks_t mock_cb = {
     mock_read_reg8,
     mock_read_reg16,
@@ -91,7 +111,10 @@ static const gdb_stub_callbacks_t mock_cb = {
     mock_clear_watchpoint,
     mock_get_pc,
     mock_get_stop_reason,
-    mock_reset
+    mock_reset,
+    nullptr, nullptr,  // continue_exec, halt
+    mock_kbd_inject,
+    mock_screenshot
 };
 
 // ---- Fixture ----
@@ -107,6 +130,10 @@ struct GdbProtocolFixture {
         mock_step_signal = 5; // SIGTRAP
         mock_stop_reason = 5;
         mock_reset_called = false;
+        mock_kbd_keycode = 0;
+        mock_kbd_modifiers = 0;
+        mock_kbd_inject_called = false;
+        mock_screenshot_called = false;
         gdb_stub_reset_state();
         gdb_stub_set_callbacks(&mock_cb);
     }
@@ -774,6 +801,102 @@ TEST_SUITE("gdb_protocol") {
         GdbProtocolFixture f;
         gdb_stub_feed_byte(0x03);
         CHECK(gdb_stub_last_signal() == 2); // SIGINT
+    }
+
+    // ---- kbd_inject monitor command tests ----
+
+    TEST_CASE("T210: qRcmd kbd with keycode and modifiers") {
+        GdbProtocolFixture f;
+        // "kbd 41 04" hex = "6b62642034312030340a" ... let's compute properly
+        // "kbd 41 04" as hex bytes:
+        std::string cmd = "kbd 41 04";
+        std::string hex;
+        for (char c : cmd) {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02x", (uint8_t)c);
+            hex += buf;
+        }
+        std::string result = gdb_stub_process_packet(("qRcmd," + hex).c_str());
+        CHECK(result == "OK");
+        CHECK(mock_kbd_inject_called == true);
+        CHECK(mock_kbd_keycode == 0x41);
+        CHECK(mock_kbd_modifiers == 0x04);
+    }
+
+    TEST_CASE("T211: qRcmd kbd with keycode only (no modifiers)") {
+        GdbProtocolFixture f;
+        std::string cmd = "kbd 41";
+        std::string hex;
+        for (char c : cmd) {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02x", (uint8_t)c);
+            hex += buf;
+        }
+        std::string result = gdb_stub_process_packet(("qRcmd," + hex).c_str());
+        CHECK(result == "OK");
+        CHECK(mock_kbd_inject_called == true);
+        CHECK(mock_kbd_keycode == 0x41);
+        CHECK(mock_kbd_modifiers == 0x00);
+    }
+
+    TEST_CASE("T212: qRcmd kbd with all modifier bits") {
+        GdbProtocolFixture f;
+        std::string cmd = "kbd 0d 3c";  // Enter + SHIFT|CTRL|ALT|CAPS
+        std::string hex;
+        for (char c : cmd) {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02x", (uint8_t)c);
+            hex += buf;
+        }
+        std::string result = gdb_stub_process_packet(("qRcmd," + hex).c_str());
+        CHECK(result == "OK");
+        CHECK(mock_kbd_keycode == 0x0D);
+        CHECK(mock_kbd_modifiers == 0x3C);
+    }
+
+    TEST_CASE("T213: qRcmd kbd with bad hex returns E03") {
+        GdbProtocolFixture f;
+        std::string cmd = "kbd GG";
+        std::string hex;
+        for (char c : cmd) {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02x", (uint8_t)c);
+            hex += buf;
+        }
+        std::string result = gdb_stub_process_packet(("qRcmd," + hex).c_str());
+        CHECK(result == "E03");
+        CHECK(mock_kbd_inject_called == false);
+    }
+
+    // ---- console_video (qXfer:n8screen) tests ----
+
+    TEST_CASE("T220: qXfer:n8screen:read triggers screenshot callback") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("qXfer:n8screen:read::0,ffff");
+        CHECK(mock_screenshot_called == true);
+        // Response should start with 'l' (last chunk — small mock data fits in one)
+        CHECK(result[0] == 'l');
+        // Should contain hex-encoded mock PNG data (89504E47AABB)
+        CHECK(result.find("89504e47aabb") != std::string::npos);
+    }
+
+    TEST_CASE("T221: qXfer:n8screen:read chunked retrieval") {
+        GdbProtocolFixture f;
+        // Read just 4 hex chars (2 bytes worth) — mock PNG is 6 bytes = 12 hex chars
+        std::string r1 = gdb_stub_process_packet("qXfer:n8screen:read::0,4");
+        CHECK(r1[0] == 'm');  // more data
+        CHECK(r1.size() == 5); // 'm' + 4 hex chars
+
+        // Read the rest
+        std::string r2 = gdb_stub_process_packet("qXfer:n8screen:read::4,ffff");
+        CHECK(r2[0] == 'l');  // last chunk
+        CHECK(r2.size() == 9); // 'l' + 8 remaining hex chars
+    }
+
+    TEST_CASE("T55a: qSupported advertises n8screen qXfer") {
+        GdbProtocolFixture f;
+        std::string result = gdb_stub_process_packet("qSupported");
+        CHECK(result.find("qXfer:n8screen:read+") != std::string::npos);
     }
 
 } // TEST_SUITE("gdb_protocol")

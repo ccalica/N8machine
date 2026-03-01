@@ -53,32 +53,36 @@ TEST_SUITE("keyboard") {
     }
 
     // -------------------------------------------------------------------------
-    // T154: Write KBD_ACK clears DATA_AVAIL and OVERFLOW
+    // T154: Write KBD_ACK pops front; two ACKs drain FIFO
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T154: Write KBD_ACK clears DATA_AVAIL and OVERFLOW") {
+    TEST_CASE("T154: Write KBD_ACK pops front entry from FIFO") {
         EmulatorFixture f;
-        // Inject twice to set overflow
         kbd_inject_key(0x41, 0x00);
         kbd_inject_key(0x42, 0x00);
-        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) != 0);
-        // ACK
+        // First ACK pops 0x41, 0x42 still buffered
         uint64_t p = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
         kbd_decode(p, N8_KBD_ACK);
-        CHECK((kbd_get_status() & N8_KBD_STAT_AVAIL) == 0);
-        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) == 0);
+        CHECK(kbd_data_available() == true);
+        CHECK(kbd_get_data() == 0x42);
+        // Second ACK pops 0x42, buffer empty
+        p = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
+        kbd_decode(p, N8_KBD_ACK);
+        CHECK(kbd_data_available() == false);
     }
 
     // -------------------------------------------------------------------------
-    // T155: Second inject before ACK sets OVERFLOW, data=second key
+    // T155: Two injects produce FIFO ordering, front is first key
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T155: Second inject before ACK sets OVERFLOW") {
+    TEST_CASE("T155: Two injects produce FIFO order, no overflow") {
         EmulatorFixture f;
         kbd_inject_key(0x41, 0x00);
         kbd_inject_key(0x42, 0x00);
-        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) != 0);
-        CHECK(kbd_get_data() == 0x42);
+        // No overflow — buffer has room for 64
+        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) == 0);
+        // Front of FIFO is first key injected
+        CHECK(kbd_get_data() == 0x41);
     }
 
     // -------------------------------------------------------------------------
@@ -107,7 +111,7 @@ TEST_SUITE("keyboard") {
     }
 
     // -------------------------------------------------------------------------
-    // T158: ACK deasserts IRQ bit 2
+    // T158: ACK deasserts IRQ bit 2 when buffer fully drained
     // -------------------------------------------------------------------------
 
     TEST_CASE("T158: ACK deasserts IRQ bit 2") {
@@ -124,7 +128,7 @@ TEST_SUITE("keyboard") {
     }
 
     // -------------------------------------------------------------------------
-    // T159: Modifier bits reflect in status
+    // T159: Modifier bits reflect front entry in status
     // -------------------------------------------------------------------------
 
     TEST_CASE("T159: Modifier bits reflect in status") {
@@ -135,7 +139,7 @@ TEST_SUITE("keyboard") {
         CHECK((kbd_get_status() & N8_KBD_STAT_CTRL) != 0);
         CHECK((kbd_get_status() & N8_KBD_STAT_ALT) == 0);
 
-        // Inject with ALT + CAPS
+        // Inject second key with ALT + CAPS, ACK first to advance
         uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
         kbd_decode(pa, N8_KBD_ACK);
         kbd_inject_key(0x42, N8_KBD_STAT_ALT | N8_KBD_STAT_CAPS);
@@ -245,22 +249,155 @@ TEST_SUITE("keyboard") {
     }
 
     // -------------------------------------------------------------------------
-    // T167: SDL auto-repeat events are filtered (design-level test)
+    // T167: Two rapid injects buffered without overflow (buffer has room)
     // -------------------------------------------------------------------------
 
-    TEST_CASE("T167: SDL repeat filter design verification") {
+    TEST_CASE("T167: Two rapid injects buffered without overflow") {
         EmulatorFixture f;
-        // Verify that calling kbd_inject_key twice simulates what would happen
-        // if repeat filtering were missing — OVERFLOW gets set.
-        // The actual SDL filter is in main.cpp (!event.key.repeat guard).
-        // Here we just verify the consequence: two injects = overflow.
         kbd_inject_key(0x41, 0x00);
         kbd_inject_key(0x41, 0x00);  // simulated repeat
-        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) != 0);
-        // Single inject should not overflow
+        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) == 0);
+        CHECK(kbd_data_available() == true);
+        // Single inject should also not overflow
         kbd_reset();
         kbd_inject_key(0x41, 0x00);
         CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) == 0);
+    }
+
+    // =========================================================================
+    // Ring buffer tests (T200+)
+    // =========================================================================
+
+    // -------------------------------------------------------------------------
+    // T200: FIFO ordering — inject A, B, C; read A, ACK, read B, ACK, read C
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T200: FIFO ordering across three keys") {
+        EmulatorFixture f;
+        kbd_inject_key(0x41, 0x00);  // A
+        kbd_inject_key(0x42, 0x00);  // B
+        kbd_inject_key(0x43, 0x00);  // C
+
+        CHECK(kbd_get_data() == 0x41);
+        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
+        kbd_decode(pa, N8_KBD_ACK);
+        CHECK(kbd_get_data() == 0x42);
+        kbd_decode(pa, N8_KBD_ACK);
+        CHECK(kbd_get_data() == 0x43);
+        kbd_decode(pa, N8_KBD_ACK);
+        CHECK(kbd_data_available() == false);
+    }
+
+    // -------------------------------------------------------------------------
+    // T201: Buffer full at 64 entries; 65th dropped + OVERFLOW
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T201: Buffer full at 64, 65th dropped with OVERFLOW") {
+        EmulatorFixture f;
+        for (int i = 0; i < 64; i++) {
+            kbd_inject_key((uint8_t)(i & 0xFF), 0x00);
+        }
+        CHECK(kbd_data_available() == true);
+        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) == 0);
+        // First key should still be at front
+        CHECK(kbd_get_data() == 0x00);
+
+        // 65th inject overflows
+        kbd_inject_key(0xFF, 0x00);
+        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) != 0);
+        // Front still 0x00 (65th was dropped)
+        CHECK(kbd_get_data() == 0x00);
+    }
+
+    // -------------------------------------------------------------------------
+    // T202: ACK when empty is safe — no crash, AVAIL stays clear
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T202: ACK when empty is safe") {
+        EmulatorFixture f;
+        CHECK(kbd_data_available() == false);
+        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
+        kbd_decode(pa, N8_KBD_ACK);
+        CHECK(kbd_data_available() == false);
+        CHECK(kbd_get_data() == 0x00);
+    }
+
+    // -------------------------------------------------------------------------
+    // T203: ACK clears OVERFLOW but keeps AVAIL when buffer non-empty
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T203: ACK clears OVERFLOW but keeps AVAIL when non-empty") {
+        EmulatorFixture f;
+        // Fill buffer to trigger overflow
+        for (int i = 0; i < 64; i++) {
+            kbd_inject_key((uint8_t)(i + 1), 0x00);
+        }
+        kbd_inject_key(0xFF, 0x00);  // 65th = overflow
+        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) != 0);
+
+        // ACK pops one, clears overflow, keeps AVAIL
+        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
+        kbd_decode(pa, N8_KBD_ACK);
+        CHECK((kbd_get_status() & N8_KBD_STAT_OVERFLOW) == 0);
+        CHECK(kbd_data_available() == true);
+        // Front advanced to second key
+        CHECK(kbd_get_data() == 0x02);
+    }
+
+    // -------------------------------------------------------------------------
+    // T204: kbd_tick() reasserts IRQ after partial drain
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T204: kbd_tick reasserts IRQ after partial drain") {
+        EmulatorFixture f;
+        // Enable IRQ
+        uint64_t pc = make_write_pins(N8_KBD_BASE + N8_KBD_CTRL, N8_KBD_CTRL_IRQ_EN);
+        kbd_decode(pc, N8_KBD_CTRL);
+        // Inject two keys
+        kbd_inject_key(0x41, 0x00);
+        kbd_inject_key(0x42, 0x00);
+        // ACK first key
+        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
+        kbd_decode(pa, N8_KBD_ACK);
+        // Simulate IRQ_CLR
+        mem[N8_IRQ_FLAGS] = 0x00;
+        // kbd_tick should reassert (buffer still has 0x42)
+        kbd_tick();
+        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) != 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // T205: Modifiers track front entry — advance changes visible modifiers
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T205: Modifiers track front entry across ACK") {
+        EmulatorFixture f;
+        kbd_inject_key(0x41, N8_KBD_STAT_SHIFT);
+        kbd_inject_key(0x42, N8_KBD_STAT_CTRL);
+        // Front is key1 with SHIFT
+        CHECK((kbd_get_status() & N8_KBD_STAT_SHIFT) != 0);
+        CHECK((kbd_get_status() & N8_KBD_STAT_CTRL) == 0);
+        // ACK advances to key2 with CTRL
+        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
+        kbd_decode(pa, N8_KBD_ACK);
+        CHECK((kbd_get_status() & N8_KBD_STAT_SHIFT) == 0);
+        CHECK((kbd_get_status() & N8_KBD_STAT_CTRL) != 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // T206: Reset clears entire buffer
+    // -------------------------------------------------------------------------
+
+    TEST_CASE("T206: Reset clears entire buffer") {
+        EmulatorFixture f;
+        for (int i = 0; i < 10; i++) {
+            kbd_inject_key((uint8_t)(0x30 + i), 0x00);
+        }
+        CHECK(kbd_data_available() == true);
+        kbd_reset();
+        CHECK(kbd_data_available() == false);
+        CHECK(kbd_get_data() == 0x00);
+        CHECK(kbd_get_status() == 0x00);
     }
 
 } // TEST_SUITE("keyboard")

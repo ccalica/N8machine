@@ -23,6 +23,8 @@ typedef struct {
     void     (*reset)(void);
     void     (*continue_exec)(void);    // resume free-running
     void     (*halt)(void);             // stop execution
+    void     (*kbd_inject)(uint8_t keycode, uint8_t modifiers);  // inject keystroke
+    const uint8_t* (*screenshot)(size_t* out_len);  // encode screen as PNG, returns data+len
 } gdb_stub_callbacks_t;
 
 typedef struct {

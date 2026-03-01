@@ -48,6 +48,20 @@ static void gdb_write_reg16(int reg_id, uint16_t val) {
 static uint8_t gdb_read_mem(uint16_t addr) {
     if (addr >= N8_FB_BASE && addr <= N8_FB_END)
         return frame_buffer[addr - N8_FB_BASE];
+    // Video registers live in emu_video.cpp statics, not mem[]
+    if (addr >= N8_VID_BASE && addr <= N8_VID_BASE + N8_VID_VSYNC) {
+        switch (addr - N8_VID_BASE) {
+            case N8_VID_MODE:   return video_get_mode();
+            case N8_VID_WIDTH:  return video_get_width();
+            case N8_VID_HEIGHT: return video_get_height();
+            case N8_VID_STRIDE: return video_get_stride();
+            case N8_VID_OPER:   return 0x00;  // write-only
+            case N8_VID_CURSOR: return video_get_cursor_style();
+            case N8_VID_CURCOL: return video_get_cursor_col();
+            case N8_VID_CURROW: return video_get_cursor_row();
+            default:            return 0x00;
+        }
+    }
     return mem[addr];
 }
 
@@ -135,6 +149,14 @@ static void gdb_reset(void) {
     fb_dirty = true;
 }
 
+static void gdb_kbd_inject(uint8_t keycode, uint8_t modifiers) {
+    kbd_inject_key(keycode, modifiers);
+}
+
+static const uint8_t* gdb_screenshot(size_t* out_len) {
+    return video_screenshot(out_len);
+}
+
 // ---- Public API ----
 
 void gdb_bridge_init() {
@@ -146,7 +168,8 @@ void gdb_bridge_init() {
         gdb_set_breakpoint, gdb_clear_breakpoint,
         gdb_set_watchpoint, gdb_clear_watchpoint,
         gdb_get_pc, gdb_get_stop_reason,
-        gdb_reset, gdb_continue_exec, gdb_halt
+        gdb_reset, gdb_continue_exec, gdb_halt,
+        gdb_kbd_inject, gdb_screenshot
     };
     static gdb_stub_config_t gdb_cfg = { 3333, true, 16 };
     gdb_stub_init(&gdb_cb, &gdb_cfg);

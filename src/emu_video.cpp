@@ -4,6 +4,11 @@
 #include "n8_font.h"
 #include "m6502.h"
 #include <cstring>
+#include <vector>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBI_WRITE_NO_STDIO
+#include "stb_image_write.h"
 
 static uint8_t vid_regs[8] = { 0 };
 static uint8_t vsync_counter = 0;
@@ -219,4 +224,33 @@ void video_rasterize(uint32_t frame_count) {
     screen.height = px_h;
     screen.dirty  = true;
     fb_dirty = false;
+}
+
+// ---- Screenshot (PNG encoding to memory) ----
+
+static std::vector<uint8_t> screenshot_buf;
+
+static void screenshot_write_func(void* context, void* data, int size) {
+    auto* buf = (std::vector<uint8_t>*)context;
+    const uint8_t* bytes = (const uint8_t*)data;
+    buf->insert(buf->end(), bytes, bytes + size);
+}
+
+const uint8_t* video_screenshot(size_t* out_len) {
+    // Force rasterize with frame_count=0 (cursor steady-visible)
+    fb_dirty = true;
+    video_rasterize(0);
+
+    int w = screen.width;
+    int h = screen.height;
+    if (w <= 0 || h <= 0) {
+        *out_len = 0;
+        return nullptr;
+    }
+
+    screenshot_buf.clear();
+    stbi_write_png_to_func(screenshot_write_func, &screenshot_buf,
+                           w, h, 4, screen_pixels, w * 4);
+    *out_len = screenshot_buf.size();
+    return screenshot_buf.data();
 }

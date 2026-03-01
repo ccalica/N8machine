@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <cstddef>
 #include "emu_screen.h"
 
 void video_init();
@@ -9,6 +10,7 @@ void video_decode(uint64_t& pins, uint8_t dev_reg);
 // Rendering pipeline
 const n8_screen_t* video_get_screen();
 void video_rasterize(uint32_t frame_count);
+const uint8_t* video_screenshot(size_t* out_len);
 
 // State accessors
 uint8_t video_get_mode();

@@ -187,6 +187,44 @@ export class RspClient {
     if (reply !== 'OK') throw new Error(`Clear breakpoint failed at $${addr.toString(16)}: ${reply}`);
   }
 
+  // ── Monitor Commands ───────────────────────────────────────
+
+  /**
+   * Send a monitor command (qRcmd). Returns reply string.
+   * @param {string} cmd — plaintext command (e.g., "kbd 41 04")
+   * @returns {Promise<string>}
+   */
+  async monitorCommand(cmd) {
+    const hex = Buffer.from(cmd, 'utf8').toString('hex');
+    return await this.#sendCommand(`qRcmd,${hex}`);
+  }
+
+  // ── qXfer Reads ──────────────────────────────────────────────
+
+  /**
+   * Read a qXfer object (chunked). Returns the full data string.
+   * @param {string} object — e.g., "n8screen", "features", "memory-map"
+   * @param {string} [annex='']
+   * @returns {Promise<string>}
+   */
+  async readXfer(object, annex = '') {
+    let result = '';
+    let offset = 0;
+    const chunkSize = 0x4000;
+    while (true) {
+      const reply = await this.#sendCommand(
+        `qXfer:${object}:read:${annex}:${offset.toString(16)},${chunkSize.toString(16)}`
+      );
+      if (reply.length === 0) throw new Error(`qXfer:${object}:read returned empty`);
+      const tag = reply[0]; // 'm' = more, 'l' = last
+      const data = reply.slice(1);
+      result += data;
+      if (tag === 'l') break;
+      offset += data.length;
+    }
+    return result;
+  }
+
   // ── Execution Control ──────────────────────────────────────
 
   /**

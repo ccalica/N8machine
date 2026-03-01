@@ -41,7 +41,7 @@
  */
 
 import { RspClient } from './rsp.mjs';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createInterface } from 'readline';
 
 // ── Symbol table ────────────────────────────────────────────────
@@ -271,6 +271,246 @@ async function cmdGoto(client, args) {
   await cmdRegs(client);
 }
 
+// ── N8 character map (byte → Unicode) ───────────────────────────
+
+// prettier-ignore
+const N8_CHARMAP = [
+  // $00-$0F
+  ' ',     '\u263A', '\u25CF', '\u2665', '\u2666', '\u2663', '\u2660', '\u2026',
+  '\u2713', '\u2717', '\u2605', '\u00DF', '\u2190', '\u2192', '\u2191', '\u2193',
+  // $10-$1F
+  '\u21B5', '\u21D0', '\u21D2', '\u21D1', '\u21D3', '\u25B6', '\u25C0', '\u25B2',
+  '\u25BC', '\u2194', '\u2195', '\u2302', '\u266A', '\u266B', '\u00A7', '\u00B6',
+  // $20-$7E: standard ASCII
+  ...Array.from({length: 95}, (_, i) => String.fromCharCode(0x20 + i)),
+  // $7F
+  '\u2310',
+  // $80-$8F: block elements
+  '\u2588', '\u2580', '\u2584', '\u258C', '\u2590', '\u2598', '\u259D', '\u2596',
+  '\u2597', '\u259A', '\u259E', '\u259B', '\u259C', '\u2599', '\u259F', '\u2591',
+  // $90-$9F: shading, thirds, diagonals
+  '\u2592', '\u2593', '\u2594', '\u2581', '\u258F', '\u2595', '\u2586', '\u2582',
+  '\u25E2', '\u25E3', '\u25E4', '\u25E5', '\u2571', '\u2572', '\u2573', '\u25AC',
+  // $A0-$AA: single-line box drawing
+  '\u2500', '\u2502', '\u250C', '\u2510', '\u2514', '\u2518', '\u251C', '\u2524',
+  '\u252C', '\u2534', '\u253C',
+  // $AB-$B5: heavy-line box drawing
+  '\u2501', '\u2503', '\u250F', '\u2513', '\u2517', '\u251B', '\u2523', '\u252B',
+  '\u2533', '\u253B', '\u254B',
+  // $B6-$B9: rounded corners
+  '\u256D', '\u256E', '\u2570', '\u256F',
+  // $BA-$BD: dashed
+  '\u254C', '\u254E', '\u254D', '\u254F',
+  // $BE-$BF: inverted punctuation
+  '\u00A1', '\u00BF',
+  // $C0-$CF: international
+  '\u00C0', '\u00C1', '\u00C4', '\u00C7', '\u00C9', '\u00D1', '\u00D6', '\u00DC',
+  '\u00E0', '\u00E1', '\u00E4', '\u00E7', '\u00E9', '\u00F1', '\u00F6', '\u00FC',
+  // $D0-$D9: geometric
+  '\u25CB', '\u25CE', '\u25A1', '\u25A0', '\u25B3', '\u25B7', '\u25BD', '\u25C1',
+  '\u25C7', '\u2606',
+  // $DA-$DF: dice
+  '\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685',
+  // $E0-$EF: math/greek
+  '\u00B1', '\u00D7', '\u00F7', '\u2260', '\u2264', '\u2265', '\u2248', '\u00B0',
+  '\u221E', '\u221A', '\u03C0', '\u03A3', '\u03C3', '\u03BC', '\u03A9', '\u03B4',
+  // $F0-$F4: currency
+  '\u00A2', '\u00A3', '\u00A5', '\u20AC', '\u00A4',
+  // $F5-$F9: electronics
+  '\u23FB', '\u23DA', '\u26A1', '\u2316', '\u2318',
+  // $FA-$FB: copyright/registered
+  '\u00A9', '\u00AE',
+  // $FC-$FD: guillemets
+  '\u00AB', '\u00BB',
+  // $FE-$FF: N8 two-thirds blocks (closest Unicode approx)
+  '\u258A', '\u258E',
+];
+
+// ── Console text ────────────────────────────────────────────────
+
+async function cmdConsoleText(client) {
+  // Read video registers at $D840 (9 bytes: mode..vsync)
+  const regs = await client.readMemory(0xD840, 9);
+  const mode   = regs[0];
+  const width  = regs[1];
+  const height = regs[2];
+  const stride = regs[3];
+  const curStyle = regs[5];
+  const curCol   = regs[6];
+  const curRow   = regs[7];
+
+  const fbSize = stride * height;
+  if (fbSize === 0 || fbSize > 0x1000) {
+    console.error('Invalid video dimensions');
+    return;
+  }
+
+  const fb = await client.readMemory(0xC000, fbSize);
+
+  const modeStr = mode === 0 ? 'Text Default' : mode === 1 ? 'Text Custom' : `0x${hex8(mode)}`;
+  const curModeStr = (curStyle & 0x03) === 0 ? 'off' : (curStyle & 0x03) === 1 ? 'steady' : 'flash';
+  const curShapeStr = (curStyle & 0x0C) === 0x04 ? 'block' : 'underline';
+  console.log(`Mode: ${modeStr}  Size: ${width}\u00D7${height}  Stride: ${stride}  Cursor: (${curCol},${curRow}) ${curModeStr} ${curShapeStr}`);
+  console.log('\u2500'.repeat(width));
+
+  for (let row = 0; row < height; row++) {
+    let line = '';
+    for (let col = 0; col < width; col++) {
+      const byte = fb[row * stride + col];
+      line += N8_CHARMAP[byte] || '?';
+    }
+    console.log(line);
+  }
+  console.log('\u2500'.repeat(width));
+}
+
+// ── Console video ────────────────────────────────────────────────
+
+async function cmdConsoleVideo(client, args) {
+  const path = args[0];
+  if (!path) { console.error('Usage: console_video <path>'); return; }
+  const hexData = await client.readXfer('n8screen');
+  const png = Buffer.from(hexData, 'hex');
+  writeFileSync(path, png);
+  console.log(`Screenshot saved: ${path} (${png.length} bytes)`);
+}
+
+// ── Help ────────────────────────────────────────────────────────
+
+function cmdHelp() {
+  console.log([
+    'n8gdb — GDB RSP client for N8machine 6502 emulator',
+    '',
+    'Usage: n8gdb [--host HOST] [--port PORT] [--sym FILE] <command> [args...]',
+    '',
+    'Commands:',
+    '  regs                        Read all CPU registers',
+    '  wreg  <reg> <val>           Write register (a x y s p pc)',
+    '  pc    <addr|label>          Set PC (safe — sets SYNC state)',
+    '  goto  <addr|label>          Set PC and continue execution',
+    '  read  <addr> [len]          Read memory (hex dump)',
+    '  write <addr> <hex|@file>    Write hex bytes or load file to address',
+    '  load  <file> <addr>         Load binary file at address',
+    '  sym   <file>                Load cc65 .sym file, print labels',
+    '  bp    <addr|label>          Set breakpoint',
+    '  bpc   <addr|label>          Clear breakpoint',
+    '  run   [--timeout ms]        Continue execution (wait for stop)',
+    '  step  [n]                   Single step (n times)',
+    '  halt                        Send interrupt (Ctrl-C)',
+    '  reset                       Reset CPU',
+    '  kbd_inject <input>          Inject keystrokes into keyboard buffer',
+    '  console_text                Read video text buffer as Unicode',
+    '  console_video <path>        Save screen screenshot as PNG',
+    '  detach                      Detach and disconnect',
+    '  help                        Show this help',
+    '  repl                        Interactive REPL mode',
+    '',
+    'kbd_inject input formats:',
+    '  kbd_inject 0x41             Hex keycode',
+    '  kbd_inject \'A\'              ASCII char',
+    '  kbd_inject "Hello"          String (injects each char)',
+    '  kbd_inject enter            Named key (enter esc tab backspace delete',
+    '                              up down left right home end pageup pagedown',
+    '                              insert f1-f12 space)',
+    '  Modifier flags: --shift --ctrl --alt --caps --mod 0xNN',
+    '',
+    'Addresses: hex with 0x or $ prefix, or bare hex. Decimal with # prefix.',
+    'Labels: if a .sym file is loaded (--sym), label names resolve to addresses.',
+    '',
+    'Environment:',
+    '  N8GDB_HOST    Default host (127.0.0.1)',
+    '  N8GDB_PORT    Default port (3333)',
+    '  N8GDB_SYM     Default .sym file path',
+    '  N8GDB_DEBUG   Set to 1 for RSP debug logging',
+  ].join('\n'));
+}
+
+// ── Named keys and auto-modifier tables ─────────────────────────
+
+const NAMED_KEYS = {
+  enter: 0x0D, return: 0x0D, cr: 0x0D,
+  backspace: 0x08, bs: 0x08,
+  tab: 0x09,
+  esc: 0x1B, escape: 0x1B,
+  delete: 0x87, del: 0x87,
+  space: 0x20,
+  up: 0x80, down: 0x81, left: 0x82, right: 0x83,
+  home: 0x84, end: 0x85, pageup: 0x86, pagedown: 0x88, insert: 0x89,
+  f1: 0x90, f2: 0x91, f3: 0x92, f4: 0x93, f5: 0x94, f6: 0x95,
+  f7: 0x96, f8: 0x97, f9: 0x98, f10: 0x99, f11: 0x9A, f12: 0x9B,
+};
+
+function charToKeycode(ch) {
+  const code = ch.charCodeAt(0);
+  // Printable ASCII $20-$7E: send ASCII code directly as keycode
+  // (N8 keycode space includes the full printable ASCII range)
+  if (code >= 0x20 && code <= 0x7E) {
+    return { keycode: code, modifiers: 0x00 };
+  }
+  return null;
+}
+
+async function cmdKbdInject(client, args) {
+  // Parse modifier flags
+  let extraMod = 0;
+  const inputArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--shift': extraMod |= 0x04; break;
+      case '--ctrl':  extraMod |= 0x08; break;
+      case '--alt':   extraMod |= 0x10; break;
+      case '--caps':  extraMod |= 0x20; break;
+      case '--mod':
+        if (args[i + 1]) extraMod |= parseInt(args[++i], 16) & 0x3C;
+        break;
+      default:
+        inputArgs.push(args[i]);
+    }
+  }
+
+  if (inputArgs.length === 0) {
+    console.error('Usage: kbd_inject <key|"string"|0xNN|named_key> [--shift] [--ctrl] [--alt] [--caps] [--mod 0xNN]');
+    return;
+  }
+
+  const input = inputArgs.join(' ');
+  const keys = [];  // [{keycode, modifiers}, ...]
+
+  // String mode: "Hello" or 'x'
+  if ((input.startsWith('"') && input.endsWith('"')) ||
+      (input.startsWith("'") && input.endsWith("'"))) {
+    const str = input.slice(1, -1);
+    if (str.length === 0) { console.error('Empty string'); return; }
+    for (const ch of str) {
+      const kc = charToKeycode(ch);
+      if (!kc) { console.error(`Cannot map character: ${ch}`); return; }
+      keys.push({ keycode: kc.keycode, modifiers: kc.modifiers | extraMod });
+    }
+  }
+  // Named key
+  else if (input.toLowerCase() in NAMED_KEYS) {
+    keys.push({ keycode: NAMED_KEYS[input.toLowerCase()], modifiers: extraMod });
+  }
+  // Hex keycode
+  else {
+    const addr = parseAddr(input);
+    if (isNaN(addr) || addr > 0xFF) {
+      console.error(`Invalid keycode: ${input}`);
+      return;
+    }
+    keys.push({ keycode: addr, modifiers: extraMod });
+  }
+
+  for (const { keycode, modifiers } of keys) {
+    const reply = await client.monitorCommand(`kbd ${hex8(keycode)} ${hex8(modifiers)}`);
+    if (reply !== 'OK') {
+      console.error(`kbd_inject failed: ${reply}`);
+      return;
+    }
+  }
+  console.log(`Injected ${keys.length} key${keys.length > 1 ? 's' : ''}`);
+}
+
 // ── REPL ────────────────────────────────────────────────────────
 
 async function repl(client) {
@@ -306,6 +546,9 @@ async function repl(client) {
         case 'step': case 's':      await cmdStep(client, args); break;
         case 'halt': case 'h':      await cmdHalt(client); break;
         case 'reset':               await cmdReset(client); break;
+        case 'kbd_inject': case 'ki': await cmdKbdInject(client, args); break;
+        case 'console_text': case 'ct': await cmdConsoleText(client); break;
+        case 'console_video': case 'cv': await cmdConsoleVideo(client, args); break;
         case 'detach':              await client.detach(); console.log('Detached'); rl.close(); return;
         case 'quit': case 'q':      client.disconnect(); rl.close(); return;
         case 'help': case '?':
@@ -325,6 +568,9 @@ async function repl(client) {
             '  step|s [n]              Single step',
             '  halt|h                  Interrupt execution',
             '  reset                   Reset CPU to reset vector',
+            '  kbd_inject|ki <input>   Inject keystrokes',
+            '  console_text|ct         Read screen as Unicode text',
+            '  console_video|cv <path> Save screen as PNG',
             '  detach                  Detach from target',
             '  quit|q                  Disconnect and exit',
           ].join('\n'));
@@ -378,7 +624,11 @@ async function main() {
     process.exit(2);
   }
 
-  // sym command doesn't need connection
+  // Commands that don't need a connection
+  if (cmd === 'help') {
+    cmdHelp();
+    process.exit(0);
+  }
   if (cmd === 'sym') {
     cmdSym(args);
     process.exit(0);
@@ -408,6 +658,9 @@ async function main() {
       case 'step':    await cmdStep(client, args); break;
       case 'halt':    await cmdHalt(client); break;
       case 'reset':   await cmdReset(client); break;
+      case 'kbd_inject': await cmdKbdInject(client, args); break;
+      case 'console_text': await cmdConsoleText(client); break;
+      case 'console_video': await cmdConsoleVideo(client, args); break;
       case 'detach':  await client.detach(); break;
       case 'repl':    await repl(client); break;
       default:
