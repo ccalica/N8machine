@@ -3,12 +3,23 @@
 ; Frame buffer + video registers + keyboard I/O.
 ; FB I/O routines adapted from test_monitor.s.
 ; Readline adapted from mon1.s for keyboard+FB.
+; Parser adapted from mon1.s with verb dispatch table.
 
 .export   _main
 .export   cursor_on, cursor_off, put_char, new_line, scroll_up, clear_screen
-.export   kbd_wait, kbd_read, print_str, readline_fb
+.export   kbd_wait, kbd_read, print_str, print_wrap, readline_fb
+.export   parse, dispatch
 
+; --- World data imports ---
 .import   str_banner, str_prompt, str_unknown
+.import   str_help_text, str_no_exit, str_exits_hdr
+.import   str_dir_n, str_dir_s, str_dir_e, str_dir_w, str_dir_u, str_dir_d
+.import   str_quit_msg
+.import   room_name_lo, room_name_hi
+.import   room_desc_lo, room_desc_hi
+.import   room_exit_n, room_exit_s, room_exit_e, room_exit_w
+.import   room_exit_u, room_exit_d
+.import   NUM_ROOMS
 
 ; --- Hardware registers ---
 KBD_DATA   = $D860
@@ -35,6 +46,13 @@ KEY_BS    = $08
 ; Line buffer
 BUF_SIZE  = 79                  ; max chars (leave room for null)
 
+; Room exit: no exit marker
+NO_EXIT   = $FF
+
+; Screen dimensions
+SCR_COLS  = 80
+SCR_ROWS  = 25
+
 ; --- Zero page variables ---
 .segment "ZEROPAGE"
 zp_col:   .res 1               ; current column (0-79)
@@ -43,10 +61,15 @@ zp_fb:    .res 2               ; frame buffer pointer
 zp_str:   .res 2               ; string pointer
 zp_tmp:   .res 1               ; temp for Y save
 line_len: .res 1               ; current input line length
+cur_room: .res 1               ; current room ID
+zp_ptr2:  .res 2               ; noun pointer (set by parse)
+zp_tmp2:  .res 1               ; second temp
 
 ; --- BSS (RAM) ---
 .segment "BSS"
 LINE_BUF: .res 80              ; input line buffer
+VERB_BUF: .res 16              ; parsed verb
+NOUN_BUF: .res 40              ; parsed noun (rest of line)
 
 ; =====================================================================
 .segment "CODE"
@@ -61,6 +84,13 @@ _main:
         STA zp_str+1
         JSR print_str
         JSR new_line
+
+        ; Set starting room
+        LDA #$00
+        STA cur_room
+
+        ; Auto-look at start
+        JSR do_look
 
 main_loop:
         ; Print prompt
@@ -78,15 +108,584 @@ main_loop:
         LDA line_len
         BEQ main_loop
 
-        ; Phase 1: echo back the input
-        LDA #<LINE_BUF
+        ; Parse verb + noun
+        JSR parse
+
+        ; Dispatch verb
+        JSR dispatch
+
+        JMP main_loop
+
+; =====================================================================
+; Parse — split LINE_BUF into VERB_BUF + NOUN_BUF
+; Converts verb to lowercase.
+; =====================================================================
+parse:
+        LDX #$00               ; index into LINE_BUF
+        LDY #$00               ; index into VERB_BUF
+
+        ; Copy verb (up to space or end)
+@verb:  LDA LINE_BUF,X
+        BEQ @end_verb
+        CMP #$20               ; space
+        BEQ @end_verb
+        ; To lowercase: if A-Z ($41-$5A), OR $20
+        CMP #$41
+        BCC @store_v
+        CMP #$5B
+        BCS @store_v
+        ORA #$20
+@store_v:
+        CPY #15                 ; VERB_BUF max 15 chars + null
+        BCS @skip_v
+        STA VERB_BUF,Y
+        INY
+@skip_v:
+        INX
+        JMP @verb
+
+@end_verb:
+        ; Null-terminate verb
+        LDA #$00
+        STA VERB_BUF,Y
+
+        ; Skip spaces
+@skip_sp:
+        LDA LINE_BUF,X
+        BEQ @no_noun
+        CMP #$20
+        BNE @has_noun
+        INX
+        JMP @skip_sp
+
+@has_noun:
+        ; Copy rest to NOUN_BUF, lowercase
+        LDY #$00
+@noun:  LDA LINE_BUF,X
+        BEQ @end_noun
+        ; To lowercase
+        CMP #$41
+        BCC @store_n
+        CMP #$5B
+        BCS @store_n
+        ORA #$20
+@store_n:
+        CPY #38                 ; NOUN_BUF max
+        BCS @skip_n
+        STA NOUN_BUF,Y
+        INY
+@skip_n:
+        INX
+        JMP @noun
+
+@end_noun:
+        LDA #$00
+        STA NOUN_BUF,Y
+        RTS
+
+@no_noun:
+        LDA #$00
+        STA NOUN_BUF
+        RTS
+
+; =====================================================================
+; Dispatch — look up VERB_BUF in verb table, call handler
+; =====================================================================
+dispatch:
+        LDX #$00               ; index into verb_table (by 4s)
+@loop:
+        ; Load verb string pointer from table
+        LDA verb_table,X
+        STA zp_ptr2
+        LDA verb_table+1,X
+        STA zp_ptr2+1
+
+        ; End of table? (null pointer)
+        ORA zp_ptr2
+        BEQ @unknown
+
+        ; Compare VERB_BUF with table entry
+        STX zp_tmp2             ; save table index
+        JSR strcmp
+        LDX zp_tmp2
+        BEQ @found              ; strcmp returned 0 = match
+
+        ; Next entry (4 bytes: 2 name ptr + 2 handler ptr)
+        INX
+        INX
+        INX
+        INX
+        JMP @loop
+
+@found:
+        ; Load handler address, push for RTS dispatch
+        LDA verb_table+3,X     ; handler hi
+        PHA
+        LDA verb_table+2,X     ; handler lo
+        PHA
+        RTS                     ; "return" to handler
+
+@unknown:
+        LDA #<str_unknown
         STA zp_str
-        LDA #>LINE_BUF
+        LDA #>str_unknown
+        STA zp_str+1
+        JSR print_str
+        JSR new_line
+        RTS
+
+; =====================================================================
+; strcmp — compare VERB_BUF with string at (zp_ptr2)
+; Returns: A=0 if equal, A!=0 if different.
+; =====================================================================
+strcmp:
+        LDY #$00
+@loop:  LDA VERB_BUF,Y
+        CMP (zp_ptr2),Y
+        BNE @diff
+        ; Both null? -> match
+        CMP #$00
+        BEQ @match
+        INY
+        BNE @loop
+@diff:  LDA #$01
+        RTS
+@match: LDA #$00
+        RTS
+
+; =====================================================================
+; Verb table: { name_lo, name_hi, (handler-1)_lo, (handler-1)_hi }
+; Handler address is stored as addr-1 for RTS dispatch.
+; =====================================================================
+.segment "RODATA"
+
+verb_table:
+        ; look / l
+        .addr vn_look
+        .word do_look - 1
+        .addr vn_l
+        .word do_look - 1
+        ; go
+        .addr vn_go
+        .word do_go - 1
+        ; directions
+        .addr vn_n
+        .word do_north - 1
+        .addr vn_s
+        .word do_south - 1
+        .addr vn_e
+        .word do_east - 1
+        .addr vn_w
+        .word do_west - 1
+        .addr vn_u
+        .word do_up - 1
+        .addr vn_d
+        .word do_down - 1
+        .addr vn_north
+        .word do_north - 1
+        .addr vn_south
+        .word do_south - 1
+        .addr vn_east
+        .word do_east - 1
+        .addr vn_west
+        .word do_west - 1
+        .addr vn_up
+        .word do_up - 1
+        .addr vn_down
+        .word do_down - 1
+        ; help / ?
+        .addr vn_help
+        .word do_help - 1
+        .addr vn_qmark
+        .word do_help - 1
+        ; quit
+        .addr vn_quit
+        .word do_quit - 1
+        ; end of table
+        .addr $0000
+        .word $0000
+
+; Verb name strings
+vn_look:  .byte "look", 0
+vn_l:     .byte "l", 0
+vn_go:    .byte "go", 0
+vn_n:     .byte "n", 0
+vn_s:     .byte "s", 0
+vn_e:     .byte "e", 0
+vn_w:     .byte "w", 0
+vn_u:     .byte "u", 0
+vn_d:     .byte "d", 0
+vn_north: .byte "north", 0
+vn_south: .byte "south", 0
+vn_east:  .byte "east", 0
+vn_west:  .byte "west", 0
+vn_up:    .byte "up", 0
+vn_down:  .byte "down", 0
+vn_help:  .byte "help", 0
+vn_qmark: .byte "?", 0
+vn_quit:  .byte "quit", 0
+
+; =====================================================================
+; Verb handlers
+; =====================================================================
+.segment "CODE"
+
+; --- do_look: print room name, description, exits ---
+do_look:
+        LDX cur_room
+
+        ; Print room name
+        LDA room_name_lo,X
+        STA zp_str
+        LDA room_name_hi,X
         STA zp_str+1
         JSR print_str
         JSR new_line
 
-        JMP main_loop
+        ; Print room description (word-wrapped)
+        LDA room_desc_lo,X
+        STA zp_str
+        LDA room_desc_hi,X
+        STA zp_str+1
+        JSR print_wrap
+        JSR new_line
+
+        ; Print exits
+        JSR print_exits
+        RTS
+
+; --- print_exits: list available exits for cur_room ---
+print_exits:
+        LDA #<str_exits_hdr
+        STA zp_str
+        LDA #>str_exits_hdr
+        STA zp_str+1
+        JSR print_str
+
+        LDX cur_room
+        LDA #$00
+        STA zp_tmp2             ; exit count
+
+        LDA room_exit_n,X
+        CMP #NO_EXIT
+        BEQ @check_s
+        INC zp_tmp2
+        JSR print_exit_sep
+        LDA #<str_dir_n
+        STA zp_str
+        LDA #>str_dir_n
+        STA zp_str+1
+        JSR print_str
+
+@check_s:
+        LDX cur_room
+        LDA room_exit_s,X
+        CMP #NO_EXIT
+        BEQ @check_e
+        INC zp_tmp2
+        JSR print_exit_sep
+        LDA #<str_dir_s
+        STA zp_str
+        LDA #>str_dir_s
+        STA zp_str+1
+        JSR print_str
+
+@check_e:
+        LDX cur_room
+        LDA room_exit_e,X
+        CMP #NO_EXIT
+        BEQ @check_w
+        INC zp_tmp2
+        JSR print_exit_sep
+        LDA #<str_dir_e
+        STA zp_str
+        LDA #>str_dir_e
+        STA zp_str+1
+        JSR print_str
+
+@check_w:
+        LDX cur_room
+        LDA room_exit_w,X
+        CMP #NO_EXIT
+        BEQ @check_u
+        INC zp_tmp2
+        JSR print_exit_sep
+        LDA #<str_dir_w
+        STA zp_str
+        LDA #>str_dir_w
+        STA zp_str+1
+        JSR print_str
+
+@check_u:
+        LDX cur_room
+        LDA room_exit_u,X
+        CMP #NO_EXIT
+        BEQ @check_d
+        INC zp_tmp2
+        JSR print_exit_sep
+        LDA #<str_dir_u
+        STA zp_str
+        LDA #>str_dir_u
+        STA zp_str+1
+        JSR print_str
+
+@check_d:
+        LDX cur_room
+        LDA room_exit_d,X
+        CMP #NO_EXIT
+        BEQ @done
+        INC zp_tmp2
+        JSR print_exit_sep
+        LDA #<str_dir_d
+        STA zp_str
+        LDA #>str_dir_d
+        STA zp_str+1
+        JSR print_str
+
+@done:
+        JSR new_line
+        RTS
+
+; Print separator between exits (comma+space after first)
+print_exit_sep:
+        LDA zp_tmp2
+        BEQ @none
+        LDA #','
+        JSR put_char
+        LDA #' '
+        JSR put_char
+@none:  RTS
+
+; --- do_go: table-driven direction lookup from NOUN_BUF ---
+do_go:
+        LDA NOUN_BUF
+        BNE @has_noun
+        ; No noun
+        LDA #<str_go_where
+        STA zp_str
+        LDA #>str_go_where
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+@has_noun:
+        ; Scan go_dir_table: { name_ptr, handler-1 } x N, terminated by $0000
+        LDX #$00
+@scan:  LDA go_dir_table,X
+        STA zp_ptr2
+        LDA go_dir_table+1,X
+        STA zp_ptr2+1
+        ORA zp_ptr2
+        BEQ @bad_dir            ; end of table
+        STX zp_tmp2
+        JSR strcmp_noun
+        LDX zp_tmp2
+        BEQ @matched
+        INX
+        INX
+        INX
+        INX
+        JMP @scan
+
+@matched:
+        ; RTS-dispatch to handler
+        LDA go_dir_table+3,X
+        PHA
+        LDA go_dir_table+2,X
+        PHA
+        RTS
+
+@bad_dir:
+        LDA #<str_no_exit
+        STA zp_str
+        LDA #>str_no_exit
+        STA zp_str+1
+        JSR print_str
+        JMP new_line
+
+; --- strcmp_noun: compare NOUN_BUF with (zp_ptr2) ---
+strcmp_noun:
+        LDY #$00
+@loop:  LDA NOUN_BUF,Y
+        CMP (zp_ptr2),Y
+        BNE @diff
+        CMP #$00
+        BEQ @match
+        INY
+        BNE @loop
+@diff:  LDA #$01
+        RTS
+@match: LDA #$00
+        RTS
+
+; --- Direction handlers ---
+do_north:
+        LDX cur_room
+        LDA room_exit_n,X
+        JMP try_move
+
+do_south:
+        LDX cur_room
+        LDA room_exit_s,X
+        JMP try_move
+
+do_east:
+        LDX cur_room
+        LDA room_exit_e,X
+        JMP try_move
+
+do_west:
+        LDX cur_room
+        LDA room_exit_w,X
+        JMP try_move
+
+do_up:
+        LDX cur_room
+        LDA room_exit_u,X
+        JMP try_move
+
+do_down:
+        LDX cur_room
+        LDA room_exit_d,X
+        JMP try_move
+
+; --- try_move: A = destination room, $FF = no exit ---
+try_move:
+        CMP #NO_EXIT
+        BEQ @blocked
+        STA cur_room
+        JSR new_line
+        JSR do_look
+        RTS
+@blocked:
+        LDA #<str_no_exit
+        STA zp_str
+        LDA #>str_no_exit
+        STA zp_str+1
+        JSR print_str
+        JSR new_line
+        RTS
+
+; --- do_help ---
+do_help:
+        LDA #<str_help_text
+        STA zp_str
+        LDA #>str_help_text
+        STA zp_str+1
+        JSR print_str
+        JSR new_line
+        RTS
+
+; --- do_quit ---
+do_quit:
+        LDA #<str_quit_msg
+        STA zp_str
+        LDA #>str_quit_msg
+        STA zp_str+1
+        JSR print_str
+        JSR new_line
+@halt:  JMP @halt
+
+; =====================================================================
+; print_wrap — word-wrapped output from (zp_str)
+; Wraps at column SCR_COLS, breaks on spaces.
+; =====================================================================
+print_wrap:
+        LDY #$00               ; source index
+@loop:
+        LDA (zp_str),Y
+        BEQ @done
+
+        ; Embedded newline ($0D)?
+        CMP #$0D
+        BEQ @nl
+
+        ; If we're at column 0 and char is space, skip leading space
+        LDA zp_col
+        BNE @no_skip
+        LDA (zp_str),Y
+        CMP #$20
+        BNE @no_skip
+        INY
+        BNE @loop
+        BEQ @done
+
+@no_skip:
+        ; Check if we need to wrap
+        LDA zp_col
+        CMP #SCR_COLS
+        BCC @fits
+
+        ; Wrap: newline, then print this char
+        STY zp_tmp
+        JSR new_line
+        LDY zp_tmp
+
+@fits:
+        ; Look ahead: if near end of line, check for word break
+        LDA zp_col
+        CMP #60                 ; start checking at col 60
+        BCC @just_print
+
+        ; If current char is space and close to end, wrap here
+        LDA (zp_str),Y
+        CMP #$20
+        BNE @just_print
+
+        ; Check if next word would fit
+        STY zp_tmp
+        JSR word_len_ahead      ; returns A = length of next word
+        CLC
+        ADC zp_col
+        CMP #SCR_COLS
+        BCC @just_print         ; word fits, print the space
+
+        ; Word won't fit — wrap
+        LDY zp_tmp
+        INY                     ; skip the space
+        STY zp_tmp
+        JSR new_line
+        LDY zp_tmp
+        JMP @loop
+
+@just_print:
+        LDA (zp_str),Y
+        STY zp_tmp
+        JSR put_char
+        LDY zp_tmp
+        INY
+        BNE @loop
+        BEQ @done
+
+@nl:
+        STY zp_tmp
+        JSR new_line
+        LDY zp_tmp
+        INY
+        BNE @loop
+
+@done:  RTS
+
+; --- word_len_ahead: count chars until next space or null ---
+; Y = current position (on the space). Count starts from Y+1.
+; Returns A = word length.
+word_len_ahead:
+        LDY zp_tmp
+        INY                     ; skip current space
+        LDA #$00
+        STA zp_tmp2             ; length counter
+@wl:    LDA (zp_str),Y
+        BEQ @wl_done
+        CMP #$20
+        BEQ @wl_done
+        CMP #$0D
+        BEQ @wl_done
+        INC zp_tmp2
+        INY
+        BNE @wl
+@wl_done:
+        LDA zp_tmp2
+        RTS
 
 ; =====================================================================
 ; Readline — keyboard poll + frame buffer echo
@@ -350,3 +949,40 @@ kbd_read:
         STA KBD_ACK
         PLA
         RTS
+
+; =====================================================================
+; Local string data
+; =====================================================================
+.segment "RODATA"
+
+str_go_where:
+        .byte "Go where?", 0
+
+; Direction lookup table for "go" command: { name_ptr, (handler-1) }
+go_dir_table:
+        .addr vn_n
+        .word do_north - 1
+        .addr vn_north
+        .word do_north - 1
+        .addr vn_s
+        .word do_south - 1
+        .addr vn_south
+        .word do_south - 1
+        .addr vn_e
+        .word do_east - 1
+        .addr vn_east
+        .word do_east - 1
+        .addr vn_w
+        .word do_west - 1
+        .addr vn_west
+        .word do_west - 1
+        .addr vn_u
+        .word do_up - 1
+        .addr vn_up
+        .word do_up - 1
+        .addr vn_d
+        .word do_down - 1
+        .addr vn_down
+        .word do_down - 1
+        .addr $0000
+        .word $0000
