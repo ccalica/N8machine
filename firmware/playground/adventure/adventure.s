@@ -1,13 +1,19 @@
 ; adventure.s - Sprawl Adventure engine
 ;
-; Frame buffer + video registers + keyboard I/O.
-; FB I/O routines adapted from test_monitor.s.
-; Readline adapted from mon1.s for keyboard+FB.
-; Parser adapted from mon1.s with verb dispatch table.
+; Uses kernel console API (K_CON_*) for video and keyboard I/O.
+; No direct frame buffer access. VID_CURSOR is direct (TODO: kernel API).
+; Requires kernel loaded at $F000 (4KB ROM at $E000-$EFFF).
+;
+; Load:
+;   n8gdb load adventure_data 0x0500
+;   n8gdb load adventure 0xE000
+;   n8gdb load ../../n8_kernel 0xF000
+;   n8gdb reset
+;   n8gdb run
 
 .export   _main
-.export   cursor_on, cursor_off, put_char, new_line, scroll_up, clear_screen
-.export   kbd_wait, kbd_read, print_str, print_wrap, readline_fb
+.export   cursor_on, cursor_off, put_char, new_line, clear_screen
+.export   kbd_wait, print_str, print_wrap, readline_fb
 .export   parse, dispatch
 
 ; --- World data imports ---
@@ -80,20 +86,18 @@ PF_VENT_OPEN     = $08          ; bit 3: vent shaft pried open
 PF_JACKED_IN     = $10          ; bit 4: jacked into matrix
 PF_ICE_BROKEN    = $20          ; bit 5: ICE wall breached
 
-; --- Hardware registers ---
-KBD_DATA   = $D860
-KBD_STATUS = $D861
-KBD_ACK    = $D861
+; --- Kernel console entry points ---
+K_CON_GETKEY    = $FE09
+K_CON_SETMODE   = $FE0C
+K_CON_GETSTATUS = $FE0F
+K_CON_PUTCHAR   = $FE12
+K_CON_NEWLINE   = $FE15
+K_CON_CLEAR     = $FE18
+K_CON_SCROLL    = $FE1B
+K_CON_SETCURSOR = $FE21
 
-VID_OPER   = $D844
+; --- Direct register access (TODO: replace with kernel cursor API) ---
 VID_CURSOR = $D845
-VID_CURCOL = $D846
-VID_CURROW = $D847
-
-FB_BASE    = $C000
-
-; Video operation codes
-VIDOP_SCROLL_UP = $01
 
 ; Cursor: flash + block + rate 15
 CURSOR_STYLE = $F6
@@ -124,7 +128,6 @@ SCR_ROWS  = 25
 .segment "ZEROPAGE"
 zp_col:   .res 1               ; current column (0-79)
 zp_row:   .res 1               ; current row (0-24)
-zp_fb:    .res 2               ; frame buffer pointer
 zp_str:   .res 2               ; string pointer
 zp_tmp:   .res 1               ; temp for Y save
 line_len: .res 1               ; current input line length
@@ -145,6 +148,11 @@ puzzle_flags:  .res 8          ; puzzle state flags
 .segment "CODE"
 
 _main:
+        ; Set video mode: text, ADVANCE-only (no WRAP/SCROLL — handled manually)
+        LDA #$00                ; mode 0 (text)
+        LDX #$01                ; VID_CTRL = ADVANCE only
+        JSR K_CON_SETMODE
+
         JSR clear_screen
 
         ; Init item locations from ROM table
@@ -169,6 +177,9 @@ _main:
         STA zp_row
         LDA #$00
         STA zp_col
+        LDX #0
+        LDY #1
+        JSR K_CON_SETCURSOR
 
         ; Print banner
         LDA #<str_banner
@@ -467,6 +478,7 @@ do_look:
         JSR new_line
 
         ; Print room description (word-wrapped)
+        LDX cur_room            ; reload (X clobbered by kernel calls)
         LDA room_desc_lo,X
         STA zp_str
         LDA room_desc_hi,X
@@ -1420,7 +1432,7 @@ use_no_puzzle:
 
 ; --- update_status_bar: draw room name on row 0 ---
 update_status_bar:
-        ; Save all ZP state used by print_str/print_wrap callers
+        ; Save all ZP state used by print_str callers
         LDA zp_col
         PHA
         LDA zp_row
@@ -1431,21 +1443,21 @@ update_status_bar:
         PHA
         LDA zp_tmp
         PHA
-        LDA zp_tmp2
-        PHA
 
-        ; Clear row 0
-        LDA #$00
-        STA zp_col
-        STA zp_row
-        JSR calc_fb_addr
-        LDY #79
-        LDA #$20
-@clr:   STA (zp_fb),Y
-        DEY
-        BPL @clr
+        ; Clear row 0: write 80 spaces via kernel
+        LDX #0
+        LDY #0
+        JSR K_CON_SETCURSOR
+        LDX #SCR_COLS
+@clr:   LDA #$20
+        JSR K_CON_PUTCHAR
+        DEX
+        BNE @clr
 
         ; Print room name at row 0
+        LDX #0
+        LDY #0
+        JSR K_CON_SETCURSOR
         LDA #$00
         STA zp_col
         STA zp_row
@@ -1458,8 +1470,6 @@ update_status_bar:
 
         ; Restore all ZP state
         PLA
-        STA zp_tmp2
-        PLA
         STA zp_tmp
         PLA
         STA zp_str+1
@@ -1469,10 +1479,10 @@ update_status_bar:
         STA zp_row
         PLA
         STA zp_col
-        LDA zp_col
-        STA VID_CURCOL
-        LDA zp_row
-        STA VID_CURROW
+        ; Restore hardware cursor position
+        LDX zp_col
+        LDY zp_row
+        JSR K_CON_SETCURSOR
         RTS
 
 ; --- do_help ---
@@ -1618,8 +1628,7 @@ readline_fb:
         LDA #$00
         STA line_len
 @loop:
-        JSR kbd_wait
-        JSR kbd_read            ; A = keycode
+        JSR kbd_wait            ; A = keycode (blocks)
 
         ; Enter -> done
         CMP #KEY_ENTER
@@ -1657,10 +1666,27 @@ readline_fb:
         BEQ @loop               ; nothing to erase
         DEC line_len
         JSR cursor_off
+        LDA zp_col
+        BNE @bs_sameline
+        ; col 0 after wrap: back to end of previous row
+        DEC zp_row
+        LDA #(SCR_COLS-1)
+        STA zp_col
+        JMP @bs_erase
+@bs_sameline:
         DEC zp_col
-        LDA #$20                ; erase with space
-        JSR put_char_at_cur
-        DEC zp_col
+@bs_erase:
+        ; Position cursor at erased column
+        LDX zp_col
+        LDY zp_row
+        JSR K_CON_SETCURSOR
+        ; Write space to erase character (cursor advances)
+        LDA #$20
+        JSR K_CON_PUTCHAR
+        ; Move cursor back to erased position
+        LDX zp_col
+        LDY zp_row
+        JSR K_CON_SETCURSOR
         JSR cursor_on
         JMP @loop
 
@@ -1676,7 +1702,7 @@ readline_fb:
         RTS
 
 ; =====================================================================
-; Frame buffer I/O (from test_monitor.s)
+; Console I/O (via kernel K_CON_* API)
 ; =====================================================================
 
 ; --- Print null-terminated string at (zp_str) ---
@@ -1704,178 +1730,63 @@ print_str:
         JMP @loop
 
 ; --- Put character A at cursor position, advance cursor ---
+; Uses VID_DATA via K_CON_PUTCHAR (ADVANCE-only VID_CTRL).
+; Shadow state zp_col/zp_row tracks position for word wrap.
 put_char:
-        PHA
-        JSR calc_fb_addr
-        PLA
-        LDY #$00
-        STA (zp_fb),Y
-
+        JSR K_CON_PUTCHAR       ; write to VID_DATA (auto-advance)
         INC zp_col
         LDA zp_col
-        CMP #80
-        BCC @update
-        LDA #$00
-        STA zp_col
-        JSR advance_row
-@update:
-        LDA zp_col
-        STA VID_CURCOL
-        LDA zp_row
-        STA VID_CURROW
-        RTS
-
-; --- Put char A at cursor without advancing row (for backspace erase) ---
-put_char_at_cur:
-        PHA
-        JSR calc_fb_addr
-        PLA
-        LDY #$00
-        STA (zp_fb),Y
-        INC zp_col
-        LDA zp_col
-        STA VID_CURCOL
-        RTS
-
-; --- Calculate FB address: zp_fb = FB_BASE + row*80 + col ---
-calc_fb_addr:
-        ; row << 4 (row * 16)
-        LDA #$00
-        STA zp_fb+1
-        LDA zp_row
-        ASL A
-        ROL zp_fb+1
-        ASL A
-        ROL zp_fb+1
-        ASL A
-        ROL zp_fb+1
-        ASL A
-        ROL zp_fb+1
-        STA zp_fb               ; zp_fb = row*16
-
-        ; Save row*16 on stack
-        LDA zp_fb+1
-        PHA
-        LDA zp_fb
-        PHA
-
-        ; row*64 = row*16 << 2
-        ASL zp_fb
-        ROL zp_fb+1
-        ASL zp_fb
-        ROL zp_fb+1
-        ; zp_fb = row*64
-
-        ; row*80 = row*64 + row*16
-        PLA                     ; lo(row*16)
-        CLC
-        ADC zp_fb
-        STA zp_fb
-        PLA                     ; hi(row*16)
-        ADC zp_fb+1
-        STA zp_fb+1
-
-        ; + col
-        CLC
-        LDA zp_fb
-        ADC zp_col
-        STA zp_fb
-        LDA zp_fb+1
-        ADC #$00
-        STA zp_fb+1
-
-        ; + FB_BASE ($C000)
-        CLC
-        LDA zp_fb+1
-        ADC #>FB_BASE
-        STA zp_fb+1
-        RTS
-
-; --- New line ---
-new_line:
-        LDA #$00
-        STA zp_col
-        JSR advance_row
-        LDA zp_col
-        STA VID_CURCOL
-        LDA zp_row
-        STA VID_CURROW
-        RTS
-
-; --- Advance row, scroll if at bottom ---
-advance_row:
-        INC zp_row
-        LDA zp_row
-        CMP #25
+        CMP #SCR_COLS
         BCC @done
-        JSR scroll_up
-        JSR update_status_bar
-        LDA #24
-        STA zp_row
+        JSR new_line            ; handles wrap, scroll, status bar
 @done:  RTS
 
-; --- Scroll up via hardware ---
-scroll_up:
-        LDA #VIDOP_SCROLL_UP
-        STA VID_OPER
-        RTS
+; --- New line ---
+; Uses K_CON_NEWLINE, detects scroll to refresh status bar.
+new_line:
+        LDA zp_row
+        PHA                     ; save pre-newline row
+        JSR K_CON_NEWLINE       ; kernel: col=0, advance row, scroll at bottom
+        ; Read new cursor position from hardware
+        JSR K_CON_GETSTATUS     ; A=status, X=col, Y=row
+        STY zp_row
+        LDA #0
+        STA zp_col
+        PLA                     ; pre-newline row
+        CMP zp_row              ; same row? → scroll happened
+        BNE @done
+        JSR update_status_bar
+@done:  RTS
 
 ; --- Clear screen ---
 clear_screen:
+        JSR K_CON_CLEAR         ; VIDOP_CLEAR (cursor reset to 0,0)
         LDA #$00
         STA zp_col
         STA zp_row
-
-        LDA #<FB_BASE
-        STA zp_fb
-        LDA #>FB_BASE
-        STA zp_fb+1
-
-        LDA #$20
-        LDX #$08                ; 8 pages (2048 bytes, covers 80*25=2000)
-        LDY #$00
-@page:  STA (zp_fb),Y
-        INY
-        BNE @page
-        INC zp_fb+1
-        DEX
-        BNE @page
-
-        LDA #$00
-        STA VID_CURCOL
-        STA VID_CURROW
         RTS
 
 ; --- Cursor on (flashing block) ---
 cursor_on:
-        LDA zp_col
-        STA VID_CURCOL
-        LDA zp_row
-        STA VID_CURROW
-        LDA #CURSOR_STYLE
+        LDX zp_col
+        LDY zp_row
+        JSR K_CON_SETCURSOR
+        LDA #CURSOR_STYLE       ; TODO: replace with kernel cursor API
         STA VID_CURSOR
         RTS
 
 ; --- Cursor off ---
 cursor_off:
-        LDA #$00
+        LDA #$00               ; TODO: replace with kernel cursor API
         STA VID_CURSOR
         RTS
 
-; --- Wait for key ---
+; --- Wait for key (blocking) ---
+; Returns A = keycode, X = modifier bits
 kbd_wait:
-        LDA KBD_STATUS
-        AND #$01
+        JSR K_CON_GETKEY        ; A=keycode ($00 if none), X=modifiers
+        CMP #$00
         BEQ kbd_wait
-        RTS
-
-; --- Read and ack key ---
-kbd_read:
-        LDA KBD_DATA
-        PHA
-        LDA #$01
-        STA KBD_ACK
-        PLA
         RTS
 
 ; Direction lookup table for "go" command: { name_ptr, (handler-1) }

@@ -2,10 +2,13 @@
 
 ## Build & Run
 
+Requires kernel loaded at $F000 (adventure uses K_CON_* kernel console API).
+
 ```bash
 make
 n8gdb load adventure_data 0x0500
 n8gdb load adventure 0xE000
+n8gdb load ../../n8_kernel 0xF000
 n8gdb reset
 n8gdb run
 ```

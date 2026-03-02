@@ -2,7 +2,7 @@
 #
 # Multi-file build: adventure.s (engine) + world.s (data)
 # Uses adventure.cfg to produce two output files:
-#   adventure       ROM engine (8KB at $E000)
+#   adventure       ROM engine (4KB at $E000, kernel at $F000)
 #   adventure_data  RAM game data (~47KB at $0500)
 #
 # Usage:
@@ -14,13 +14,13 @@ CA65    = ca65
 LD65    = ld65
 CAFLAGS = -t none --cpu 6502
 CFG     = adventure.cfg
-COMMON  = ../common_init.s ../common_vectors.s
 
 TARGET  = adventure
 SOURCES = adventure.s world.s
-COMMON_SRCS = ../common_init.s ../common_vectors.s
+COMMON_SRCS = ../common_init.s
 ALL_SRCS = $(SOURCES) $(COMMON_SRCS)
-OBJECTS = $(SOURCES:.s=.o) common_init.o common_vectors.o
+# common_init.o first so _init lands at $E000 (kernel JMPs to $E000)
+OBJECTS = common_init.o $(SOURCES:.s=.o)
 
 .PHONY: all clean
 
@@ -34,9 +34,6 @@ world.o: world.s
 	$(CA65) $(CAFLAGS) -o $@ $<
 
 common_init.o: ../common_init.s
-	$(CA65) $(CAFLAGS) -o $@ $<
-
-common_vectors.o: ../common_vectors.s
 	$(CA65) $(CAFLAGS) -o $@ $<
 
 # Link
