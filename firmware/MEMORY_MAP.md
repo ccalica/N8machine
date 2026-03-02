@@ -56,7 +56,7 @@ The 8KB ROM region ($E000-$FFFF) is split into two separately-built binaries:
 |-----------|------|-----|---------------------------------------------|
 | `STARTUP` | ROM  | ROM | Boot code (`_init`), constructor tables      |
 | `ONCE`    | ROM  | ROM | One-time initialization (currently unused)   |
-| `CODE`    | ROM  | ROM | TTY driver, interrupt handlers               |
+| `CODE`    | ROM  | ROM | TTY driver, console routines, interrupt handlers |
 | `RODATA`  | ROM  | ROM | Read-only data (string literals)             |
 | `DATA`    | ROM  | RAM | Initialized data (copied to RAM at boot)     |
 | `BSS`     | —    | RAM | Zero-initialized at boot (`zerobss`)         |
@@ -76,9 +76,18 @@ The monitor calls kernel services through fixed entry points:
 
 | Address | Function       | Description            |
 |---------|---------------|------------------------|
-| `$FE00` | `K_TTY_PUTC`  | Print character (A)    |
-| `$FE03` | `K_TTY_GETC`  | Get character → A      |
-| `$FE06` | `K_TTY_PEEKC` | Peek char count → A    |
+| `$FE00` | `K_TTY_PUTC`      | Print character (A)                              |
+| `$FE03` | `K_TTY_GETC`      | Get character → A                                |
+| `$FE06` | `K_TTY_PEEKC`     | Peek char count → A                              |
+| `$FE09` | `K_CON_GETKEY`    | Non-blocking key read → A=keycode, X=modifiers   |
+| `$FE0C` | `K_CON_SETMODE`   | Set video mode (A) and control (X)               |
+| `$FE0F` | `K_CON_GETSTATUS` | → A=VID_STATUS, X=col, Y=row                    |
+| `$FE12` | `K_CON_PUTCHAR`   | Write char (A) to VID_DATA at cursor             |
+| `$FE15` | `K_CON_NEWLINE`   | Col=0, advance row, scroll at bottom             |
+| `$FE18` | `K_CON_CLEAR`     | Clear screen (VIDOP_CLEAR)                       |
+| `$FE1B` | `K_CON_SCROLL`    | Scroll screen: X=horiz(signed), Y=vert(signed)   |
+| `$FE1E` | `K_CON_MOVCURSOR` | Move cursor: X=horiz(signed), Y=vert(signed)     |
+| `$FE21` | `K_CON_SETCURSOR` | Set cursor: X=col, Y=row                        |
 
 ## Zero Page ($0000-$00FF)
 

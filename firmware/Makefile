@@ -5,7 +5,7 @@ LIB      = n8.lib
 DEST_DIR = ..
 
 # --- Kernel ($F000-$FFFF) ---
-KERNEL_SRC = init.s tty.s interrupt.s vectors.s kentry.s
+KERNEL_SRC = init.s tty.s console.s interrupt.s vectors.s kentry.s
 KERNEL_OBJ = n8_kernel
 KERNEL_CFG = kernel.cfg
 KERNEL_FLAGS = -vm -t none -O --cpu 6502 -C $(KERNEL_CFG) -m $(KERNEL_OBJ).map -Ln $(KERNEL_OBJ).sym
