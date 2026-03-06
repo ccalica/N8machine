@@ -25,4 +25,4 @@ test_demo: test_demo.s demo.cfg
 	$(CL65) -vm -t none --cpu 6502 -C demo.cfg -Wl --dbgfile,$(@).dbg -m $@.map -Ln $@.sym -o $@ $<
 
 clean:
-	-rm -f $(TESTS) test_demo *.o *.map *.sym *.dbg
+	-rm -f $(TESTS) test_demo *.o *.map *.sym *.dbg *.vec
