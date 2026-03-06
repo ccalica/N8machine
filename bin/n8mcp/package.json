@@ -1,0 +1,16 @@
+{
+  "name": "n8mcp",
+  "version": "1.0.0",
+  "description": "MCP server for N8machine 6502 emulator",
+  "type": "module",
+  "bin": {
+    "n8mcp": "./n8mcp.mjs"
+  },
+  "scripts": {
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25 || ^4.0"
+  }
+}

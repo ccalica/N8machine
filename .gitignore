@@ -11,3 +11,4 @@ build/test/
 N8firmware*
 n8_kernel*
 n8_monitor*
+node_modules/
