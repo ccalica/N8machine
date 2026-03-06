@@ -18,7 +18,7 @@ make clean-test   # clean test artifacts only
 
 Run a single test by name: `./n8_test -tc="test name"`
 
-Dependencies: `libsdl2-dev`, OpenGL, `cc65` (firmware only), Node.js (n8gdb only).
+Dependencies: `libsdl2-dev`, OpenGL, `cc65` (firmware only), Node.js (n8gdb/n8mcp).
 
 Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` from CWD).
 
@@ -82,6 +82,69 @@ cc65 toolchain (`cl65 -t none --cpu 6502`). Linker config: `firmware/n8.cfg`. Cu
 
 Playground programs build to 8KB ROM binaries at $E000 with `.sym` files for n8gdb label resolution.
 
+## n8mcp — MCP Server
+
+`bin/n8mcp/n8mcp.mjs` — MCP server for AI-assisted debugging via Claude Code or other MCP clients. Connects to the GDB RSP stub over TCP, exposing 18 tools for emulator control.
+
+**Setup:** Install dependencies once: `cd bin/n8mcp && npm install`
+
+**Configuration** (`~/.claude/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "n8machine": {
+      "command": "node",
+      "args": ["/path/to/N8machine/bin/n8mcp/n8mcp.mjs"],
+      "env": { "N8_HOME": "/path/to/N8machine" }
+    }
+  }
+}
+```
+
+**Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `n8_start` | Start n8 emulator (no-op if running) |
+| `n8_stop` | Stop n8 emulator |
+| `n8_restart` | Restart n8 emulator |
+| `n8_regs` | Read all CPU registers with decoded flags |
+| `n8_write_reg` | Write a register by name (a/x/y/s/p/pc) |
+| `n8_status` | Show running/halted state + registers |
+| `n8_read_memory` | Read memory (hex dump + ASCII) |
+| `n8_write_memory` | Write hex bytes to memory |
+| `n8_load_binary` | Load binary file at address, optionally load .sym |
+| `n8_load_symbols` | Load cc65 .sym file for label resolution |
+| `n8_run` | Continue execution, wait for stop |
+| `n8_step` | Single-step N instructions |
+| `n8_halt` | Interrupt running program |
+| `n8_reset` | Reset CPU via reset vector |
+| `n8_goto` | Set PC and continue |
+| `n8_set_breakpoint` | Set breakpoint at address/label |
+| `n8_clear_breakpoint` | Clear breakpoint |
+| `n8_clear_all_breakpoints` | Clear all breakpoints/watchpoints |
+| `n8_kbd_inject` | Inject keystrokes (e.g. `go north[enter]`) |
+| `n8_console_text` | Read framebuffer as Unicode text |
+| `n8_console_video` | Capture screen as PNG screenshot |
+
+Read-only tools (`n8_regs`, `n8_read_memory`, `n8_status`, `n8_console_text`, `n8_console_video`, `n8_set_breakpoint`, `n8_clear_breakpoint`, `n8_clear_all_breakpoints`, `n8_kbd_inject`) auto-resume the CPU if it was running before the tool call.
+
+Env vars: `N8_HOME` (repo root, required for `n8_start`), `N8GDB_HOST`, `N8GDB_PORT`, `N8GDB_DEBUG`.
+
+Tests: `node bin/n8mcp/test.mjs` (131 tests, mock RSP server, no emulator needed).
+
+## Shared Modules
+
+`bin/shared/` — Reusable code imported by both n8gdb and n8mcp:
+
+| Module | Contents |
+|--------|----------|
+| `address.mjs` | `parseAddr()` — hex/decimal/label address parsing |
+| `symbols.mjs` | `loadSymbols()` — cc65 .sym file loader |
+| `format.mjs` | `hexdump()`, `fmtRegs()`, `fmtStop()`, `hex8()`, `hex16()` |
+| `charmap.mjs` | `N8_CHARMAP` — 256-entry byte-to-Unicode map |
+| `keyboard.mjs` | `parseKeyInput()`, `NAMED_KEYS`, `charToKeycode()` |
+
 ## Key Files
 
 | File | Purpose |
@@ -90,9 +153,12 @@ Playground programs build to 8KB ROM binaries at $E000 with `.sym` files for n8g
 | `src/emulator.cpp` | CPU core, 64KB memory, device router, breakpoint/watchpoint logic |
 | `src/n8_memory_map.h` | All hardware address constants and register definitions |
 | `src/gdb_stub.cpp` | GDB RSP protocol handler + TCP transport thread |
+| `src/gdb_bridge.cpp` | GDB-to-emulator callback bridge (zero coupling) |
 | `src/emu_tty.cpp` | TTY memory-mapped device (raw terminal I/O) |
 | `src/emu_video.cpp` | Video control registers, scroll, VID_DATA streaming |
 | `src/emu_kbd.cpp` | Keyboard registers, IRQ reassertion, key injection |
 | `src/m6502.h` | Vendored 6502 CPU emulator (do not edit) |
-| `bin/n8gdb/rsp.mjs` | Low-level GDB RSP TCP client |
+| `bin/n8gdb/rsp.mjs` | Low-level GDB RSP TCP client (shared by n8gdb + n8mcp) |
 | `bin/n8gdb/n8gdb.mjs` | n8gdb CLI commands and REPL |
+| `bin/n8mcp/n8mcp.mjs` | MCP server for AI-assisted debugging |
+| `bin/shared/` | Shared modules (address, symbols, format, charmap, keyboard) |
