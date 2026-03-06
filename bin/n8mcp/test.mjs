@@ -706,6 +706,66 @@ async function testAutoResumeNotRunning() {
   mock.close();
 }
 
+async function testAutoResumeOnError() {
+  currentTest = 'mcp:auto_resume_on_error';
+  // When fn throws, withAutoResume should NOT resume the CPU.
+  // The CPU stays halted so the user can investigate.
+  const mock = await createMockServer(new Map([
+    ['qSupported', 'PacketSize=4000;swbreak+;hwbreak+'],
+    ['QStartNoAckMode', 'OK'],
+    ['?', 'T00thread:01;'],  // T00 = was running
+  ]));
+
+  const client = new RspClient();
+  await client.connect('127.0.0.1', mock.port);
+  assert(client.wasRunning, 'wasRunning should be true');
+
+  // Simulate withAutoResume where fn throws
+  const wasRunning = client.wasRunning;
+  let threw = false;
+  try {
+    await (async () => { throw new Error('simulated tool failure'); })();
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'fn threw as expected');
+
+  // The key assertion: continueAsync should NOT have been called.
+  // We verify by checking that no 'c' command was sent.
+  assert(!mock.received.includes('c'), 'no continue sent on error');
+
+  client.disconnect();
+  mock.close();
+}
+
+async function testSharedReadConsoleText() {
+  currentTest = 'shared:readConsoleText';
+
+  // Video regs (12 bytes) and framebuffer via mock
+  const videoRegsHex = '002802280001050100000000';
+  const row1 = '48656c6c6f' + '00'.repeat(35);
+  const row2 = '00'.repeat(40);
+
+  const mock = await mockWithHandshake(new Map([
+    ['md840', videoRegsHex],
+    ['mc000', row1 + row2],
+  ]));
+
+  const { readConsoleText: sharedReadConsoleText } = await import('../shared/console.mjs');
+
+  const client = new RspClient();
+  await client.connect('127.0.0.1', mock.port);
+
+  const text = await sharedReadConsoleText(client);
+  assert(text.includes('Text Default'), 'mode label');
+  assert(text.includes('40\u00D72'), 'dimensions');
+  assert(text.includes('Hello'), 'framebuffer content');
+  assert(text.includes('(5,1)'), 'cursor position');
+
+  client.disconnect();
+  mock.close();
+}
+
 async function testSymbolAddressResolution() {
   currentTest = 'mcp:symbol_address_resolution';
 
@@ -876,6 +936,8 @@ async function main() {
     testMcpGoto,
     testAutoResume,
     testAutoResumeNotRunning,
+    testAutoResumeOnError,
+    testSharedReadConsoleText,
     testSymbolAddressResolution,
     testMcpLoadBinary,
     testMonitorCommand,

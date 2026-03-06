@@ -144,6 +144,7 @@ Tests: `node bin/n8mcp/test.mjs` (131 tests, mock RSP server, no emulator needed
 | `format.mjs` | `hexdump()`, `fmtRegs()`, `fmtStop()`, `hex8()`, `hex16()` |
 | `charmap.mjs` | `N8_CHARMAP` — 256-entry byte-to-Unicode map |
 | `keyboard.mjs` | `parseKeyInput()`, `NAMED_KEYS`, `charToKeycode()` |
+| `console.mjs` | `readConsoleText()` — read video regs + framebuffer as Unicode text |
 
 ## Key Files
 

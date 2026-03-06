@@ -24,8 +24,8 @@ import { RspClient } from '../n8gdb/rsp.mjs';
 import { loadSymbols } from '../shared/symbols.mjs';
 import { parseAddr } from '../shared/address.mjs';
 import { hexdump, fmtRegs, fmtStop, hex8, hex16 } from '../shared/format.mjs';
-import { N8_CHARMAP } from '../shared/charmap.mjs';
 import { parseKeyInput } from '../shared/keyboard.mjs';
+import { readConsoleText } from '../shared/console.mjs';
 
 // ── State ────────────────────────────────────────────────────────
 
@@ -56,11 +56,9 @@ function resolveAddr(str) {
 async function withAutoResume(fn) {
   await ensureConnected();
   const wasRunning = client.wasRunning;
-  try {
-    return await fn(client);
-  } finally {
-    if (wasRunning) client.continueAsync();
-  }
+  const result = await fn(client);
+  if (wasRunning) client.continueAsync();
+  return result;
 }
 
 /**
@@ -154,45 +152,6 @@ async function stopN8() {
     await new Promise(r => setTimeout(r, 250));
   }
   return pid;
-}
-
-// ── Console text helper ──────────────────────────────────────────
-
-async function readConsoleText(rsp) {
-  const regs = await rsp.readMemory(0xD840, 12);
-  const mode   = regs[0];
-  const width  = regs[1];
-  const height = regs[2];
-  const stride = regs[3];
-  const curStyle = regs[5];
-  const curCol   = regs[6];
-  const curRow   = regs[7];
-
-  const fbSize = stride * height;
-  if (fbSize === 0 || fbSize > 0x1000) {
-    throw new Error(`Invalid video dimensions: ${width}x${height} stride=${stride}`);
-  }
-
-  const fb = await rsp.readMemory(0xC000, fbSize);
-
-  const modeStr = mode === 0 ? 'Text Default' : mode === 1 ? 'Text Custom' : `0x${hex8(mode)}`;
-  const curModeStr = (curStyle & 0x03) === 0 ? 'off' : (curStyle & 0x03) === 1 ? 'steady' : 'flash';
-  const curShapeStr = (curStyle & 0x0C) === 0x04 ? 'block' : 'underline';
-
-  const lines = [];
-  lines.push(`Mode: ${modeStr}  Size: ${width}\u00D7${height}  Stride: ${stride}  Cursor: (${curCol},${curRow}) ${curModeStr} ${curShapeStr}`);
-  lines.push('\u2500'.repeat(width));
-
-  for (let row = 0; row < height; row++) {
-    let line = '';
-    for (let col = 0; col < width; col++) {
-      const byte = fb[row * stride + col];
-      line += N8_CHARMAP[byte] || '?';
-    }
-    lines.push(line);
-  }
-  lines.push('\u2500'.repeat(width));
-  return lines.join('\n');
 }
 
 // ── MCP Server ───────────────────────────────────────────────────
@@ -618,4 +577,4 @@ main().catch((err) => {
 
 // Export for testing
 export { server, ensureConnected, resolveAddr, withAutoResume, withConnection,
-         readConsoleText, startN8, stopN8, isPortOpen, symbols, addrLabels };
+         startN8, stopN8, isPortOpen, symbols, addrLabels };

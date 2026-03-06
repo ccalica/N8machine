@@ -71,9 +71,9 @@ function fmtRegs(r) {
 function fmtStop(reply) {
   if (!reply) return 'no reply';
   if (reply.startsWith('T05')) {
-    if (reply.includes('watch:')) return `watchpoint (write) hit — ${reply}`;
-    if (reply.includes('rwatch:')) return `watchpoint (read) hit — ${reply}`;
     if (reply.includes('awatch:')) return `watchpoint (access) hit — ${reply}`;
+    if (reply.includes('rwatch:')) return `watchpoint (read) hit — ${reply}`;
+    if (reply.includes('watch:')) return `watchpoint (write) hit — ${reply}`;
     return `breakpoint hit — ${reply}`;
   }
   if (reply.startsWith('T')) return `stopped signal ${parseInt(reply.slice(1, 3), 16)} — ${reply}`;
@@ -229,43 +229,12 @@ async function cmdGoto(client, args) {
 
 import { N8_CHARMAP } from '../shared/charmap.mjs';
 import { parseKeyInput, NAMED_KEYS, charToKeycode } from '../shared/keyboard.mjs';
+import { readConsoleText } from '../shared/console.mjs';
 
 // ── Console text ────────────────────────────────────────────────
 
 async function cmdConsoleText(client) {
-  // Read video registers at $D840 (9 bytes: mode..vsync)
-  const regs = await client.readMemory(0xD840, 9);
-  const mode   = regs[0];
-  const width  = regs[1];
-  const height = regs[2];
-  const stride = regs[3];
-  const curStyle = regs[5];
-  const curCol   = regs[6];
-  const curRow   = regs[7];
-
-  const fbSize = stride * height;
-  if (fbSize === 0 || fbSize > 0x1000) {
-    console.error('Invalid video dimensions');
-    return;
-  }
-
-  const fb = await client.readMemory(0xC000, fbSize);
-
-  const modeStr = mode === 0 ? 'Text Default' : mode === 1 ? 'Text Custom' : `0x${hex8(mode)}`;
-  const curModeStr = (curStyle & 0x03) === 0 ? 'off' : (curStyle & 0x03) === 1 ? 'steady' : 'flash';
-  const curShapeStr = (curStyle & 0x0C) === 0x04 ? 'block' : 'underline';
-  console.log(`Mode: ${modeStr}  Size: ${width}\u00D7${height}  Stride: ${stride}  Cursor: (${curCol},${curRow}) ${curModeStr} ${curShapeStr}`);
-  console.log('\u2500'.repeat(width));
-
-  for (let row = 0; row < height; row++) {
-    let line = '';
-    for (let col = 0; col < width; col++) {
-      const byte = fb[row * stride + col];
-      line += N8_CHARMAP[byte] || '?';
-    }
-    console.log(line);
-  }
-  console.log('\u2500'.repeat(width));
+  console.log(await readConsoleText(client));
 }
 
 // ── Console video ────────────────────────────────────────────────
