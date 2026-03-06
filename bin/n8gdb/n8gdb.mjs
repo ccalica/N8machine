@@ -47,73 +47,26 @@ import { RspClient } from './rsp.mjs';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createInterface } from 'readline';
 
+import { loadSymbols as _loadSymbols } from '../shared/symbols.mjs';
+import { parseAddr as _parseAddr } from '../shared/address.mjs';
+import { hexdump, fmtRegs as _fmtRegs, fmtStop as _fmtStop, hex8, hex16 } from '../shared/format.mjs';
+
 // ── Symbol table ────────────────────────────────────────────────
 
 const symbols = new Map();  // name -> addr
 const addrLabels = new Map();  // addr -> name[]
 
 function loadSymbols(path) {
-  const content = readFileSync(path, 'utf8');
-  let count = 0;
-  for (const line of content.split(/\r?\n/)) {
-    const m = line.match(/^al\s+([0-9a-fA-F]+)\s+\.(\S+)/);
-    if (m) {
-      const addr = parseInt(m[1], 16);
-      const name = m[2];
-      symbols.set(name, addr);
-      if (!addrLabels.has(addr)) addrLabels.set(addr, []);
-      addrLabels.get(addr).push(name);
-      count++;
-    }
-  }
-  return count;
+  return _loadSymbols(path, symbols, addrLabels);
 }
-
-// ── Address parsing ─────────────────────────────────────────────
 
 function parseAddr(str) {
-  if (!str) return NaN;
-  // Label lookup
-  if (symbols.has(str)) return symbols.get(str);
-  // Decimal with # prefix
-  if (str.startsWith('#')) return parseInt(str.slice(1), 10);
-  // Hex with prefix
-  if (str.startsWith('0x') || str.startsWith('0X')) return parseInt(str.slice(2), 16);
-  if (str.startsWith('$')) return parseInt(str.slice(1), 16);
-  // If it contains non-hex chars (without a prefix), it's likely a mistyped label
-  if (/[g-zG-Z_]/.test(str)) return NaN;
-  // Bare hex
-  return parseInt(str, 16);
-}
-
-// ── Output helpers ──────────────────────────────────────────────
-
-function hexdump(buf, baseAddr) {
-  const lines = [];
-  for (let off = 0; off < buf.length; off += 16) {
-    const slice = buf.subarray(off, Math.min(off + 16, buf.length));
-    const hex = Array.from(slice).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    const ascii = Array.from(slice).map(b => (b >= 0x20 && b <= 0x7e) ? String.fromCharCode(b) : '.').join('');
-    const addr = (baseAddr + off).toString(16).padStart(4, '0');
-    lines.push(`${addr}: ${hex.padEnd(48)} ${ascii}`);
-  }
-  return lines.join('\n');
+  return _parseAddr(str, symbols);
 }
 
 function fmtRegs(r) {
-  const lines = [];
-  lines.push(`A:${hex8(r.a)}  X:${hex8(r.x)}  Y:${hex8(r.y)}  S:${hex8(r.s)}  P:${hex8(r.p)}  PC:${hex16(r.pc)}`);
-  const p = r.p;
-  const flags = `N${b(p,7)} V${b(p,6)} -${b(p,5)} B${b(p,4)} D${b(p,3)} I${b(p,2)} Z${b(p,1)} C${b(p,0)}`;
-  lines.push(`Flags: ${flags}`);
-  // Label at PC
-  if (addrLabels.has(r.pc)) lines.push(`  @ ${addrLabels.get(r.pc).join(', ')}`);
-  return lines.join('\n');
+  return _fmtRegs(r, addrLabels);
 }
-
-function hex8(v) { return v.toString(16).padStart(2, '0'); }
-function hex16(v) { return v.toString(16).padStart(4, '0'); }
-function b(v, bit) { return (v >> bit) & 1; }
 
 function fmtStop(reply) {
   if (!reply) return 'no reply';
@@ -274,60 +227,8 @@ async function cmdGoto(client, args) {
   await cmdRegs(client);
 }
 
-// ── N8 character map (byte → Unicode) ───────────────────────────
-
-// prettier-ignore
-const N8_CHARMAP = [
-  // $00-$0F
-  ' ',     '\u263A', '\u25CF', '\u2665', '\u2666', '\u2663', '\u2660', '\u2026',
-  '\u2713', '\u2717', '\u2605', '\u00DF', '\u2190', '\u2192', '\u2191', '\u2193',
-  // $10-$1F
-  '\u21B5', '\u21D0', '\u21D2', '\u21D1', '\u21D3', '\u25B6', '\u25C0', '\u25B2',
-  '\u25BC', '\u2194', '\u2195', '\u2302', '\u266A', '\u266B', '\u00A7', '\u00B6',
-  // $20-$7E: standard ASCII
-  ...Array.from({length: 95}, (_, i) => String.fromCharCode(0x20 + i)),
-  // $7F
-  '\u2310',
-  // $80-$8F: block elements
-  '\u2588', '\u2580', '\u2584', '\u258C', '\u2590', '\u2598', '\u259D', '\u2596',
-  '\u2597', '\u259A', '\u259E', '\u259B', '\u259C', '\u2599', '\u259F', '\u2591',
-  // $90-$9F: shading, thirds, diagonals
-  '\u2592', '\u2593', '\u2594', '\u2581', '\u258F', '\u2595', '\u2586', '\u2582',
-  '\u25E2', '\u25E3', '\u25E4', '\u25E5', '\u2571', '\u2572', '\u2573', '\u25AC',
-  // $A0-$AA: single-line box drawing
-  '\u2500', '\u2502', '\u250C', '\u2510', '\u2514', '\u2518', '\u251C', '\u2524',
-  '\u252C', '\u2534', '\u253C',
-  // $AB-$B5: heavy-line box drawing
-  '\u2501', '\u2503', '\u250F', '\u2513', '\u2517', '\u251B', '\u2523', '\u252B',
-  '\u2533', '\u253B', '\u254B',
-  // $B6-$B9: rounded corners
-  '\u256D', '\u256E', '\u2570', '\u256F',
-  // $BA-$BD: dashed
-  '\u254C', '\u254E', '\u254D', '\u254F',
-  // $BE-$BF: inverted punctuation
-  '\u00A1', '\u00BF',
-  // $C0-$CF: international
-  '\u00C0', '\u00C1', '\u00C4', '\u00C7', '\u00C9', '\u00D1', '\u00D6', '\u00DC',
-  '\u00E0', '\u00E1', '\u00E4', '\u00E7', '\u00E9', '\u00F1', '\u00F6', '\u00FC',
-  // $D0-$D9: geometric
-  '\u25CB', '\u25CE', '\u25A1', '\u25A0', '\u25B3', '\u25B7', '\u25BD', '\u25C1',
-  '\u25C7', '\u2606',
-  // $DA-$DF: dice
-  '\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685',
-  // $E0-$EF: math/greek
-  '\u00B1', '\u00D7', '\u00F7', '\u2260', '\u2264', '\u2265', '\u2248', '\u00B0',
-  '\u221E', '\u221A', '\u03C0', '\u03A3', '\u03C3', '\u03BC', '\u03A9', '\u03B4',
-  // $F0-$F4: currency
-  '\u00A2', '\u00A3', '\u00A5', '\u20AC', '\u00A4',
-  // $F5-$F9: electronics
-  '\u23FB', '\u23DA', '\u26A1', '\u2316', '\u2318',
-  // $FA-$FB: copyright/registered
-  '\u00A9', '\u00AE',
-  // $FC-$FD: guillemets
-  '\u00AB', '\u00BB',
-  // $FE-$FF: N8 two-thirds blocks (closest Unicode approx)
-  '\u258A', '\u258E',
-];
+import { N8_CHARMAP } from '../shared/charmap.mjs';
+import { parseKeyInput, NAMED_KEYS, charToKeycode } from '../shared/keyboard.mjs';
 
 // ── Console text ────────────────────────────────────────────────
 
@@ -433,34 +334,9 @@ function cmdHelp() {
   ].join('\n'));
 }
 
-// ── Named keys and auto-modifier tables ─────────────────────────
-
-const NAMED_KEYS = {
-  enter: 0x0D, return: 0x0D, cr: 0x0D,
-  backspace: 0x08, bs: 0x08,
-  tab: 0x09,
-  esc: 0x1B, escape: 0x1B,
-  delete: 0x0F, del: 0x0F,
-  space: 0x20,
-  up: 0x01, down: 0x02, left: 0x03, right: 0x04,
-  home: 0x05, end: 0x06, pageup: 0x0A, pagedown: 0x0B, insert: 0x0E,
-  printscreen: 0x10, pause: 0x11,
-  f1: 0x80, f2: 0x81, f3: 0x82, f4: 0x83, f5: 0x84, f6: 0x85,
-  f7: 0x86, f8: 0x87, f9: 0x88, f10: 0x89, f11: 0x8A, f12: 0x8B,
-};
-
-function charToKeycode(ch) {
-  const code = ch.charCodeAt(0);
-  // Printable ASCII $20-$7E: send ASCII code directly as keycode
-  // (N8 keycode space includes the full printable ASCII range)
-  if (code >= 0x20 && code <= 0x7E) {
-    return { keycode: code, modifiers: 0x00 };
-  }
-  return null;
-}
+// ── Keyboard injection ──────────────────────────────────────────
 
 async function cmdKbdInject(client, args) {
-  // Parse modifier flags
   let extraMod = 0;
   const inputArgs = [];
   for (let i = 0; i < args.length; i++) {
@@ -483,49 +359,8 @@ async function cmdKbdInject(client, args) {
   }
 
   const input = inputArgs.join(' ');
-  const keys = [];  // [{keycode, modifiers}, ...]
-
-  // Parse input as inline text with [named_key] and [0xNN] sequences.
-  // Bare text characters are sent as ASCII keycodes.
-  // [enter], [backspace], [up], [0x41], etc. insert named/hex keys inline.
-  let i = 0;
-  while (i < input.length) {
-    if (input[i] === '\\' && i + 1 < input.length && input[i + 1] === 'n') {
-      keys.push({ keycode: 0x0D, modifiers: extraMod });
-      i += 2;
-    } else if (input[i] === '[') {
-      const close = input.indexOf(']', i + 1);
-      if (close === -1) {
-        // No closing bracket — treat '[' as literal char
-        const kc = charToKeycode(input[i]);
-        if (!kc) { console.error(`Cannot map character: ${input[i]}`); return; }
-        keys.push({ keycode: kc.keycode, modifiers: kc.modifiers | extraMod });
-        i++;
-        continue;
-      }
-      const tag = input.slice(i + 1, close);
-      const tagLower = tag.toLowerCase();
-      if (tagLower in NAMED_KEYS) {
-        keys.push({ keycode: NAMED_KEYS[tagLower], modifiers: extraMod });
-      } else {
-        // Try hex keycode: [0x41] or [$41]
-        const addr = parseAddr(tag);
-        if (!isNaN(addr) && addr <= 0xFF) {
-          keys.push({ keycode: addr, modifiers: extraMod });
-        } else {
-          console.error(`Unknown key name: [${tag}]`);
-          return;
-        }
-      }
-      i = close + 1;
-    } else {
-      const kc = charToKeycode(input[i]);
-      if (!kc) { console.error(`Cannot map character: ${input[i]}`); return; }
-      keys.push({ keycode: kc.keycode, modifiers: kc.modifiers | extraMod });
-      i++;
-    }
-  }
-
+  const { keys, error } = parseKeyInput(input, extraMod, parseAddr);
+  if (error) { console.error(error); return; }
   if (keys.length === 0) { console.error('No keys to inject'); return; }
   if (keys.length > 32) {
     console.error(`Too many keys (${keys.length}): limit is 32 to avoid keyboard buffer overflow`);

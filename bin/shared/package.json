@@ -1,0 +1,6 @@
+{
+  "name": "n8-shared",
+  "version": "1.0.0",
+  "description": "Shared utilities for N8machine tools",
+  "type": "module"
+}
