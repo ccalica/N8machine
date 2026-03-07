@@ -86,48 +86,6 @@ TEST_SUITE("keyboard") {
     }
 
     // -------------------------------------------------------------------------
-    // T156: KBD_CTRL IRQ_EN=1: inject sets IRQ bit 2
-    // -------------------------------------------------------------------------
-
-    TEST_CASE("T156: KBD_CTRL IRQ_EN enables IRQ on inject") {
-        EmulatorFixture f;
-        // Enable IRQ
-        uint64_t pc = make_write_pins(N8_KBD_BASE + N8_KBD_CTRL, N8_KBD_CTRL_IRQ_EN);
-        kbd_decode(pc, N8_KBD_CTRL);
-        // Inject key
-        kbd_inject_key(0x41, 0x00);
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) != 0);
-    }
-
-    // -------------------------------------------------------------------------
-    // T157: KBD_CTRL IRQ_EN=0: inject does NOT set IRQ
-    // -------------------------------------------------------------------------
-
-    TEST_CASE("T157: KBD_CTRL IRQ_EN=0 does not set IRQ") {
-        EmulatorFixture f;
-        // IRQ disabled by default (ctrl=0)
-        kbd_inject_key(0x41, 0x00);
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) == 0);
-    }
-
-    // -------------------------------------------------------------------------
-    // T158: ACK deasserts IRQ bit 2 when buffer fully drained
-    // -------------------------------------------------------------------------
-
-    TEST_CASE("T158: ACK deasserts IRQ bit 2") {
-        EmulatorFixture f;
-        // Enable IRQ and inject
-        uint64_t pc = make_write_pins(N8_KBD_BASE + N8_KBD_CTRL, N8_KBD_CTRL_IRQ_EN);
-        kbd_decode(pc, N8_KBD_CTRL);
-        kbd_inject_key(0x41, 0x00);
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) != 0);
-        // ACK
-        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
-        kbd_decode(pa, N8_KBD_ACK);
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) == 0);
-    }
-
-    // -------------------------------------------------------------------------
     // T159: Modifier bits reflect front entry in status
     // -------------------------------------------------------------------------
 
@@ -213,39 +171,6 @@ TEST_SUITE("keyboard") {
         uint64_t p = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
         kbd_decode(p, N8_KBD_ACK);
         CHECK(kbd_data_available() == false);
-    }
-
-    // -------------------------------------------------------------------------
-    // T165: kbd_tick() reasserts IRQ when data avail + IRQ enabled
-    // -------------------------------------------------------------------------
-
-    TEST_CASE("T165: kbd_tick reasserts IRQ") {
-        EmulatorFixture f;
-        // Enable IRQ
-        uint64_t pc = make_write_pins(N8_KBD_BASE + N8_KBD_CTRL, N8_KBD_CTRL_IRQ_EN);
-        kbd_decode(pc, N8_KBD_CTRL);
-        // Inject key
-        kbd_inject_key(0x41, 0x00);
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) != 0);
-        // Simulate IRQ_CLR
-        mem[N8_IRQ_FLAGS] = 0x00;
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) == 0);
-        // kbd_tick should reassert
-        kbd_tick();
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) != 0);
-    }
-
-    // -------------------------------------------------------------------------
-    // T166: kbd_tick() does NOT assert IRQ when IRQ disabled
-    // -------------------------------------------------------------------------
-
-    TEST_CASE("T166: kbd_tick does not assert IRQ when disabled") {
-        EmulatorFixture f;
-        // IRQ disabled (default)
-        kbd_inject_key(0x41, 0x00);
-        mem[N8_IRQ_FLAGS] = 0x00;
-        kbd_tick();
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) == 0);
     }
 
     // -------------------------------------------------------------------------
@@ -342,28 +267,6 @@ TEST_SUITE("keyboard") {
         CHECK(kbd_data_available() == true);
         // Front advanced to second key
         CHECK(kbd_get_data() == 0x02);
-    }
-
-    // -------------------------------------------------------------------------
-    // T204: kbd_tick() reasserts IRQ after partial drain
-    // -------------------------------------------------------------------------
-
-    TEST_CASE("T204: kbd_tick reasserts IRQ after partial drain") {
-        EmulatorFixture f;
-        // Enable IRQ
-        uint64_t pc = make_write_pins(N8_KBD_BASE + N8_KBD_CTRL, N8_KBD_CTRL_IRQ_EN);
-        kbd_decode(pc, N8_KBD_CTRL);
-        // Inject two keys
-        kbd_inject_key(0x41, 0x00);
-        kbd_inject_key(0x42, 0x00);
-        // ACK first key
-        uint64_t pa = make_write_pins(N8_KBD_BASE + N8_KBD_ACK, 0x00);
-        kbd_decode(pa, N8_KBD_ACK);
-        // Simulate IRQ_CLR
-        mem[N8_IRQ_FLAGS] = 0x00;
-        // kbd_tick should reassert (buffer still has 0x42)
-        kbd_tick();
-        CHECK((mem[N8_IRQ_FLAGS] & (1 << N8_IRQ_BIT_KBD)) != 0);
     }
 
     // -------------------------------------------------------------------------

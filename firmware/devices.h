@@ -9,7 +9,6 @@
 /* --- System / IRQ (slot 0) --- */
 #define N8_IRQ_FLAGS        0xD800
 #define N8_IRQ_BIT_TTY      1
-#define N8_IRQ_BIT_KBD      2
 
 /* --- TTY (slot 1) --- */
 #define N8_TTY_OUT_STATUS   0xD820
@@ -67,9 +66,6 @@
 #define N8_KBD_STAT_CTRL      0x08
 #define N8_KBD_STAT_ALT       0x10
 #define N8_KBD_STAT_CAPS      0x20
-
-/* KBD_CTRL bits */
-#define N8_KBD_CTRL_IRQ_EN    0x01
 
 /* --- Frame Buffer --- */
 #define N8_FB_BASE          0xC000

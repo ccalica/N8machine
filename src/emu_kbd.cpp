@@ -1,5 +1,4 @@
 #include "emu_kbd.h"
-#include "emulator.h"
 #include "n8_memory_map.h"
 #include "m6502.h"
 
@@ -17,15 +16,12 @@ static int kbd_head  = 0;   // index of front (next to read)
 static int kbd_tail  = 0;   // index of next write position
 static int kbd_count = 0;   // number of entries in buffer
 static uint8_t kbd_overflow = 0x00;  // N8_KBD_STAT_OVERFLOW if set
-static uint8_t kbd_ctrl = 0x00;
 
 void kbd_init()  { kbd_reset(); }
 
 void kbd_reset() {
     kbd_head = kbd_tail = kbd_count = 0;
     kbd_overflow = 0x00;
-    kbd_ctrl = 0x00;
-    emu_clr_irq(N8_IRQ_BIT_KBD);
 }
 
 void kbd_inject_key(uint8_t keycode, uint8_t modifiers) {
@@ -37,16 +33,6 @@ void kbd_inject_key(uint8_t keycode, uint8_t modifiers) {
     kbd_buf[kbd_tail].modifiers = modifiers & N8_KBD_MODIFIER_MASK;
     kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
     kbd_count++;
-
-    if (kbd_ctrl & N8_KBD_CTRL_IRQ_EN) {
-        emu_set_irq(N8_IRQ_BIT_KBD);
-    }
-}
-
-void kbd_tick() {
-    if (kbd_count > 0 && (kbd_ctrl & N8_KBD_CTRL_IRQ_EN)) {
-        emu_set_irq(N8_IRQ_BIT_KBD);
-    }
 }
 
 void kbd_decode(uint64_t& pins, uint8_t reg) {
@@ -63,17 +49,13 @@ void kbd_decode(uint64_t& pins, uint8_t reg) {
                 val = avail | kbd_overflow | mods;
                 break;
             }
-            case N8_KBD_CTRL:
-                val = kbd_ctrl;
-                break;
             default:
-                val = 0x00;
+                val = 0x00;  // KBD_CTRL and reserved regs read 0
                 break;
         }
         M6502_SET_DATA(pins, val);
     } else {
         // Write
-        uint8_t val = M6502_GET_DATA(pins);
         switch (reg) {
             case N8_KBD_ACK:  // offset 1 write = acknowledge
                 if (kbd_count > 0) {
@@ -81,15 +63,9 @@ void kbd_decode(uint64_t& pins, uint8_t reg) {
                     kbd_count--;
                 }
                 kbd_overflow = 0x00;  // always clear overflow on ACK
-                if (kbd_count == 0) {
-                    emu_clr_irq(N8_IRQ_BIT_KBD);
-                }
-                break;
-            case N8_KBD_CTRL:
-                kbd_ctrl = val & N8_KBD_CTRL_IRQ_EN;
                 break;
             default:
-                break;  // KBD_DATA is read-only
+                break;  // KBD_DATA read-only, KBD_CTRL reserved
         }
     }
 }

@@ -186,7 +186,7 @@ n8gdb run
 (type in emulator window — text appears on Screen)
 ```
 
-**Tests:** `kbd_inject`, `console_text`, keyboard IRQ, video scroll
+**Tests:** `kbd_inject`, `console_text`, keyboard polling, video scroll
 
 ### test_benchmark — 6502 cycle benchmark
 

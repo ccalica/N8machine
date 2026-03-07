@@ -200,14 +200,14 @@ ROM deferred to future work (likely via bank switching into a Dev Bank).
 ## Keyboard — `$D860` (Phase 1)
 
 8-byte block. Teensy 4.1 handles USB HID-to-ASCII conversion.
-Apple II-style: poll or IRQ, read data, acknowledge.
+Apple II-style: poll, read data, acknowledge.
 
 | Address         | R/W | Name       | Description                                                                             |
 | ---------------:| --- | ---------- | --------------------------------------------------------------------------------------- |
 | `$D860`         | R   | KBD_DATA   | Key code. `$00–$7F` = ASCII, `$80–$FF` = extended (see [keycodes.md](keycodes.md)) |
 | `$D861`         | R   | KBD_STATUS | Flags + live modifier state (see bits below)                                            |
-| `$D861`         | W   | KBD_ACK    | Write any value: clears DATA_AVAIL, OVERFLOW, deasserts IRQ                             |
-| `$D862`         | R/W | KBD_CTRL   | Bit 0 = IRQ enable (default 0 = polling only)                                           |
+| `$D861`         | W   | KBD_ACK    | Write any value: pops front entry, clears OVERFLOW                                      |
+| `$D862`         | —   | KBD_CTRL   | Reserved (reads 0, writes ignored)                                                      |
 | `$D863`–`$D867` | —   | —          | Reserved (Phase 2)                                                                      |
 
 **KBD_STATUS bits (read-only):**

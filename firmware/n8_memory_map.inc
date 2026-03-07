@@ -4,7 +4,6 @@
 ; --- System / IRQ (slot 0) ---
 .define N8_IRQ_FLAGS      $D800
 .define N8_IRQ_BIT_TTY    1
-.define N8_IRQ_BIT_KBD    2
 
 ; --- TTY (slot 1) ---
 .define N8_TTY_OUT_STATUS $D820
@@ -82,9 +81,6 @@
 .define N8_KBD_STAT_CTRL      $08
 .define N8_KBD_STAT_ALT       $10
 .define N8_KBD_STAT_CAPS      $20
-
-; KBD_CTRL bits
-.define N8_KBD_CTRL_IRQ_EN    $01
 
 ; Key codes — control & nav ($00-$1F)
 .define N8_KEY_NONE        $00

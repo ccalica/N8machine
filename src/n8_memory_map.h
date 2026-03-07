@@ -33,7 +33,6 @@
 
 // --- IRQ Bits ---
 #define N8_IRQ_BIT_TTY     1
-#define N8_IRQ_BIT_KBD     2
 
 // --- TTY Device (slot 1) ---
 #define N8_TTY_BASE        0xD820
@@ -122,9 +121,6 @@
 
 // KBD modifier mask (SHIFT|CTRL|ALT|CAPS)
 #define N8_KBD_MODIFIER_MASK (N8_KBD_STAT_SHIFT | N8_KBD_STAT_CTRL | N8_KBD_STAT_ALT | N8_KBD_STAT_CAPS)
-
-// KBD_CTRL bits
-#define N8_KBD_CTRL_IRQ_EN   0x01
 
 // Key codes — control & nav ($00-$1F)
 #define N8_KEY_NONE        0x00

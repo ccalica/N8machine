@@ -153,7 +153,7 @@ cursor_off:
 | KBD_DATA   | $D860 | R  | Front keycode from FIFO |
 | KBD_STATUS | $D861 | R  | bit0=available, bit1=overflow, bits2-5=modifiers |
 | KBD_ACK    | $D861 | W  | Write $01 to pop front entry |
-| KBD_CTRL   | $D862 | RW | bit0=IRQ enable |
+| KBD_CTRL   | $D862 | -- | Reserved |
 
 Polling loop:
 ```asm

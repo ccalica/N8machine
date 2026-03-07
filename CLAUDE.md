@@ -45,7 +45,7 @@ Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` 
 
 **Main loop** (`src/main.cpp`): Each frame polls `gdb_stub_poll()` for GDB commands, then runs `emulator_step()` in a ~13ms time slice. Breakpoint/watchpoint hits call `gdb_stub_notify_stop()` to send async stop replies. SDL keyboard events are translated to N8 keycodes via `sdl_to_n8_keycode()` and injected via `kbd_inject_key()`.
 
-**IRQ mechanism:** `mem[$D800]` is the IRQ flag register. `IRQ_CLR()` zeros it every tick; devices reassert via their tick functions (`tty_tick()`, `kbd_tick()`). TTY asserts bit 1, keyboard asserts bit 2.
+**IRQ mechanism:** `mem[$D800]` is the IRQ flag register. `IRQ_CLR()` zeros it every tick; devices reassert via their tick functions (`tty_tick()`). TTY asserts bit 1. Keyboard is polling-only (no IRQ).
 
 ## Testing
 
@@ -157,7 +157,7 @@ Tests: `node bin/n8mcp/test.mjs` (131 tests, mock RSP server, no emulator needed
 | `src/gdb_bridge.cpp` | GDB-to-emulator callback bridge (zero coupling) |
 | `src/emu_tty.cpp` | TTY memory-mapped device (raw terminal I/O) |
 | `src/emu_video.cpp` | Video control registers, scroll, VID_DATA streaming |
-| `src/emu_kbd.cpp` | Keyboard registers, IRQ reassertion, key injection |
+| `src/emu_kbd.cpp` | Keyboard registers, FIFO buffer, key injection |
 | `src/m6502.h` | Vendored 6502 CPU emulator (do not edit) |
 | `bin/n8gdb/rsp.mjs` | Low-level GDB RSP TCP client (shared by n8gdb + n8mcp) |
 | `bin/n8gdb/n8gdb.mjs` | n8gdb CLI commands and REPL |

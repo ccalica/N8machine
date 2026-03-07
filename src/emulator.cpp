@@ -142,7 +142,6 @@ void emulator_step() {
         // IRQ tick: clear all flags, let devices reassert, then update pin
         IRQ_CLR();
         tty_tick(pins);
-        kbd_tick();
         if (mem[N8_IRQ_FLAGS] != 0)
             pins |= M6502_IRQ;
         else
