@@ -47,7 +47,7 @@ The 8KB ROM region ($E000-$FFFF) is split into two separately-built binaries:
 
 | Binary       | Range           | Size | Linker Config  |
 |-------------|-----------------|------|----------------|
-| `n8_monitor` | `$E000-$EFFF`  | 4 KB | `monitor.cfg`  |
+| `n8_shell`   | `$E000-$EFFF`  | 4 KB | `shell.cfg`    |
 | `n8_kernel`  | `$F000-$FFFF`  | 4 KB | `kernel.cfg`   |
 
 ### Kernel Segments (kernel.cfg)

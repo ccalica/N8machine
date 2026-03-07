@@ -43,22 +43,25 @@ int tty_kbhit() {
 int getch() {
     int r;
     unsigned char c;
-    if ((r=read(0, &c, sizeof(c))) < 0) {
-        return r;
+    if ((r = read(0, &c, sizeof(c))) <= 0) {
+        return -1;
     }
     return c;
 }
 
+static bool tty_stdin_eof = false;
+
 void tty_tick(uint64_t &pins) {
-    if(tty_buff.size() > 0) { 
+    if(tty_buff.size() > 0) {
         emu_set_irq(N8_IRQ_BIT_TTY);
     }
-    if(!tty_kbhit()) {
+    if(tty_stdin_eof || !tty_kbhit()) {
         return;
     }
     int c;
-    if((c = getch()) < 0) { // error condition
-        exit(-1);
+    if((c = getch()) < 0) {
+        tty_stdin_eof = true;   // EOF or error — stop polling stdin
+        return;
     }
     tty_buff.push((uint8_t (c & 0xff)));
     emu_set_irq(N8_IRQ_BIT_TTY);

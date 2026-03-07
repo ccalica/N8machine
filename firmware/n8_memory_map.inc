@@ -119,9 +119,9 @@
 .define N8_ROM_SIZE       $2000
 .define N8_ROM_END        $FFFF
 
-; --- Monitor ($E000-$EFFF, 4KB) ---
-.define N8_MONITOR_BASE   $E000
-.define N8_MONITOR_SIZE   $1000
+; --- Shell ($E000-$EFFF, 4KB) ---
+.define N8_SHELL_BASE     $E000
+.define N8_SHELL_SIZE     $1000
 
 ; --- Kernel ($F000-$FFFF, 4KB) ---
 .define N8_KERNEL_BASE    $F000

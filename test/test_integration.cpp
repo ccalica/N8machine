@@ -2,7 +2,7 @@
 #include "test_helpers.h"
 
 extern const char *kernel_file;
-extern const char *monitor_file;
+extern const char *shell_file;
 
 TEST_SUITE("integration") {
 
@@ -175,9 +175,9 @@ TEST_SUITE("integration") {
     TEST_CASE("T170: emulator_loadrom places kernel at $F000 and monitor at $E000") {
         EmulatorFixture f;
         const char *old_kernel = kernel_file;
-        const char *old_monitor = monitor_file;
+        const char *old_monitor = shell_file;
         kernel_file = "/tmp/n8_test_kernel_170.bin";
-        monitor_file = "/tmp/n8_test_monitor_170.bin";
+        shell_file = "/tmp/n8_test_monitor_170.bin";
 
         // Write a small kernel ROM: 16 bytes at $F000
         FILE *fp = fopen(kernel_file, "w");
@@ -188,7 +188,7 @@ TEST_SUITE("integration") {
         fclose(fp);
 
         // Write a small monitor ROM: 16 bytes at $E000
-        fp = fopen(monitor_file, "w");
+        fp = fopen(shell_file, "w");
         REQUIRE(fp != nullptr);
         uint8_t mon_data[] = {0xA2, 0x55, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA,
                               0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA, 0xEA};
@@ -202,7 +202,7 @@ TEST_SUITE("integration") {
         CHECK(mem[0xE001] == 0x55);
 
         kernel_file = old_kernel;
-        monitor_file = old_monitor;
+        shell_file = old_monitor;
     }
 
     // -------------------------------------------------------------------------
@@ -252,9 +252,9 @@ TEST_SUITE("integration") {
     TEST_CASE("T174: Oversized kernel is truncated to 4KB at $F000") {
         EmulatorFixture f;
         const char *old_kernel = kernel_file;
-        const char *old_monitor = monitor_file;
+        const char *old_monitor = shell_file;
         kernel_file = "/tmp/n8_test_kernel_174.bin";
-        monitor_file = "/tmp/n8_test_monitor_174_empty.bin";
+        shell_file = "/tmp/n8_test_monitor_174_empty.bin";
 
         // Write an 8KB kernel (oversized — should truncate to 4KB)
         FILE *fp = fopen(kernel_file, "w");
@@ -268,7 +268,7 @@ TEST_SUITE("integration") {
         fclose(fp);
 
         // Write an empty monitor so load doesn't error
-        fp = fopen(monitor_file, "w");
+        fp = fopen(shell_file, "w");
         REQUIRE(fp != nullptr);
         fclose(fp);
 
@@ -280,7 +280,7 @@ TEST_SUITE("integration") {
         CHECK(mem[0xE000] == 0x00);
 
         kernel_file = old_kernel;
-        monitor_file = old_monitor;
+        shell_file = old_monitor;
     }
 
     // -------------------------------------------------------------------------
