@@ -14,7 +14,7 @@
 std::list<std::string> labels[65536];
 
 const char *kernel_label_file = "n8_kernel.sym";
-const char *monitor_label_file = "n8_monitor.sym";
+const char *shell_label_file = "n8_shell.sym";
 void emu_labels_add(uint16_t addr, char * label) {
     labels[addr].remove(label);
     labels[addr].emplace_back(label);
@@ -86,7 +86,7 @@ static void load_label_file(const char *path) {
 void emu_labels_load() {
     emu_labels_clear();
     load_label_file(kernel_label_file);
-    load_label_file(monitor_label_file);
+    load_label_file(shell_label_file);
 }
 
 void emu_labels_init() {
