@@ -219,16 +219,15 @@ The parser knows CL expects exactly 1 payload byte after the comma.
 Close the file, free channel_id for reuse.
 Closing an already-closed or invalid channel returns command error $04.
 
-**SEEK** — `"SK,<type><lo><hi>"`
-Fixed-length binary payload: type byte + LE uint16 offset, then null terminator.
-The parser knows SK expects exactly 3 payload bytes before the null. Binary bytes
-may contain $00 safely — the parser counts bytes, not scans for null within payload.
-If null arrives before all 3 bytes, command error $09 (invalid syntax).
+**SEEK** — `"SK,<chan_id>,<type>,<lo><hi>"`
+Binary payload: channel ID, comma, type byte, comma, LE uint16 offset, then null
+terminator. The parser knows SK expects exactly 6 payload bytes after the first
+comma. Binary bytes (chan_id, lo, hi) may contain $00 safely — the parser counts
+bytes, not scans for null within payload.
 
-Type byte:
-- `A` — absolute (from start)
-- `+` — relative forward
-- `-` — relative backward
+- `chan_id` — data channel (0x00-0x0E), binary byte
+- `type` — `A` (absolute from start), `+` (relative forward), `-` (relative backward)
+- `lo`, `hi` — LE uint16 offset, binary bytes
 
 Returns $00 via DISK_DATA on success, command error code on failure.
 Not valid on append-mode channels (command error $0A).

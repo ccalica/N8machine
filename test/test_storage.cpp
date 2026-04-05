@@ -102,6 +102,39 @@ struct StorageFixture {
         return read_reg(N8_DISK_DATA);
     }
 
+    // Helper: send CLOSE command with binary channel ID
+    void send_close(uint8_t chan_id) {
+        write_reg(N8_DISK_CHAN, N8_DISK_CONTROL_CHAN);
+        write_reg(N8_DISK_DATA, 'C');
+        write_reg(N8_DISK_DATA, 'L');
+        write_reg(N8_DISK_DATA, ',');
+        write_reg(N8_DISK_DATA, chan_id);  // binary byte
+        write_reg(N8_DISK_DATA, 0x00);    // null terminate
+    }
+
+    // Helper: send SEEK command — "SK,<chan_id>,<type>,<lo><hi>"
+    void send_seek(uint8_t chan_id, uint8_t type, uint16_t offset) {
+        write_reg(N8_DISK_CHAN, N8_DISK_CONTROL_CHAN);
+        write_reg(N8_DISK_DATA, 'S');
+        write_reg(N8_DISK_DATA, 'K');
+        write_reg(N8_DISK_DATA, ',');
+        write_reg(N8_DISK_DATA, chan_id);
+        write_reg(N8_DISK_DATA, ',');
+        write_reg(N8_DISK_DATA, type);
+        write_reg(N8_DISK_DATA, ',');
+        write_reg(N8_DISK_DATA, (uint8_t)(offset & 0xFF));
+        write_reg(N8_DISK_DATA, (uint8_t)(offset >> 8));
+        write_reg(N8_DISK_DATA, 0x00);
+    }
+
+    // Helper: open file for writing and return channel id
+    uint8_t open_file_write(const char* filename) {
+        char cmd[128];
+        snprintf(cmd, sizeof(cmd), "OP,W,%s", filename);
+        send_command(cmd);
+        return get_cmd_result();
+    }
+
     // Helper: read all data from a channel into a vector
     std::vector<uint8_t> read_channel(uint8_t chan_id) {
         std::vector<uint8_t> data;
@@ -302,9 +335,104 @@ TEST_SUITE("storage") {
         CHECK(s.get_cmd_error() == N8_DISK_CE_FILE_EXISTS);
     }
 
-    TEST_CASE("OPEN W: returns bad arg (Phase 1)") {
+    TEST_CASE("OPEN W: creates new file") {
         StorageFixture s;
-        s.send_command("OP,W,test.txt");
+        s.send_command("OP,W,newfile.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+
+        // Write some bytes
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.write_reg(N8_DISK_DATA, 'H');
+        s.write_reg(N8_DISK_DATA, 'i');
+
+        // Close
+        s.send_close(ch);
+        CHECK(!s.has_cmd_error());
+
+        // Reopen for reading and verify
+        s.send_command("OP,R,newfile.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        CHECK(data.size() == 2);
+        CHECK(data[0] == 'H');
+        CHECK(data[1] == 'i');
+    }
+
+    TEST_CASE("OPEN W: truncates existing file") {
+        StorageFixture s;
+        s.create_file("existing.txt", "old content");
+
+        s.send_command("OP,W,existing.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.write_reg(N8_DISK_DATA, 'N');
+        s.write_reg(N8_DISK_DATA, 'W');
+        s.send_close(ch);
+
+        // Read back — should only have "NW", not old content
+        s.send_command("OP,R,existing.txt");
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        CHECK(data.size() == 2);
+        CHECK(data[0] == 'N');
+        CHECK(data[1] == 'W');
+    }
+
+    TEST_CASE("OPEN A: appends to existing file") {
+        StorageFixture s;
+        s.create_file("append.txt", "AB");
+
+        s.send_command("OP,A,append.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.write_reg(N8_DISK_DATA, 'C');
+        s.write_reg(N8_DISK_DATA, 'D');
+        s.send_close(ch);
+
+        // Read back
+        s.send_command("OP,R,append.txt");
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "ABCD");
+    }
+
+    TEST_CASE("OPEN A: creates new file if missing") {
+        StorageFixture s;
+        s.send_command("OP,A,newappend.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.write_reg(N8_DISK_DATA, 'X');
+        s.send_close(ch);
+
+        s.send_command("OP,R,newappend.txt");
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        CHECK(data.size() == 1);
+        CHECK(data[0] == 'X');
+    }
+
+    TEST_CASE("read on write channel sets error $04") {
+        StorageFixture s;
+        s.send_command("OP,W,wfile.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.read_reg(N8_DISK_DATA);
+        CHECK(s.read_reg(N8_DISK_ERROR) == N8_DISK_IOE_PERMISSION);
+    }
+
+    TEST_CASE("OPEN: invalid mode returns bad arg") {
+        StorageFixture s;
+        s.send_command("OP,X,test.txt");
         CHECK(s.has_cmd_error());
         CHECK(s.get_cmd_error() == N8_DISK_CE_BAD_ARG);
     }
@@ -383,10 +511,8 @@ TEST_SUITE("storage") {
         s.send_command("OP,R,test.txt");
         uint8_t ch = s.get_cmd_result();
 
-        // Close it
-        char cmd[8];
-        snprintf(cmd, sizeof(cmd), "CL,%X", ch);
-        s.send_command(cmd);
+        // Close it (binary channel ID)
+        s.send_close(ch);
         CHECK(!s.has_cmd_error());
 
         // Verify closed
@@ -396,7 +522,7 @@ TEST_SUITE("storage") {
 
     TEST_CASE("CLOSE: closing closed channel returns error $04") {
         StorageFixture s;
-        s.send_command("CL,0");
+        s.send_close(0x00);
         CHECK(s.has_cmd_error());
         CHECK(s.get_cmd_error() == N8_DISK_CE_CHAN_NOT_OPEN);
     }
@@ -408,9 +534,7 @@ TEST_SUITE("storage") {
         s.send_command("OP,R,test.txt");
         uint8_t ch = s.get_cmd_result();
 
-        char cmd[8];
-        snprintf(cmd, sizeof(cmd), "CL,%X", ch);
-        s.send_command(cmd);
+        s.send_close(ch);
 
         // Should be able to reopen
         s.send_command("OP,R,test.txt");
@@ -728,5 +852,332 @@ TEST_SUITE("storage") {
         StorageFixture s;
         s.write_reg(N8_DISK_CHAN, 0x00);
         CHECK(storage_get_status() == 0x00);
+    }
+
+    // =========================================================================
+    // SEEK
+    // =========================================================================
+
+    TEST_CASE("SEEK: absolute seek on read channel") {
+        StorageFixture s;
+        s.create_file("seektest.txt", "ABCDEFGHIJ");
+
+        s.send_command("OP,R,seektest.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        // Read 3 bytes to advance
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.read_reg(N8_DISK_DATA);  // A
+        s.read_reg(N8_DISK_DATA);  // B
+        s.read_reg(N8_DISK_DATA);  // C
+
+        // Seek absolute to position 5
+        s.send_seek(ch, 'A', 5);
+        CHECK(!s.has_cmd_error());
+
+        // Read should return 'F'
+        s.write_reg(N8_DISK_CHAN, ch);
+        CHECK(s.read_reg(N8_DISK_DATA) == 'F');
+    }
+
+    TEST_CASE("SEEK: relative forward on read channel") {
+        StorageFixture s;
+        s.create_file("seektest.txt", "ABCDEFGHIJ");
+
+        s.send_command("OP,R,seektest.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        // Read 2 bytes (logical pos = 2)
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.read_reg(N8_DISK_DATA);  // A
+        s.read_reg(N8_DISK_DATA);  // B
+
+        // Seek forward 3 (logical pos 2 + 3 = 5)
+        s.send_seek(ch, '+', 3);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        CHECK(s.read_reg(N8_DISK_DATA) == 'F');
+    }
+
+    TEST_CASE("SEEK: relative backward on read channel") {
+        StorageFixture s;
+        s.create_file("seektest.txt", "ABCDEFGHIJ");
+
+        s.send_command("OP,R,seektest.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        // Read 5 bytes
+        s.write_reg(N8_DISK_CHAN, ch);
+        for (int i = 0; i < 5; i++) s.read_reg(N8_DISK_DATA);
+
+        // Seek backward 3 (5 - 3 = 2)
+        s.send_seek(ch, '-', 3);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        CHECK(s.read_reg(N8_DISK_DATA) == 'C');
+    }
+
+    TEST_CASE("SEEK: on write channel") {
+        StorageFixture s;
+
+        // Write ABCDE
+        s.send_command("OP,W,seekwrite.txt");
+        uint8_t ch = s.get_cmd_result();
+        s.write_reg(N8_DISK_CHAN, ch);
+        for (char c = 'A'; c <= 'E'; c++)
+            s.write_reg(N8_DISK_DATA, c);
+
+        // Seek absolute to 2, overwrite
+        s.send_seek(ch, 'A', 2);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.write_reg(N8_DISK_DATA, 'X');
+        s.send_close(ch);
+
+        // Read back: should be "ABXDE"
+        s.send_command("OP,R,seekwrite.txt");
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "ABXDE");
+    }
+
+    TEST_CASE("SEEK: on append channel returns error $0A") {
+        StorageFixture s;
+        s.create_file("append.txt", "data");
+        s.send_command("OP,A,append.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        s.send_seek(ch, 'A', 0);
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_BAD_ARG);
+    }
+
+    TEST_CASE("SEEK: channel 0 (null byte in binary payload)") {
+        StorageFixture s;
+        s.create_file("ch0test.txt", "ABCDEF");
+
+        s.send_command("OP,R,ch0test.txt");
+        uint8_t ch = s.get_cmd_result();
+        CHECK(ch == 0x00);  // first alloc is channel 0
+
+        // Seek to position 3 — chan_id 0x00 is a null byte in the payload
+        s.send_seek(0x00, 'A', 3);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        CHECK(s.read_reg(N8_DISK_DATA) == 'D');
+    }
+
+    TEST_CASE("SEEK: invalid type returns error") {
+        StorageFixture s;
+        s.create_file("test.txt", "data");
+        s.send_command("OP,R,test.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        s.send_seek(ch, 'Z', 0);
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_BAD_ARG);
+    }
+
+    // =========================================================================
+    // CHDIR
+    // =========================================================================
+
+    TEST_CASE("CHDIR: change to subdirectory and verify with PWDIR") {
+        StorageFixture s;
+        s.create_dir("subdir");
+
+        s.send_command("CD,subdir");
+        CHECK(!s.has_cmd_error());
+
+        s.send_command("PD");
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "/subdir");
+    }
+
+    TEST_CASE("CHDIR: affects relative path operations") {
+        StorageFixture s;
+        s.create_dir("sub");
+        // Create a file inside sub/
+        char path[512];
+        snprintf(path, sizeof(path), "%s/sub/inner.txt", s.tmpdir);
+        FILE* fp = fopen(path, "wb");
+        fwrite("inside", 1, 6, fp);
+        fclose(fp);
+
+        s.send_command("CD,sub");
+        CHECK(!s.has_cmd_error());
+
+        // OPEN relative to new cwd
+        s.send_command("OP,R,inner.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "inside");
+    }
+
+    TEST_CASE("CHDIR: nonexistent directory returns error") {
+        StorageFixture s;
+        s.send_command("CD,nope");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_DIR_NOT_FOUND);
+    }
+
+    TEST_CASE("CHDIR: to a file returns error $0C") {
+        StorageFixture s;
+        s.create_file("afile.txt", "data");
+        s.send_command("CD,afile.txt");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_NOT_A_DIR);
+    }
+
+    // =========================================================================
+    // MKDIR
+    // =========================================================================
+
+    TEST_CASE("MKDIR: create directory and verify with LS") {
+        StorageFixture s;
+        s.send_command("MD,newdir");
+        CHECK(!s.has_cmd_error());
+
+        s.send_command("LS");
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        CHECK(data[0] == 'D');  // directory entry
+    }
+
+    TEST_CASE("MKDIR: already exists returns error $02") {
+        StorageFixture s;
+        s.create_dir("existing");
+        s.send_command("MD,existing");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_FILE_EXISTS);
+    }
+
+    // =========================================================================
+    // RMDIR
+    // =========================================================================
+
+    TEST_CASE("RMDIR: remove empty directory") {
+        StorageFixture s;
+        s.create_dir("todelete");
+
+        s.send_command("RD,todelete");
+        CHECK(!s.has_cmd_error());
+
+        // Verify gone
+        s.send_command("LS");
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        CHECK(data.empty());
+    }
+
+    TEST_CASE("RMDIR: non-empty directory returns error $0D") {
+        StorageFixture s;
+        s.create_dir("notempty");
+        char path[512];
+        snprintf(path, sizeof(path), "%s/notempty/file.txt", s.tmpdir);
+        FILE* fp = fopen(path, "wb");
+        fwrite("x", 1, 1, fp);
+        fclose(fp);
+
+        s.send_command("RD,notempty");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_DIR_NOT_EMPTY);
+    }
+
+    TEST_CASE("RMDIR: on a file returns error $0C") {
+        StorageFixture s;
+        s.create_file("notadir.txt", "data");
+        s.send_command("RD,notadir.txt");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_NOT_A_DIR);
+    }
+
+    // =========================================================================
+    // REMOVE
+    // =========================================================================
+
+    TEST_CASE("REMOVE: delete file") {
+        StorageFixture s;
+        s.create_file("deleteme.txt", "data");
+
+        s.send_command("RM,deleteme.txt");
+        CHECK(!s.has_cmd_error());
+
+        // Verify gone
+        s.send_command("LS");
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        CHECK(data.empty());
+    }
+
+    TEST_CASE("REMOVE: nonexistent file returns error $01") {
+        StorageFixture s;
+        s.send_command("RM,ghost.txt");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_FILE_NOT_FOUND);
+    }
+
+    // =========================================================================
+    // MOVE
+    // =========================================================================
+
+    TEST_CASE("MOVE: rename file") {
+        StorageFixture s;
+        s.create_file("old.txt", "content");
+
+        s.send_command("MV,old.txt,new.txt");
+        CHECK(!s.has_cmd_error());
+
+        // Old should be gone, new should exist
+        s.send_command("OP,R,new.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "content");
+
+        s.send_command("OP,R,old.txt");
+        CHECK(s.has_cmd_error());
+    }
+
+    TEST_CASE("MOVE: move file into directory") {
+        StorageFixture s;
+        s.create_file("moveme.txt", "data");
+        s.create_dir("dest");
+
+        s.send_command("MV,moveme.txt,dest");
+        CHECK(!s.has_cmd_error());
+
+        // File should be at dest/moveme.txt
+        s.send_command("CD,dest");
+        s.send_command("OP,R,moveme.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "data");
+    }
+
+    TEST_CASE("MOVE: self-move returns error $0A") {
+        StorageFixture s;
+        s.create_file("same.txt", "data");
+        s.send_command("MV,same.txt,same.txt");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_BAD_ARG);
+    }
+
+    TEST_CASE("MOVE: nonexistent source returns error") {
+        StorageFixture s;
+        s.send_command("MV,ghost.txt,new.txt");
+        CHECK(s.has_cmd_error());
     }
 }

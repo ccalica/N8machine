@@ -8,6 +8,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <climits>
+#include <cerrno>
+#include <unistd.h>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -103,6 +105,12 @@ static void cmd_list(const char* args);
 static void cmd_open(const char* args);
 static void cmd_close(const char* args);
 static void cmd_pwdir(const char* args);
+static void cmd_seek(const char* args);
+static void cmd_chdir(const char* args);
+static void cmd_mkdir(const char* args);
+static void cmd_rmdir(const char* args);
+static void cmd_remove(const char* args);
+static void cmd_move(const char* args);
 
 // ============================================================
 // Init / Reset / Tick
@@ -375,8 +383,11 @@ static void decode_data_write(uint8_t val) {
             ch.io_error = N8_DISK_IOE_NOT_OPEN;
         } else if (ch.mode == MODE_READ) {
             ch.io_error = N8_DISK_IOE_PERMISSION;
+        } else if (ch.mode == MODE_WRITE || ch.mode == MODE_APPEND) {
+            if (fwrite(&val, 1, 1, ch.fp) != 1) {
+                ch.io_error = N8_DISK_IOE_DISK_FULL;
+            }
         }
-        // Phase 2: write/append mode handling
     }
 }
 
@@ -389,13 +400,15 @@ static void decode_data_write(uint8_t val) {
 // binary payloads where $00 is valid data, not a null terminator. When a
 // binary opcode is detected, the parser switches to payload mode and counts
 // bytes instead of scanning for null.
-// Currently only SK has binary payload (3 bytes: type + lo + hi).
+// Currently SK and CL have binary payloads.
+// SK: <chan_id>,<type>,<lo><hi> = 6 bytes after first comma.
+// CL: <chan_id> = 1 byte after first comma.
 // Extend this function when adding future binary-payload commands.
 static void parser_check_binary_opcode() {
     if (cmd_len == 3 && cmd_buf[2] == ',') {
         if (cmd_buf[0] == 'S' && cmd_buf[1] == 'K') {
             cmd_in_payload = true;
-            cmd_expected_payload = 3;  // type + lo + hi
+            cmd_expected_payload = 6;  // chan_id + ',' + type + ',' + lo + hi
         } else if (cmd_buf[0] == 'C' && cmd_buf[1] == 'L') {
             cmd_in_payload = true;
             cmd_expected_payload = 1;  // channel ID byte
@@ -463,6 +476,12 @@ static void storage_execute_command() {
     else if (op0 == 'O' && op1 == 'P') cmd_open(args);
     else if (op0 == 'C' && op1 == 'L') cmd_close(args);
     else if (op0 == 'P' && op1 == 'D') cmd_pwdir(args);
+    else if (op0 == 'S' && op1 == 'K') cmd_seek(args);
+    else if (op0 == 'C' && op1 == 'D') cmd_chdir(args);
+    else if (op0 == 'M' && op1 == 'D') cmd_mkdir(args);
+    else if (op0 == 'R' && op1 == 'D') cmd_rmdir(args);
+    else if (op0 == 'R' && op1 == 'M') cmd_remove(args);
+    else if (op0 == 'M' && op1 == 'V') cmd_move(args);
     else {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
@@ -796,8 +815,18 @@ static void cmd_open(const char* args) {
         return;
     }
 
-    // Phase 1: read only
-    if (mode_char != 'R') {
+    channel_mode_t mode;
+    const char* fmode;
+    if (mode_char == 'R') {
+        mode = MODE_READ;
+        fmode = "rb";
+    } else if (mode_char == 'W') {
+        mode = MODE_WRITE;
+        fmode = "wb";
+    } else if (mode_char == 'A') {
+        mode = MODE_APPEND;
+        fmode = "ab";
+    } else {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_ARG;
         return;
@@ -829,7 +858,7 @@ static void cmd_open(const char* args) {
         return;
     }
 
-    FILE* fp = fopen(resolved, "rb");
+    FILE* fp = fopen(resolved, fmode);
     if (!fp) {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_FILE_NOT_FOUND;
@@ -846,13 +875,15 @@ static void cmd_open(const char* args) {
 
     channel_t& ch = channels[ch_id];
     ch.type = CHAN_FILE;
-    ch.mode = MODE_READ;
+    ch.mode = mode;
     ch.active = true;
     ch.fp = fp;
     strncpy(ch.host_path, resolved, STORAGE_PATH_MAX - 1);
     ch.host_path[STORAGE_PATH_MAX - 1] = '\0';
 
-    storage_refill_buffer(ch_id);
+    if (mode == MODE_READ) {
+        storage_refill_buffer(ch_id);
+    }
 
     cmd_result = (uint8_t)ch_id;
     cmd_result_valid = true;
@@ -883,6 +914,321 @@ static void cmd_close(const char* args) {
     }
 
     storage_close_channel(id);
+    cmd_result = 0x00;
+    cmd_result_valid = true;
+}
+
+// ============================================================
+// Phase 2 Commands: SEEK, CHDIR, MKDIR, RMDIR, REMOVE, MOVE
+// ============================================================
+
+static void cmd_seek(const char* args) {
+    // "SK,<chan_id>,<type>,<lo><hi>" — binary payload (5 bytes after first comma)
+    // args[0] = ',', args[1] = chan_id, args[2] = ',', args[3] = type,
+    // args[4] = ',', args[5] = lo, args[6] = hi
+    if (args[0] != ',' || args[2] != ',' || args[4] != ',') {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
+        return;
+    }
+
+    uint8_t target_chan = (uint8_t)args[1];
+    uint8_t type       = (uint8_t)args[3];
+    uint8_t lo         = (uint8_t)args[5];
+    uint8_t hi         = (uint8_t)args[6];
+    long offset        = (long)(lo | (hi << 8));
+
+    if (target_chan >= STORAGE_MAX_CHANNELS) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_ARG;
+        return;
+    }
+    channel_t& ch = channels[target_chan];
+    if (!ch.active || ch.type != CHAN_FILE) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_CHAN_NOT_OPEN;
+        return;
+    }
+    if (ch.mode == MODE_APPEND) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_ARG;
+        return;
+    }
+
+    // For read channels, compute logical position (FILE* is ahead by buf_count)
+    long target;
+    if (ch.mode == MODE_READ) {
+        long file_pos = ftell(ch.fp);
+        long logical = file_pos - ch.buf_count;
+        if (type == 'A')      target = offset;
+        else if (type == '+') target = logical + offset;
+        else if (type == '-') target = logical - offset;
+        else {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_BAD_ARG;
+            return;
+        }
+        if (target < 0) target = 0;
+        fseek(ch.fp, target, SEEK_SET);
+        // Invalidate read buffer and refill
+        ch.buf_pos = 0;
+        ch.buf_count = 0;
+        ch.eof = false;
+        storage_refill_buffer(target_chan);
+    } else {
+        // Write channel — no buffer offset issue
+        if (type == 'A')      { fseek(ch.fp, offset, SEEK_SET); }
+        else if (type == '+') { fseek(ch.fp, offset, SEEK_CUR); }
+        else if (type == '-') { fseek(ch.fp, -offset, SEEK_CUR); }
+        else {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_BAD_ARG;
+            return;
+        }
+    }
+
+    cmd_result = 0x00;
+    cmd_result_valid = true;
+}
+
+// Helper: parse comma + path from args, resolve path
+// Returns true on success with resolved path in out. Sets cmd_error on failure.
+static bool parse_path_arg(const char* args, char* out, size_t out_size) {
+    if (args[0] != ',') {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
+        return false;
+    }
+    const char* path = args + 1;
+    if (path[0] == '\0') {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
+        return false;
+    }
+    if (strlen(path) > STORAGE_FILENAME_MAX) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_NAME_TOO_LONG;
+        return false;
+    }
+    if (!storage_resolve_path(path, out, out_size)) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_DIR_NOT_FOUND;
+        return false;
+    }
+    return true;
+}
+
+static void cmd_chdir(const char* args) {
+    char resolved[STORAGE_PATH_MAX];
+    if (!parse_path_arg(args, resolved, sizeof(resolved)))
+        return;
+
+    struct stat st;
+    if (stat(resolved, &st) != 0) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_DIR_NOT_FOUND;
+        return;
+    }
+    if (!S_ISDIR(st.st_mode)) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_NOT_A_DIR;
+        return;
+    }
+
+    // Compute guest-relative path by stripping root_path prefix
+    char resolved_root[PATH_MAX];
+    if (!realpath(root_path, resolved_root)) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_NOT_READY;
+        return;
+    }
+    size_t root_len = strlen(resolved_root);
+
+    if (strncmp(resolved, resolved_root, root_len) == 0) {
+        const char* suffix = resolved + root_len;
+        if (suffix[0] == '/') {
+            snprintf(cwd, sizeof(cwd), "%s", suffix);
+        } else if (suffix[0] == '\0') {
+            strcpy(cwd, "/");
+        } else {
+            snprintf(cwd, sizeof(cwd), "/%s", suffix);
+        }
+    } else {
+        strcpy(cwd, "/");
+    }
+
+    cmd_result = 0x00;
+    cmd_result_valid = true;
+}
+
+static void cmd_mkdir(const char* args) {
+    char resolved[STORAGE_PATH_MAX];
+    if (!parse_path_arg(args, resolved, sizeof(resolved)))
+        return;
+
+    if (mkdir(resolved, 0755) != 0) {
+        if (errno == EEXIST) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_FILE_EXISTS;
+        } else if (errno == ENOENT) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_DIR_NOT_FOUND;
+        } else {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_PERMISSION;
+        }
+        return;
+    }
+
+    cmd_result = 0x00;
+    cmd_result_valid = true;
+}
+
+static void cmd_rmdir(const char* args) {
+    char resolved[STORAGE_PATH_MAX];
+    if (!parse_path_arg(args, resolved, sizeof(resolved)))
+        return;
+
+    struct stat st;
+    if (stat(resolved, &st) != 0) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_DIR_NOT_FOUND;
+        return;
+    }
+    if (!S_ISDIR(st.st_mode)) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_NOT_A_DIR;
+        return;
+    }
+
+    if (rmdir(resolved) != 0) {
+        if (errno == ENOTEMPTY) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_DIR_NOT_EMPTY;
+        } else {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_PERMISSION;
+        }
+        return;
+    }
+
+    cmd_result = 0x00;
+    cmd_result_valid = true;
+}
+
+static void cmd_remove(const char* args) {
+    char resolved[STORAGE_PATH_MAX];
+    if (!parse_path_arg(args, resolved, sizeof(resolved)))
+        return;
+
+    if (unlink(resolved) != 0) {
+        if (errno == ENOENT) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_FILE_NOT_FOUND;
+        } else if (errno == EISDIR) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_NOT_A_DIR;
+        } else {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_PERMISSION;
+        }
+        return;
+    }
+
+    cmd_result = 0x00;
+    cmd_result_valid = true;
+}
+
+static void cmd_move(const char* args) {
+    // "MV,<src>,<dst>"
+    if (args[0] != ',') {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
+        return;
+    }
+
+    // Find second comma to split src and dst
+    const char* src_start = args + 1;
+    const char* comma2 = strchr(src_start, ',');
+    if (!comma2 || comma2 == src_start) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
+        return;
+    }
+    const char* dst_start = comma2 + 1;
+    if (dst_start[0] == '\0') {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
+        return;
+    }
+
+    // Extract src as a separate string
+    char src_name[STORAGE_FILENAME_MAX + 1];
+    size_t src_len = (size_t)(comma2 - src_start);
+    if (src_len == 0 || src_len > STORAGE_FILENAME_MAX) {
+        cmd_error_flag = true;
+        cmd_error_code = (src_len == 0) ? N8_DISK_CE_BAD_SYNTAX : N8_DISK_CE_NAME_TOO_LONG;
+        return;
+    }
+    memcpy(src_name, src_start, src_len);
+    src_name[src_len] = '\0';
+
+    if (strlen(dst_start) > STORAGE_FILENAME_MAX) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_NAME_TOO_LONG;
+        return;
+    }
+
+    char resolved_src[STORAGE_PATH_MAX];
+    if (!storage_resolve_path(src_name, resolved_src, sizeof(resolved_src))) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_FILE_NOT_FOUND;
+        return;
+    }
+
+    char resolved_dst[STORAGE_PATH_MAX];
+    if (!storage_resolve_path(dst_start, resolved_dst, sizeof(resolved_dst))) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_DIR_NOT_FOUND;
+        return;
+    }
+
+    // Self-move check
+    if (strcmp(resolved_src, resolved_dst) == 0) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_BAD_ARG;
+        return;
+    }
+
+    // Check if source exists
+    struct stat src_st;
+    if (stat(resolved_src, &src_st) != 0) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_FILE_NOT_FOUND;
+        return;
+    }
+
+    // If dst is an existing directory, move src into it
+    struct stat dst_st;
+    if (stat(resolved_dst, &dst_st) == 0 && S_ISDIR(dst_st.st_mode)) {
+        // Extract basename from src
+        const char* base = strrchr(resolved_src, '/');
+        base = base ? base + 1 : resolved_src;
+        char final_dst[STORAGE_PATH_MAX];
+        snprintf(final_dst, sizeof(final_dst), "%s/%s", resolved_dst, base);
+        if (rename(resolved_src, final_dst) != 0) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_PERMISSION;
+            return;
+        }
+    } else {
+        if (rename(resolved_src, resolved_dst) != 0) {
+            cmd_error_flag = true;
+            cmd_error_code = (errno == ENOENT) ? N8_DISK_CE_FILE_NOT_FOUND : N8_DISK_CE_PERMISSION;
+            return;
+        }
+    }
+
     cmd_result = 0x00;
     cmd_result_valid = true;
 }

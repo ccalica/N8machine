@@ -1,7 +1,7 @@
 # Storage Device — Emulator Implementation
 
-Implementation guide for the N8Machine storage device. Covers Phase 1 scope:
-**LS, OPEN (read-only), CLOSE, PWDIR**. Write/seek/directory mutation deferred.
+Implementation guide for the N8Machine storage device. All commands implemented:
+**LS, OPEN (R/W/A), CLOSE, PWDIR, SEEK, CHDIR, MKDIR, RMDIR, REMOVE, MOVE**.
 
 Reference spec: `docs/memory_map/storage.md`
 
@@ -462,7 +462,12 @@ static void storage_execute_command() {
     else if (op0=='O' && op1=='P') cmd_open(args);
     else if (op0=='C' && op1=='L') cmd_close(args);
     else if (op0=='P' && op1=='D') cmd_pwdir(args);
-    // Phase 2: SK, MV, RM, CD, MD, RD
+    else if (op0 == 'S' && op1 == 'K') cmd_seek(args);
+    else if (op0 == 'C' && op1 == 'D') cmd_chdir(args);
+    else if (op0 == 'M' && op1 == 'D') cmd_mkdir(args);
+    else if (op0 == 'R' && op1 == 'D') cmd_rmdir(args);
+    else if (op0 == 'R' && op1 == 'M') cmd_remove(args);
+    else if (op0 == 'M' && op1 == 'V') cmd_move(args);
     else {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
@@ -559,21 +564,21 @@ Simplest command. Good first implementation target.
 **Implementation note**: sort requires collecting all entries before writing
 the response. Use a growable buffer (realloc) or two-pass (count then fill).
 
-### OPEN — `"OP,R,<filename>"`
+### OPEN — `"OP,<mode>,<filename>"`
 
-Phase 1: read mode only. W and A return command error `$0A`.
+Modes: `R` (read), `W` (write/create/truncate), `A` (append/create).
 
 1. Parse mode char at `args[1]`. Verify comma at `args[0]` and `args[2]`.
-   If mode is not `R`, error `$0A`. If syntax bad, error `$09`.
+   If mode not `R`/`W`/`A`, error `$0A`. If syntax bad, error `$09`.
 2. Extract filename from `args + 3`.
 3. Validate filename length (max 63). Error `$0B` if too long.
 4. `storage_resolve_path()` on filename. Error `$01` if invalid.
 5. `storage_check_already_open()`. Error `$02` if already open.
-6. `fopen(resolved, "rb")`. Error `$01` if fails.
+6. `fopen(resolved, fmode)`. R→`"rb"`, W→`"wb"`, A→`"ab"`. Error `$01` if fails.
 7. Allocate file channel. Error `$05` if none free.
-8. Set `type = CHAN_FILE`, `mode = MODE_READ`, `active = true`.
+8. Set `type = CHAN_FILE`, `mode`, `active = true`.
 9. Store `resolved` in `host_path` for double-open detection.
-10. `storage_refill_buffer()` to prime read buffer.
+10. Read mode only: `storage_refill_buffer()` to prime read buffer.
 11. Set `cmd_result = channel_id`.
 
 ### CLOSE — `"CL,<chan_id>"`
@@ -585,6 +590,63 @@ Phase 1: read mode only. W and A return command error `$0A`.
 2. If channel not active, error `$04`.
 3. Call `storage_close_channel(id)`.
 4. Set `cmd_result = 0x00` (success), `cmd_result_valid = true`.
+
+## Phase 2 Command Implementations
+
+### OPEN Write/Append — `"OP,W,<filename>"` / `"OP,A,<filename>"`
+
+Same validation as OPEN R (syntax, filename length, path resolution, double-open check).
+Mode dispatch: `W` → `fopen(resolved, "wb")` (create/truncate), `A` → `fopen(resolved, "ab")` (create/append).
+Write/append channels skip `storage_refill_buffer()` (no read buffer needed).
+`DISK_DATA` write on data channel: `fwrite(&val, 1, 1, ch.fp)`. If fwrite fails, set `io_error = DISK_FULL`.
+Reads on write/append channels return `PERMISSION` error (existing code handles this).
+
+### SEEK — `"SK,<chan_id>,<type>,<lo><hi>"`
+
+Binary payload (6 bytes after first comma): chan_id, comma, type, comma, lo, hi.
+Channel ID is explicit — no implicit state tracking needed.
+
+- `chan_id`: data channel (0x00-0x0E), binary byte (can be $00).
+- `type`: `A` (absolute), `+` (forward), `-` (backward).
+- `lo`, `hi`: LE uint16 offset, binary bytes.
+- Reject if target channel is not an active CHAN_FILE → `CHAN_NOT_OPEN`.
+- Reject MODE_APPEND → `BAD_ARG`.
+- **Read channels**: compute logical position as `ftell(fp) - buf_count`, apply seek type
+  to get absolute target, `fseek(SEEK_SET, target)`, invalidate buffer and refill.
+- **Write channels**: `fseek` directly (no buffer offset issue).
+- Returns `$00` on success.
+
+### CHDIR — `"CD,<path>"`
+
+1. Parse comma + path, resolve via `storage_resolve_path()`.
+2. `stat()` resolved path. Error `$03` if not found, `$0C` if not a directory.
+3. Compute guest-relative path by stripping `root_path` prefix from resolved path.
+4. Store in `cwd`. Return `$00`.
+
+### MKDIR — `"MD,<path>"`
+
+`mkdir(resolved, 0755)`. EEXIST → `$02`, ENOENT → `$03`, else `$08` (permission).
+
+### RMDIR — `"RD,<path>"`
+
+`stat()` to verify it's a directory (`$0C` if not). `rmdir()`. ENOTEMPTY → `$0D`.
+
+### REMOVE — `"RM,<path>"`
+
+`unlink(resolved)`. ENOENT → `$01`, EISDIR → `$0C`.
+
+### MOVE — `"MV,<src>,<dst>"`
+
+1. Parse two comma-separated paths. Resolve both.
+2. Self-move check (resolved src == resolved dst → `$0A`).
+3. `stat(src)` → error `$01` if not found.
+4. If dst is an existing directory, append `basename(src)` to dst.
+5. `rename(resolved_src, resolved_dst)`.
+
+### Helper: `parse_path_arg()`
+
+Shared by CD, MD, RD, RM. Parses comma + path from args, validates length,
+resolves via `storage_resolve_path()`. Sets appropriate command errors on failure.
 
 ## Tick Function
 
@@ -751,10 +813,14 @@ $(BUILD_DIR)/emu_storage.o \
 | Response channel auto-close | After read drains buf_count to 0 with eof: close if CHAN_RESPONSE. |
 | DISK_CTRL bit 1 on closed channel | Check active. If false, set io_error $01. |
 | DISK_STATUS on inactive channel | Return $00. |
-| SK null in payload | cmd_in_payload == true: append all bytes including $00, count down. |
+| SK null in payload | cmd_in_payload == true: append all bytes including $00, count down. chan_id=0 is valid. |
 | Double open | storage_check_already_open() before fopen. Error $02. |
-| Move to self | Phase 2. |
-| Seek past EOF | Phase 2. |
+| Move to self | `strcmp(resolved_src, resolved_dst) == 0` → error $0A. |
+| Seek past EOF | `fseek` past end extends file with zeros (POSIX behavior). |
+| Read on write channel | DISK_DATA read: `ch.mode != MODE_READ` → io_error $04. |
+| Seek on append | `ch.mode == MODE_APPEND` → error $0A. |
+| SEEK buffer invalidation | Read channels: compute logical pos, fseek absolute, reset buf, refill. |
+| Move into directory | If dst is existing dir, append basename(src) to dst path. |
 
 ## Testing Strategy
 
@@ -763,7 +829,7 @@ $(BUILD_DIR)/emu_storage.o \
 Use `EmulatorFixture` for bus decode tests. Create a temp directory with
 known files in test setup, clean up in teardown (`mkdtemp()` + populate).
 
-**Phase 1 test cases:**
+**Test cases (Phase 1 + Phase 2):**
 
 | Test | Description |
 |------|-------------|
@@ -777,15 +843,19 @@ known files in test setup, clean up in teardown (`mkdtemp()` + populate).
 | PWDIR | Send "PD", read channel, verify "/" |
 | LIST | Create test files, send "LS", read entries, verify format |
 | OPEN R | Create file, send "OP,R,file", read content, verify match |
+| OPEN W | Create new file, truncate existing file |
+| OPEN A | Append to existing, create new if missing |
 | CLOSE | Open, close, verify channel inactive |
+| SEEK | Absolute, relative forward/backward, buffer invalidation, write channel |
+| CHDIR | Change dir + PWDIR verify, affects relative paths, error on file/missing |
+| MKDIR | Create directory, verify with LS, error on existing |
+| RMDIR | Remove empty dir, error on non-empty/not-a-dir |
+| REMOVE | Delete file, error on nonexistent |
+| MOVE | Rename, move into directory, self-move error |
 | Double null | Send "PD\0\0", verify single execution |
 | Buffer overflow | Write 257 bytes, verify DISK_ERROR $06 |
 | Read past EOF | Read entire file + 1, verify DISK_ERROR $03 |
-| STATUS bytes_avail | Open file > 15 bytes, verify saturates at 15 |
-| STATUS EOF lifecycle | Read to completion, verify EOF progression |
-| Response auto-close | Read all LIST bytes, verify channel auto-closed |
-| Read on closed channel | Verify DISK_ERROR $01 |
-| Double open | Open same file twice, verify command error $02 |
+| Read/write permission | Read on write channel, write on read channel → $04 |
 | Invalid command | Send "XX", verify command error $09 |
 
 ### GDB Playground Test (firmware/gdb_playground/test_storage.s)
@@ -808,20 +878,15 @@ n8gdb read 0500 40    # file content
 
 ## Implementation Order
 
-1. `n8_memory_map.h` — add all constants
-2. `emu_storage.h` — header
-3. `emu_storage.cpp` — skeleton (init/reset/tick/decode as stubs)
-4. `emulator.cpp` — wire in init/reset/tick/decode + slot 4 case
-5. `Makefile` — add source
-6. Verify build: `make`
-7. Register decode — DISK_CHAN, DISK_CTRL, DISK_ERROR, DISK_STATUS, phantoms
-8. `test_storage.cpp` — register-level tests. `make test`
-9. Command parser — byte accumulation, null termination, overflow
-10. PWDIR — simplest command, proves full lifecycle
-11. OPEN (R) + buffer refill — proves file channel
-12. LIST — proves response channel + directory enumeration
-13. CLOSE — proves channel teardown
-14. Edge case tests
-15. `gdb_bridge.cpp` — accessor functions
-16. `main.cpp` — `--storage` CLI arg
-17. `test_storage.s` — GDB playground program
+### Phase 1 (complete)
+1. `n8_memory_map.h` — all constants
+2. `emu_storage.h/cpp` — skeleton, register decode, command parser
+3. Integration: `emulator.cpp`, `gdb_bridge.cpp`, `main.cpp`, `Makefile`
+4. Commands: PWDIR → OPEN R → LIST → CLOSE
+5. Tests + firmware playground
+
+### Phase 2 (complete)
+1. OPEN W/A + DISK_DATA write path (decode_data_write)
+2. SEEK (explicit chan_id in binary payload, buffer invalidation)
+3. CD, MD, RD, RM (parse_path_arg helper)
+4. MOVE (two-path parsing, dir-as-destination)
