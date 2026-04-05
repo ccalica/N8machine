@@ -165,177 +165,218 @@ void storage_set_root_path(const char* path) {
 
 // ============================================================
 // Register Decode
+//
+// Called once per bus cycle when addr falls in slot 4 ($D880-$D89F).
+// The 6502 bus places an address and R/W signal; we decode the
+// register offset and either put data on the bus (read) or
+// consume data from the bus (write).
 // ============================================================
 
+// Forward declaration for DISK_DATA helpers
+static void decode_data_read(uint64_t& pins);
+static void decode_data_write(uint8_t val);
+
 void storage_decode(uint64_t& pins, uint8_t reg) {
-    if (reg >= N8_DISK_REG_COUNT) {
-        // Phantom registers
-        if (pins & M6502_RW) M6502_SET_DATA(pins, 0x00);
-        return;
+    bool is_read = (pins & M6502_RW);
+    uint8_t val = is_read ? 0 : M6502_GET_DATA(pins);
+
+    switch (reg) {
+
+    // ---- DISK_CHAN ($D880) ----
+    // Write: select channel (lo nibble). Clears error state for that channel.
+    // Read:  returns current channel ID + active bit (bit 5).
+    case N8_DISK_CHAN: {
+        if (is_read) {
+            uint8_t result = current_channel & N8_DISK_CHAN_MASK;
+            if (current_channel < STORAGE_MAX_CHANNELS && channels[current_channel].active)
+                result |= N8_DISK_CHAN_ACTIVE;
+            M6502_SET_DATA(pins, result);
+        } else {
+            uint8_t id = val & N8_DISK_CHAN_MASK;
+            current_channel = id;
+            // Selecting a channel clears its error state
+            if (id == N8_DISK_CONTROL_CHAN) {
+                ctrl_io_error = 0;
+                cmd_error_flag = false;
+                cmd_error_code = 0;
+            } else if (id < STORAGE_MAX_CHANNELS) {
+                channels[id].io_error = 0;
+            }
+        }
+        break;
     }
 
-    if (pins & M6502_RW) {
-        // ---- READ ----
-        switch (reg) {
-            case N8_DISK_CHAN: {
-                uint8_t result = current_channel & N8_DISK_CHAN_MASK;
-                if (current_channel < STORAGE_MAX_CHANNELS && channels[current_channel].active) {
-                    result |= N8_DISK_CHAN_ACTIVE;
+    // ---- DISK_DATA ($D881) ----
+    // Write on control channel: feeds byte into command parser.
+    // Write on data channel:    writes to file (Phase 2; currently errors).
+    // Read on control channel:  returns command error code or result byte.
+    // Read on data channel:     returns next byte from read buffer, refills as needed.
+    case N8_DISK_DATA: {
+        if (is_read)
+            decode_data_read(pins);
+        else
+            decode_data_write(val);
+        break;
+    }
+
+    // ---- DISK_ERROR ($D882) ----
+    // Read-only. Returns I/O error for data channels, or command error flag
+    // (bit 7) for the control channel. Latches until cleared by DISK_CHAN write.
+    case N8_DISK_ERROR: {
+        if (is_read) {
+            if (current_channel == N8_DISK_CONTROL_CHAN) {
+                uint8_t err = ctrl_io_error;
+                if (cmd_error_flag) err = N8_DISK_ERR_CMD;
+                M6502_SET_DATA(pins, err);
+            } else if (current_channel < STORAGE_MAX_CHANNELS) {
+                M6502_SET_DATA(pins, channels[current_channel].io_error);
+            } else {
+                M6502_SET_DATA(pins, 0x00);
+            }
+        }
+        // Writes ignored (read-only register)
+        break;
+    }
+
+    // ---- DISK_CTRL ($D883) ----
+    // Write-only, edge-triggered. Bit 7: full device reset. Bit 0: reset
+    // command parser + close response channels. Bit 1: close current channel.
+    case N8_DISK_CTRL: {
+        if (is_read) {
+            M6502_SET_DATA(pins, 0x00);
+        } else {
+            // Bit 7: full device reset (close all, clear all state)
+            if (val & N8_DISK_CTRL_DEVICE) {
+                storage_reset();
+                return;
+            }
+            // Bit 0: reset command parser, close response channels
+            if (val & N8_DISK_CTRL_PARSER) {
+                cmd_len = 0;
+                cmd_overflow = false;
+                cmd_in_payload = false;
+                cmd_error_flag = false;
+                cmd_error_code = 0;
+                cmd_result_valid = false;
+                ctrl_io_error = 0;
+                for (int i = 0; i < STORAGE_MAX_CHANNELS; i++) {
+                    if (channels[i].type == CHAN_RESPONSE && channels[i].active)
+                        storage_close_channel(i);
                 }
-                M6502_SET_DATA(pins, result);
-                break;
             }
-            case N8_DISK_DATA: {
-                if (current_channel == N8_DISK_CONTROL_CHAN) {
-                    if (cmd_error_flag) {
-                        M6502_SET_DATA(pins, cmd_error_code);
-                    } else if (cmd_result_valid) {
-                        M6502_SET_DATA(pins, cmd_result);
-                        cmd_result_valid = false;
-                    } else {
-                        M6502_SET_DATA(pins, 0x00);
-                    }
-                } else if (current_channel < STORAGE_MAX_CHANNELS) {
-                    channel_t& ch = channels[current_channel];
-                    if (!ch.active) {
-                        ch.io_error = N8_DISK_IOE_NOT_OPEN;
-                        M6502_SET_DATA(pins, 0x00);
-                    } else if (ch.mode != MODE_READ) {
-                        ch.io_error = N8_DISK_IOE_PERMISSION;
-                        M6502_SET_DATA(pins, 0x00);
-                    } else if (ch.buf_count == 0 && ch.eof) {
-                        ch.io_error = N8_DISK_IOE_PAST_EOF;
-                        M6502_SET_DATA(pins, 0x00);
-                    } else {
-                        if (ch.buf_count == 0 && !ch.eof) {
-                            storage_refill_buffer(current_channel);
-                        }
-                        if (ch.buf_count > 0) {
-                            uint8_t byte = ch.read_buf[ch.buf_pos++];
-                            ch.buf_count--;
-                            M6502_SET_DATA(pins, byte);
-                            // Eager refill
-                            if (ch.buf_count == 0 && !ch.eof) {
-                                storage_refill_buffer(current_channel);
-                            }
-                        } else {
-                            M6502_SET_DATA(pins, 0x00);
-                        }
-                    }
-                } else {
-                    M6502_SET_DATA(pins, 0x00);
-                }
-                break;
-            }
-            case N8_DISK_ERROR: {
-                if (current_channel == N8_DISK_CONTROL_CHAN) {
-                    uint8_t err = ctrl_io_error;
-                    if (cmd_error_flag) err = N8_DISK_ERR_CMD;
-                    M6502_SET_DATA(pins, err);
-                } else if (current_channel < STORAGE_MAX_CHANNELS) {
-                    M6502_SET_DATA(pins, channels[current_channel].io_error);
-                } else {
-                    M6502_SET_DATA(pins, 0x00);
-                }
-                break;
-            }
-            case N8_DISK_CTRL: {
-                M6502_SET_DATA(pins, 0x00);  // write-only
-                break;
-            }
-            case N8_DISK_STATUS: {
+            // Bit 1: close the currently selected channel
+            if (val & N8_DISK_CTRL_CHANNEL) {
                 if (current_channel >= STORAGE_MAX_CHANNELS ||
                     !channels[current_channel].active) {
-                    M6502_SET_DATA(pins, 0x00);
+                    if (current_channel < STORAGE_MAX_CHANNELS)
+                        channels[current_channel].io_error = N8_DISK_IOE_NOT_OPEN;
                 } else {
-                    channel_t& ch = channels[current_channel];
-                    uint8_t status = 0;
-                    int avail = ch.buf_count;
-                    if (avail > 15) avail = 15;
-                    status |= (avail & N8_DISK_STAT_AVAIL);
-                    if (ch.eof && ch.buf_count == 0)
-                        status |= N8_DISK_STAT_EOF;
-                    status |= N8_DISK_STAT_CTS;
-                    if (ch.buf_count == 0 && !ch.eof)
-                        status |= N8_DISK_STAT_BUSY;
-                    M6502_SET_DATA(pins, status);
-                    // Auto-close response channels when firmware observes EOF
-                    if (ch.eof && ch.buf_count == 0 && ch.type == CHAN_RESPONSE) {
-                        storage_close_channel(current_channel);
-                    }
+                    storage_close_channel(current_channel);
                 }
-                break;
             }
         }
+        break;
+    }
+
+    // ---- DISK_STATUS ($D884) ----
+    // Read-only. Returns buffer fill level (bits 0-3, saturates at 15),
+    // EOF (bit 5), CTS (bit 6, always set), Busy (bit 7).
+    // Response channels auto-close when firmware reads STATUS showing EOF.
+    case N8_DISK_STATUS: {
+        if (is_read) {
+            if (current_channel >= STORAGE_MAX_CHANNELS ||
+                !channels[current_channel].active) {
+                M6502_SET_DATA(pins, 0x00);
+            } else {
+                channel_t& ch = channels[current_channel];
+                uint8_t status = 0;
+                int avail = ch.buf_count;
+                if (avail > 15) avail = 15;
+                status |= (avail & N8_DISK_STAT_AVAIL);
+                if (ch.eof && ch.buf_count == 0)
+                    status |= N8_DISK_STAT_EOF;
+                status |= N8_DISK_STAT_CTS;
+                if (ch.buf_count == 0 && !ch.eof)
+                    status |= N8_DISK_STAT_BUSY;
+                M6502_SET_DATA(pins, status);
+                // Auto-close response channels when firmware observes EOF
+                if (ch.eof && ch.buf_count == 0 && ch.type == CHAN_RESPONSE)
+                    storage_close_channel(current_channel);
+            }
+        }
+        // Writes ignored (read-only register)
+        break;
+    }
+
+    default:
+        // Phantom registers beyond REG_COUNT: read $00, write ignored
+        if (is_read) M6502_SET_DATA(pins, 0x00);
+        break;
+    }
+}
+
+// ---- DISK_DATA read helper ----
+// Control channel: return command error code or result byte.
+// Data channel: return next byte from the 256-byte read-ahead buffer.
+//   Refills buffer from host file/response when drained.
+static void decode_data_read(uint64_t& pins) {
+    if (current_channel == N8_DISK_CONTROL_CHAN) {
+        // Command error code takes priority, then result byte, then $00
+        if (cmd_error_flag) {
+            M6502_SET_DATA(pins, cmd_error_code);
+        } else if (cmd_result_valid) {
+            M6502_SET_DATA(pins, cmd_result);
+            cmd_result_valid = false;  // consumed
+        } else {
+            M6502_SET_DATA(pins, 0x00);
+        }
+        return;
+    }
+    if (current_channel >= STORAGE_MAX_CHANNELS) {
+        M6502_SET_DATA(pins, 0x00);
+        return;
+    }
+    channel_t& ch = channels[current_channel];
+    if (!ch.active) {
+        ch.io_error = N8_DISK_IOE_NOT_OPEN;
+        M6502_SET_DATA(pins, 0x00);
+    } else if (ch.mode != MODE_READ) {
+        ch.io_error = N8_DISK_IOE_PERMISSION;
+        M6502_SET_DATA(pins, 0x00);
+    } else if (ch.buf_count == 0 && ch.eof) {
+        ch.io_error = N8_DISK_IOE_PAST_EOF;
+        M6502_SET_DATA(pins, 0x00);
     } else {
-        // ---- WRITE ----
-        uint8_t val = M6502_GET_DATA(pins);
-        switch (reg) {
-            case N8_DISK_CHAN: {
-                uint8_t id = val & N8_DISK_CHAN_MASK;
-                current_channel = id;
-                if (id == N8_DISK_CONTROL_CHAN) {
-                    ctrl_io_error = 0;
-                    cmd_error_flag = false;
-                    cmd_error_code = 0;
-                } else if (id < STORAGE_MAX_CHANNELS) {
-                    channels[id].io_error = 0;
-                }
-                break;
-            }
-            case N8_DISK_DATA: {
-                if (current_channel == N8_DISK_CONTROL_CHAN) {
-                    parser_feed_byte(val);
-                } else if (current_channel < STORAGE_MAX_CHANNELS) {
-                    channel_t& ch = channels[current_channel];
-                    if (!ch.active) {
-                        ch.io_error = N8_DISK_IOE_NOT_OPEN;
-                    } else if (ch.mode == MODE_READ) {
-                        ch.io_error = N8_DISK_IOE_PERMISSION;
-                    }
-                    // Phase 2: write/append mode handling
-                }
-                break;
-            }
-            case N8_DISK_ERROR: {
-                // Read-only, ignore writes
-                break;
-            }
-            case N8_DISK_CTRL: {
-                if (val & N8_DISK_CTRL_DEVICE) {
-                    storage_reset();
-                    return;
-                }
-                if (val & N8_DISK_CTRL_PARSER) {
-                    cmd_len = 0;
-                    cmd_overflow = false;
-                    cmd_in_payload = false;
-                    cmd_error_flag = false;
-                    cmd_error_code = 0;
-                    cmd_result_valid = false;
-                    ctrl_io_error = 0;
-                    // Close all response channels
-                    for (int i = 0; i < STORAGE_MAX_CHANNELS; i++) {
-                        if (channels[i].type == CHAN_RESPONSE && channels[i].active)
-                            storage_close_channel(i);
-                    }
-                }
-                if (val & N8_DISK_CTRL_CHANNEL) {
-                    if (current_channel >= STORAGE_MAX_CHANNELS ||
-                        !channels[current_channel].active) {
-                        if (current_channel < STORAGE_MAX_CHANNELS)
-                            channels[current_channel].io_error = N8_DISK_IOE_NOT_OPEN;
-                    } else {
-                        storage_close_channel(current_channel);
-                    }
-                }
-                break;
-            }
-            case N8_DISK_STATUS: {
-                // Read-only, ignore writes
-                break;
-            }
+        // Refill if buffer empty but stream not finished
+        if (ch.buf_count == 0 && !ch.eof)
+            storage_refill_buffer(current_channel);
+        if (ch.buf_count > 0) {
+            uint8_t byte = ch.read_buf[ch.buf_pos++];
+            ch.buf_count--;
+            M6502_SET_DATA(pins, byte);
+            // Eager refill keeps bytes_avail in STATUS accurate
+            if (ch.buf_count == 0 && !ch.eof)
+                storage_refill_buffer(current_channel);
+        } else {
+            M6502_SET_DATA(pins, 0x00);
         }
+    }
+}
+
+// ---- DISK_DATA write helper ----
+// Control channel: feed byte into command parser (accumulate, null = execute).
+// Data channel: write to file channel (Phase 2; currently errors on read-only).
+static void decode_data_write(uint8_t val) {
+    if (current_channel == N8_DISK_CONTROL_CHAN) {
+        parser_feed_byte(val);
+    } else if (current_channel < STORAGE_MAX_CHANNELS) {
+        channel_t& ch = channels[current_channel];
+        if (!ch.active) {
+            ch.io_error = N8_DISK_IOE_NOT_OPEN;
+        } else if (ch.mode == MODE_READ) {
+            ch.io_error = N8_DISK_IOE_PERMISSION;
+        }
+        // Phase 2: write/append mode handling
     }
 }
 
@@ -343,11 +384,22 @@ void storage_decode(uint64_t& pins, uint8_t reg) {
 // Command Parser
 // ============================================================
 
-static void parser_check_opcode() {
-    if (cmd_len == 3 &&
-        cmd_buf[0] == 'S' && cmd_buf[1] == 'K' && cmd_buf[2] == ',') {
-        cmd_in_payload = true;
-        cmd_expected_payload = 3;
+// Check if the accumulated command buffer matches a binary-payload opcode.
+// Called after each byte appended. Some commands (e.g., SK) have fixed-length
+// binary payloads where $00 is valid data, not a null terminator. When a
+// binary opcode is detected, the parser switches to payload mode and counts
+// bytes instead of scanning for null.
+// Currently only SK has binary payload (3 bytes: type + lo + hi).
+// Extend this function when adding future binary-payload commands.
+static void parser_check_binary_opcode() {
+    if (cmd_len == 3 && cmd_buf[2] == ',') {
+        if (cmd_buf[0] == 'S' && cmd_buf[1] == 'K') {
+            cmd_in_payload = true;
+            cmd_expected_payload = 3;  // type + lo + hi
+        } else if (cmd_buf[0] == 'C' && cmd_buf[1] == 'L') {
+            cmd_in_payload = true;
+            cmd_expected_payload = 1;  // channel ID byte
+        }
     }
 }
 
@@ -384,7 +436,7 @@ static void parser_feed_byte(uint8_t byte) {
         return;
     }
 
-    parser_check_opcode();
+    parser_check_binary_opcode();
 }
 
 static void storage_execute_command() {
@@ -516,17 +568,24 @@ static bool storage_resolve_path(const char* guest_path, char* out, size_t out_s
     return true;
 }
 
+// Refill the 256-byte read-ahead buffer for a channel.
+// File channels: read from host FILE* via fread().
+// Response channels: copy from the in-memory response buffer.
+// Sets ch.eof when the backing source is exhausted.
+// Called eagerly after each DISK_DATA read to keep bytes_avail accurate.
 static void storage_refill_buffer(int chan_id) {
     channel_t& ch = channels[chan_id];
     if (ch.eof) return;
 
     if (ch.type == CHAN_FILE) {
+        // Read up to 256 bytes from host file
         size_t n = fread(ch.read_buf, 1, STORAGE_READ_BUF_SIZE, ch.fp);
         ch.buf_pos = 0;
         ch.buf_count = (int)n;
         if ((int)n < STORAGE_READ_BUF_SIZE)
-            ch.eof = true;
+            ch.eof = true;  // short read = end of file
     } else if (ch.type == CHAN_RESPONSE) {
+        // Copy next chunk from in-memory response (LIST/PWDIR result)
         int remaining = ch.response_len - ch.response_pos;
         int to_copy = (remaining < STORAGE_READ_BUF_SIZE) ? remaining : STORAGE_READ_BUF_SIZE;
         memcpy(ch.read_buf, ch.response_data + ch.response_pos, to_copy);
@@ -534,7 +593,7 @@ static void storage_refill_buffer(int chan_id) {
         ch.buf_pos = 0;
         ch.buf_count = to_copy;
         if (ch.response_pos >= ch.response_len)
-            ch.eof = true;
+            ch.eof = true;  // entire response consumed
     }
 }
 
@@ -568,11 +627,17 @@ static void cmd_pwdir(const char* args) {
     }
 
     int len = (int)strlen(cwd);
+    uint8_t* buf = (uint8_t*)malloc(len);
+    if (!buf) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_DISK_FULL;
+        return;
+    }
     channel_t& ch = channels[ch_id];
     ch.type = CHAN_RESPONSE;
     ch.mode = MODE_READ;
     ch.active = true;
-    ch.response_data = (uint8_t*)malloc(len);
+    ch.response_data = buf;
     memcpy(ch.response_data, cwd, len);
     ch.response_len = len;
     ch.response_pos = 0;
@@ -693,13 +758,21 @@ static void cmd_list(const char* args) {
         return;
     }
 
+    int rlen = (int)response.size();
+    uint8_t* rbuf = rlen > 0 ? (uint8_t*)malloc(rlen) : NULL;
+    if (rlen > 0 && !rbuf) {
+        cmd_error_flag = true;
+        cmd_error_code = N8_DISK_CE_DISK_FULL;
+        return;
+    }
     channel_t& ch = channels[ch_id];
     ch.type = CHAN_RESPONSE;
     ch.mode = MODE_READ;
     ch.active = true;
-    ch.response_len = (int)response.size();
-    ch.response_data = (uint8_t*)malloc(ch.response_len);
-    memcpy(ch.response_data, response.data(), ch.response_len);
+    ch.response_len = rlen;
+    ch.response_data = rbuf;
+    if (rlen > 0)
+        memcpy(ch.response_data, response.data(), rlen);
     ch.response_pos = 0;
 
     storage_refill_buffer(ch_id);
@@ -786,29 +859,20 @@ static void cmd_open(const char* args) {
 }
 
 static void cmd_close(const char* args) {
-    // "CL,<chan_id>" — chan_id is single hex digit 0-E
+    // "CL,<chan_id>" — chan_id is a single binary byte (0x00-0x0E), not ASCII.
+    // Similar framing to SEEK: the parser knows CL has a 1-byte binary payload
+    // after the comma. The null terminator follows the payload byte.
     if (args[0] != ',') {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
         return;
     }
 
-    char hex = args[1];
-    int id = -1;
-    if (hex >= '0' && hex <= '9') id = hex - '0';
-    else if (hex >= 'A' && hex <= 'E') id = hex - 'A' + 10;
-    else if (hex >= 'a' && hex <= 'e') id = hex - 'a' + 10;
+    int id = (uint8_t)args[1];
 
-    if (id < 0 || id >= STORAGE_MAX_CHANNELS) {
+    if (id >= STORAGE_MAX_CHANNELS) {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_ARG;
-        return;
-    }
-
-    // Check for trailing garbage
-    if (args[2] != '\0') {
-        cmd_error_flag = true;
-        cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
         return;
     }
 

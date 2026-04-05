@@ -214,6 +214,8 @@ Opening a file that is already open returns command error $02.
 SEEK past EOF pads the file with zeros (POSIX behavior).
 
 **CLOSE** — `"CL,<chan_id>"`
+Fixed-length binary payload: 1 byte channel ID (0x00-0x0E), then null terminator.
+The parser knows CL expects exactly 1 payload byte after the comma.
 Close the file, free channel_id for reuse.
 Closing an already-closed or invalid channel returns command error $04.
 

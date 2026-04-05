@@ -177,23 +177,18 @@ phase2:
 @not_nl:
         INX
         CPX #32
-        BCS @done_read          ; read at most 32 bytes
+        BCS @full               ; read at most 32 bytes
         PLA                     ; discard saved status
         JMP @read
 
 @check_eof:
-        PLA
+        PLA                     ; restore status (already consumed by PLA)
         AND #STAT_EOF
         BNE @done_read
         JMP @read               ; busy-wait (shouldn't happen)
 
+@full:  PLA                     ; discard saved status (BCS skipped the PLA above)
 @done_read:
-        ; If we still have PHA on stack from BCS, clean it
-        ; (BCS skips PLA, so stack has one extra byte)
-        ; Actually: BCS jumps here directly after PHA/AND/BEQ/LDA..
-        ; The PLA at check_eof only runs on BEQ path. On BCS we skip it.
-        ; Need to clean stack. Pull the saved status.
-        PLA
 
 @store_count:
         STY RES_LIST+34        ; [34] = entry count
@@ -351,26 +346,14 @@ phase5:
         LDA #CONTROL_CHAN
         STA DISK_CHAN
 
-        ; Build "CL,N" where N is the channel from phase 3
+        ; Send "CL,<binary_chan_id>" + null
         LDA #'C'
         STA DISK_DATA
         LDA #'L'
         STA DISK_DATA
         LDA #','
         STA DISK_DATA
-        ; Channel ID as hex digit
-        LDA zp_chan
-        CMP #$0A
-        BCS @hex_af
-        CLC
-        ADC #'0'
-        JMP @send_id
-@hex_af:
-        SEC
-        SBC #$0A
-        CLC
-        ADC #'A'
-@send_id:
+        LDA zp_chan             ; binary channel ID byte
         STA DISK_DATA
         LDA #$00
         STA DISK_DATA          ; execute

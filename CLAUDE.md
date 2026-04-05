@@ -20,7 +20,7 @@ Run a single test by name: `./n8_test -tc="test name"`
 
 Dependencies: `libsdl2-dev`, OpenGL, `cc65` (firmware only), Node.js (n8gdb/n8mcp).
 
-Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` from CWD).
+Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` from CWD). Optional: `--storage <path>` sets the storage device root directory (default `./storage/`).
 
 ## Architecture
 
@@ -36,7 +36,8 @@ Run the emulator from the repo root (it loads `N8firmware` and `N8firmware.sym` 
 - `$D820-$D83F` TTY (slot 1) — `emu_tty.cpp`
 - `$D840-$D85F` Video Control (slot 2, 12 regs) — `emu_video.cpp`
 - `$D860-$D87F` Keyboard (slot 3) — `emu_kbd.cpp`
-- `$D880-$DFFF` Reserved device slots
+- `$D880-$D89F` Storage (slot 4, 5 regs) — `emu_storage.cpp`
+- `$D8A0-$DFFF` Reserved device slots
 - `$E000-$FFFF` ROM (8KB firmware binary)
 
 **Device router:** Slot-based dispatch in `emulator_step()`: `slot = (addr - $D800) >> 5`, `reg = offset & 0x1F`. Bus decode priority: frame buffer → device router → generic mem[] (with ROM write protection).
@@ -158,6 +159,7 @@ Tests: `node bin/n8mcp/test.mjs` (131 tests, mock RSP server, no emulator needed
 | `src/emu_tty.cpp` | TTY memory-mapped device (raw terminal I/O) |
 | `src/emu_video.cpp` | Video control registers, scroll, VID_DATA streaming |
 | `src/emu_kbd.cpp` | Keyboard registers, FIFO buffer, key injection |
+| `src/emu_storage.cpp` | Storage device: channel I/O, command parser, host FS |
 | `src/m6502.h` | Vendored 6502 CPU emulator (do not edit) |
 | `bin/n8gdb/rsp.mjs` | Low-level GDB RSP TCP client (shared by n8gdb + n8mcp) |
 | `bin/n8gdb/n8gdb.mjs` | n8gdb CLI commands and REPL |

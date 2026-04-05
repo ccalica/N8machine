@@ -414,16 +414,20 @@ Bytes written to DISK_DATA on the control channel feed the command parser.
 ### Opcode Detection
 
 After accumulating 3 bytes, check if the buffer starts with a known
-fixed-payload opcode + comma. Currently only SK has binary payload.
-This is where the "smart parser" lives — extend this check when adding
-future binary-payload commands.
+fixed-payload opcode + comma. Binary-payload opcodes: SK (3 bytes),
+CL (1 byte). This is where the "smart parser" lives — extend this
+check when adding future binary-payload commands.
 
 ```cpp
-static void parser_check_opcode() {
-    if (cmd_len == 3 &&
-        cmd_buf[0] == 'S' && cmd_buf[1] == 'K' && cmd_buf[2] == ',') {
-        cmd_in_payload = true;
-        cmd_expected_payload = 3;  // type + lo + hi
+static void parser_check_binary_opcode() {
+    if (cmd_len == 3 && cmd_buf[2] == ',') {
+        if (cmd_buf[0] == 'S' && cmd_buf[1] == 'K') {
+            cmd_in_payload = true;
+            cmd_expected_payload = 3;  // type + lo + hi
+        } else if (cmd_buf[0] == 'C' && cmd_buf[1] == 'L') {
+            cmd_in_payload = true;
+            cmd_expected_payload = 1;  // channel ID byte
+        }
     }
 }
 ```
@@ -574,8 +578,9 @@ Phase 1: read mode only. W and A return command error `$0A`.
 
 ### CLOSE — `"CL,<chan_id>"`
 
-1. Parse channel ID from `args[1]`. Expect comma at `args[0]`.
-   Channel ID is a single hex digit (`0`-`E`), case-insensitive.
+1. Parse channel ID as binary byte from `args[1]`. Expect comma at `args[0]`.
+   Channel ID is a raw byte (0x00-0x0E), not ASCII. The parser treats CL as a
+   binary-payload opcode (1 byte after comma), same framing as SK.
    Error `$09` if bad syntax, `$0A` if out of range.
 2. If channel not active, error `$04`.
 3. Call `storage_close_channel(id)`.
