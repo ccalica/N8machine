@@ -122,6 +122,61 @@
 // KBD modifier mask (SHIFT|CTRL|ALT|CAPS)
 #define N8_KBD_MODIFIER_MASK (N8_KBD_STAT_SHIFT | N8_KBD_STAT_CTRL | N8_KBD_STAT_ALT | N8_KBD_STAT_CAPS)
 
+// --- Storage Device (slot 4) ---
+#define N8_STORAGE_BASE       0xD880
+#define N8_DISK_CHAN          0x00    // Register offsets within slot
+#define N8_DISK_DATA          0x01
+#define N8_DISK_ERROR         0x02
+#define N8_DISK_CTRL          0x03
+#define N8_DISK_STATUS        0x04
+#define N8_DISK_REG_COUNT     5
+#define N8_STORAGE_SLOT       4
+
+// DISK_CHAN read bits
+#define N8_DISK_CHAN_MASK     0x0F
+#define N8_DISK_CHAN_ACTIVE   0x20    // bit 5
+
+// DISK_ERROR bits
+#define N8_DISK_ERR_CMD       0x80   // bit 7: command error flag
+
+// DISK_CTRL bits
+#define N8_DISK_CTRL_PARSER   0x01   // bit 0: reset command parser
+#define N8_DISK_CTRL_CHANNEL  0x02   // bit 1: reset current channel
+#define N8_DISK_CTRL_DEVICE   0x80   // bit 7: full device reset
+
+// DISK_STATUS bits
+#define N8_DISK_STAT_AVAIL    0x0F   // bits 0-3 mask
+#define N8_DISK_STAT_EOF      0x20   // bit 5
+#define N8_DISK_STAT_CTS      0x40   // bit 6
+#define N8_DISK_STAT_BUSY     0x80   // bit 7
+
+// I/O error codes (DISK_ERROR bits 0-6)
+#define N8_DISK_IOE_NONE          0x00
+#define N8_DISK_IOE_NOT_OPEN      0x01
+#define N8_DISK_IOE_DISK_FULL     0x02
+#define N8_DISK_IOE_PAST_EOF      0x03
+#define N8_DISK_IOE_PERMISSION    0x04
+#define N8_DISK_IOE_NOT_READY     0x05
+#define N8_DISK_IOE_CMD_OVERFLOW  0x06
+
+// Command error codes (read from DISK_DATA when bit 7 set)
+#define N8_DISK_CE_FILE_NOT_FOUND  0x01
+#define N8_DISK_CE_FILE_EXISTS     0x02
+#define N8_DISK_CE_DIR_NOT_FOUND   0x03
+#define N8_DISK_CE_CHAN_NOT_OPEN   0x04
+#define N8_DISK_CE_NO_FREE_CHAN    0x05
+#define N8_DISK_CE_DISK_FULL       0x06
+#define N8_DISK_CE_PERMISSION      0x08
+#define N8_DISK_CE_BAD_SYNTAX      0x09
+#define N8_DISK_CE_BAD_ARG         0x0A
+#define N8_DISK_CE_NAME_TOO_LONG   0x0B
+#define N8_DISK_CE_NOT_A_DIR       0x0C
+#define N8_DISK_CE_DIR_NOT_EMPTY   0x0D
+#define N8_DISK_CE_NOT_READY       0x0E
+
+// Control channel ID
+#define N8_DISK_CONTROL_CHAN  0x0F
+
 // Key codes — control & nav ($00-$1F)
 #define N8_KEY_NONE        0x00
 #define N8_KEY_UP          0x01

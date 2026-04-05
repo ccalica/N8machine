@@ -8,6 +8,7 @@
 #include "emu_tty.h"
 #include "emu_video.h"
 #include "emu_kbd.h"
+#include "emu_storage.h"
 #include "emu_labels.h"
 #include "emu_dis6502.h"
 #include "utils.h"
@@ -163,6 +164,7 @@ struct EmulatorFixture {
         tty_reset();
         video_init();
         kbd_init();
+        storage_init();
         pins = m6502_init(&cpu, &desc);
         stub_clear_console_buffer();
     }

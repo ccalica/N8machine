@@ -8,6 +8,7 @@
 #include "emu_tty.h"
 #include "emu_video.h"
 #include "emu_kbd.h"
+#include "emu_storage.h"
 #include "emu_labels.h"
 #include "gui_console.h"
 #include "utils.h"
@@ -107,7 +108,8 @@ void emulator_init() {
     tty_init();
     video_init();
     kbd_init();
-    
+    storage_init();
+
 }
 
 void emulator_step() {
@@ -142,6 +144,7 @@ void emulator_step() {
         // IRQ tick: clear all flags, let devices reassert, then update pin
         IRQ_CLR();
         tty_tick(pins);
+        storage_tick();
         if (mem[N8_IRQ_FLAGS] != 0)
             pins |= M6502_IRQ;
         else
@@ -184,6 +187,9 @@ void emulator_step() {
                     break;
                 case N8_KBD_SLOT:  // $D860: Keyboard
                     kbd_decode(pins, reg);
+                    break;
+                case N8_STORAGE_SLOT:  // $D880: Storage
+                    storage_decode(pins, reg);
                     break;
                 default:
                     // Reserved slots: read returns $00, write ignored
@@ -323,6 +329,7 @@ void emulator_reset() {
     tty_reset();
     video_reset();
     kbd_reset();
+    storage_reset();
     memset(frame_buffer, 0, N8_FB_SIZE);
     fb_dirty = true;
     emulator_loadrom();

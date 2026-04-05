@@ -11,7 +11,7 @@ CLFLAGS = -vm -t none --cpu 6502 -C playground.cfg -Wl --dbgfile,$(@).dbg
 CFG     = playground.cfg
 COMMON  = common_init.s common_vectors.s
 
-TESTS = test_regs test_breakpoints test_memory test_stack test_counter test_zeropage test_tty test_monitor test_benchmark test_viddata test_keyecho test_console demo_console demo_tui
+TESTS = test_regs test_breakpoints test_memory test_stack test_counter test_zeropage test_tty test_monitor test_benchmark test_viddata test_keyecho test_console test_storage demo_console demo_tui
 
 .PHONY: all clean
 
