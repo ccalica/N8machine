@@ -160,6 +160,7 @@ determine payload framing rather than scanning for null within the payload.
 | $04   | Channel not open                           |
 | $05   | No free channels                           |
 | $06   | Disk full                                  |
+| $07   | Is a directory (RM on a directory)          |
 | $08   | Permission denied                          |
 | $09   | Invalid command syntax                     |
 | $0A   | Invalid argument                           |

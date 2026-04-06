@@ -321,6 +321,21 @@ TEST_SUITE("storage") {
         CHECK(s.get_cmd_error() == N8_DISK_CE_FILE_NOT_FOUND);
     }
 
+    TEST_CASE("OPEN: double open with different modes returns error $02") {
+        StorageFixture s;
+        s.create_file("shared.txt", "data");
+
+        // Open for read
+        s.send_command("OP,R,shared.txt");
+        CHECK(!s.has_cmd_error());
+
+        // Try to open same file for write — should fail
+        s.write_reg(N8_DISK_CHAN, N8_DISK_CONTROL_CHAN);
+        s.send_command("OP,W,shared.txt");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_FILE_EXISTS);
+    }
+
     TEST_CASE("OPEN R: double open returns error $02") {
         StorageFixture s;
         s.create_file("test.txt", "data");
@@ -539,6 +554,56 @@ TEST_SUITE("storage") {
         // Should be able to reopen
         s.send_command("OP,R,test.txt");
         CHECK(!s.has_cmd_error());
+    }
+
+    TEST_CASE("CLOSE: write channel flushes data to disk") {
+        StorageFixture s;
+
+        // Open, write some bytes, close
+        s.send_command("OP,W,flush_test.txt");
+        uint8_t ch = s.get_cmd_result();
+        s.write_reg(N8_DISK_CHAN, ch);
+        for (char c = 'A'; c <= 'Z'; c++)
+            s.write_reg(N8_DISK_DATA, c);
+        s.send_close(ch);
+
+        // Read back — all 26 bytes should be present
+        s.send_command("OP,R,flush_test.txt");
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        CHECK(data.size() == 26);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    }
+
+    TEST_CASE("READ: 256-byte exact-multiple file EOF edge case") {
+        StorageFixture s;
+        // Create a file exactly 256 bytes — one full read buffer
+        uint8_t data[256];
+        for (int i = 0; i < 256; i++) data[i] = (uint8_t)i;
+        s.create_file_binary("exact256.bin", data, 256);
+
+        s.send_command("OP,R,exact256.bin");
+        uint8_t ch = s.get_cmd_result();
+
+        // Read all 256 bytes
+        s.write_reg(N8_DISK_CHAN, ch);
+        for (int i = 0; i < 256; i++) {
+            uint8_t byte = s.read_reg(N8_DISK_DATA);
+            CHECK(byte == (uint8_t)i);
+        }
+
+        // After consuming the last byte, STATUS should eventually show EOF.
+        // There may be one extra Busy cycle while refill discovers 0 bytes.
+        s.write_reg(N8_DISK_CHAN, ch);
+        uint8_t status = s.read_reg(N8_DISK_STATUS);
+        // Either EOF is already set, or one more DATA read triggers it
+        if (!(status & N8_DISK_STAT_EOF)) {
+            s.read_reg(N8_DISK_DATA);  // trigger refill
+            status = s.read_reg(N8_DISK_STATUS);
+        }
+        CHECK((status & N8_DISK_STAT_EOF) != 0);
+        CHECK((status & N8_DISK_STAT_AVAIL) == 0);
     }
 
     // =========================================================================
@@ -1066,6 +1131,24 @@ TEST_SUITE("storage") {
         CHECK(s.read_reg(N8_DISK_DATA) == 0xAA);
     }
 
+    TEST_CASE("SEEK: past EOF on read channel shows EOF status") {
+        StorageFixture s;
+        s.create_file("small.txt", "ABCDE");  // 5 bytes
+
+        s.send_command("OP,R,small.txt");
+        uint8_t ch = s.get_cmd_result();
+
+        // Seek past end of file
+        s.send_seek(ch, 'A', 100);
+        CHECK(!s.has_cmd_error());
+
+        // STATUS should show EOF with 0 bytes available
+        s.write_reg(N8_DISK_CHAN, ch);
+        uint8_t status = s.read_reg(N8_DISK_STATUS);
+        CHECK((status & N8_DISK_STAT_EOF) != 0);
+        CHECK((status & N8_DISK_STAT_AVAIL) == 0);
+    }
+
     TEST_CASE("SEEK: invalid type returns error") {
         StorageFixture s;
         s.create_file("test.txt", "data");
@@ -1130,6 +1213,36 @@ TEST_SUITE("storage") {
         s.send_command("CD,afile.txt");
         CHECK(s.has_cmd_error());
         CHECK(s.get_cmd_error() == N8_DISK_CE_NOT_A_DIR);
+    }
+
+    TEST_CASE("CHDIR: path component > 63 bytes returns error") {
+        StorageFixture s;
+        // Build a path with one component that's 64 chars
+        std::string long_name(64, 'x');
+        std::string cmd = "CD," + long_name;
+        s.send_command(cmd.c_str());
+        CHECK(s.has_cmd_error());
+        // storage_resolve_path rejects it, parse_path_arg maps to DIR_NOT_FOUND
+        CHECK(s.get_cmd_error() == N8_DISK_CE_DIR_NOT_FOUND);
+    }
+
+    TEST_CASE("CHDIR: multi-component path with valid component lengths") {
+        StorageFixture s;
+        s.create_dir("aaa");
+        // Create subdir via host filesystem
+        char path[512];
+        snprintf(path, sizeof(path), "%s/aaa/bbb", s.tmpdir);
+        mkdir(path, 0755);
+
+        s.send_command("CD,aaa/bbb");
+        CHECK(!s.has_cmd_error());
+
+        // Verify with PWDIR
+        s.send_command("PD");
+        uint8_t ch = s.get_cmd_result();
+        auto data = s.read_channel(ch);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "/aaa/bbb");
     }
 
     // =========================================================================

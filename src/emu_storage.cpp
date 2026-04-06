@@ -544,14 +544,19 @@ static bool storage_resolve_path(const char* guest_path, char* out, size_t out_s
         }
     }
 
-    // Reject any path component that is ".."
+    // Validate each path component: reject ".." traversal and names > FILENAME_MAX
     const char* p = guest_path;
     while (*p) {
         if (p[0] == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
             return false;
         }
-        // Skip to next component
+        // Measure component length
+        const char* comp_start = p;
         while (*p && *p != '/') p++;
+        size_t comp_len = (size_t)(p - comp_start);
+        if (comp_len > STORAGE_FILENAME_MAX) {
+            return false;
+        }
         while (*p == '/') p++;
     }
 
@@ -993,7 +998,11 @@ static void cmd_seek(const char* args) {
             return;
         }
         if (target < 0) target = 0;
-        fseek(ch.fp, target, SEEK_SET);
+        if (fseek(ch.fp, target, SEEK_SET) != 0) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_BAD_ARG;
+            return;
+        }
         // Invalidate read buffer and refill
         ch.buf_pos = 0;
         ch.buf_count = 0;
@@ -1001,11 +1010,21 @@ static void cmd_seek(const char* args) {
         storage_refill_buffer(target_chan);
     } else {
         // Write channel — flush libc buffer so ftell/fseek are accurate
-        fflush(ch.fp);
-        if (type == 'A')      { fseek(ch.fp, offset, SEEK_SET); }
-        else if (type == '+') { fseek(ch.fp, offset, SEEK_CUR); }
-        else if (type == '-') { fseek(ch.fp, -offset, SEEK_CUR); }
+        if (fflush(ch.fp) != 0) {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_DISK_FULL;
+            return;
+        }
+        int seek_rc;
+        if (type == 'A')      { seek_rc = fseek(ch.fp, offset, SEEK_SET); }
+        else if (type == '+') { seek_rc = fseek(ch.fp, offset, SEEK_CUR); }
+        else if (type == '-') { seek_rc = fseek(ch.fp, -offset, SEEK_CUR); }
         else {
+            cmd_error_flag = true;
+            cmd_error_code = N8_DISK_CE_BAD_ARG;
+            return;
+        }
+        if (seek_rc != 0) {
             cmd_error_flag = true;
             cmd_error_code = N8_DISK_CE_BAD_ARG;
             return;
