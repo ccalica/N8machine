@@ -972,6 +972,100 @@ TEST_SUITE("storage") {
         CHECK(s.read_reg(N8_DISK_DATA) == 'D');
     }
 
+    TEST_CASE("SEEK: absolute seek with hi byte (offset > 255)") {
+        StorageFixture s;
+        // Create a file with 512 bytes: 0x00..0xFF repeated twice
+        uint8_t data[512];
+        for (int rep = 0; rep < 2; rep++)
+            for (int i = 0; i < 256; i++)
+                data[rep * 256 + i] = (uint8_t)i;
+        s.create_file_binary("bigseek.bin", data, 512);
+
+        s.send_command("OP,R,bigseek.bin");
+        uint8_t ch = s.get_cmd_result();
+        CHECK(!s.has_cmd_error());
+
+        // Seek to offset 300 (0x012C) — hi=0x01, lo=0x2C
+        // If the hi byte is garbage, we'll land at the wrong position
+        s.send_seek(ch, 'A', 300);
+        CHECK(!s.has_cmd_error());
+
+        // Offset 300 into our pattern: 300 % 256 = 44 = 0x2C
+        s.write_reg(N8_DISK_CHAN, ch);
+        uint8_t byte = s.read_reg(N8_DISK_DATA);
+        CHECK(byte == 0x2C);
+    }
+
+    TEST_CASE("SEEK: absolute seek to offset 256 (hi=1, lo=0)") {
+        StorageFixture s;
+        uint8_t data[512];
+        for (int rep = 0; rep < 2; rep++)
+            for (int i = 0; i < 256; i++)
+                data[rep * 256 + i] = (uint8_t)i;
+        s.create_file_binary("bigseek2.bin", data, 512);
+
+        s.send_command("OP,R,bigseek2.bin");
+        uint8_t ch = s.get_cmd_result();
+
+        // Seek to 256 (0x0100) — first byte of second repetition
+        s.send_seek(ch, 'A', 256);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        CHECK(s.read_reg(N8_DISK_DATA) == 0x00);
+        CHECK(s.read_reg(N8_DISK_DATA) == 0x01);
+    }
+
+    TEST_CASE("SEEK: relative forward with hi byte") {
+        StorageFixture s;
+        uint8_t data[512];
+        for (int rep = 0; rep < 2; rep++)
+            for (int i = 0; i < 256; i++)
+                data[rep * 256 + i] = (uint8_t)i;
+        s.create_file_binary("bigseek3.bin", data, 512);
+
+        s.send_command("OP,R,bigseek3.bin");
+        uint8_t ch = s.get_cmd_result();
+
+        // Read 2 bytes to set logical pos = 2
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.read_reg(N8_DISK_DATA);
+        s.read_reg(N8_DISK_DATA);
+
+        // Seek forward 300 → logical pos = 302 (0x012E)
+        s.send_seek(ch, '+', 300);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        CHECK(s.read_reg(N8_DISK_DATA) == 0x2E);  // 302 % 256
+    }
+
+    TEST_CASE("SEEK: write channel with hi byte offset") {
+        StorageFixture s;
+        // Create 512-byte file of zeros
+        uint8_t data[512];
+        memset(data, 0, 512);
+        s.create_file_binary("bigwrite.bin", data, 512);
+
+        s.send_command("OP,W,bigwrite.bin");
+        uint8_t ch = s.get_cmd_result();
+
+        // Seek to offset 300 and write a marker byte
+        s.send_seek(ch, 'A', 300);
+        CHECK(!s.has_cmd_error());
+
+        s.write_reg(N8_DISK_CHAN, ch);
+        s.write_reg(N8_DISK_DATA, 0xAA);
+        s.send_close(ch);
+
+        // Read back and verify the marker is at offset 300
+        s.send_command("OP,R,bigwrite.bin");
+        uint8_t ch2 = s.get_cmd_result();
+        s.send_seek(ch2, 'A', 300);
+        s.write_reg(N8_DISK_CHAN, ch2);
+        CHECK(s.read_reg(N8_DISK_DATA) == 0xAA);
+    }
+
     TEST_CASE("SEEK: invalid type returns error") {
         StorageFixture s;
         s.create_file("test.txt", "data");
@@ -1179,5 +1273,41 @@ TEST_SUITE("storage") {
         StorageFixture s;
         s.send_command("MV,ghost.txt,new.txt");
         CHECK(s.has_cmd_error());
+    }
+
+    TEST_CASE("MOVE: overwrite existing file in directory") {
+        StorageFixture s;
+        s.create_dir("dest");
+        s.create_file("moveme.txt", "new content");
+        // Create a file with the same basename in dest/
+        s.send_command("CD,dest");
+        s.send_command("OP,W,moveme.txt");
+        uint8_t ch = s.get_cmd_result();
+        s.write_reg(N8_DISK_CHAN, ch);
+        const char* old_data = "old content";
+        for (int i = 0; old_data[i]; i++)
+            s.write_reg(N8_DISK_DATA, old_data[i]);
+        s.send_close(ch);
+        s.send_command("CD,/");
+
+        // Move should overwrite dest/moveme.txt atomically
+        s.send_command("MV,moveme.txt,dest");
+        CHECK(!s.has_cmd_error());
+
+        s.send_command("CD,dest");
+        s.send_command("OP,R,moveme.txt");
+        CHECK(!s.has_cmd_error());
+        uint8_t ch2 = s.get_cmd_result();
+        auto data = s.read_channel(ch2);
+        std::string result(data.begin(), data.end());
+        CHECK(result == "new content");
+    }
+
+    TEST_CASE("REMOVE: on a directory returns error $07") {
+        StorageFixture s;
+        s.create_dir("mydir");
+        s.send_command("RM,mydir");
+        CHECK(s.has_cmd_error());
+        CHECK(s.get_cmd_error() == N8_DISK_CE_IS_A_DIR);
     }
 }

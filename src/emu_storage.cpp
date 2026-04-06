@@ -184,6 +184,24 @@ void storage_set_root_path(const char* path) {
 static void decode_data_read(uint64_t& pins);
 static void decode_data_write(uint8_t val);
 
+// Hardware register decode — called from device router on every bus cycle
+// targeting $D880-$D884.
+//
+// Data flow overview:
+//   CPU → DISK_CHAN (W)  → selects active channel, clears error state
+//   CPU → DISK_DATA (W)  → control chan: feeds command parser byte-by-byte
+//                           data chan: writes byte to host file via fwrite()
+//   CPU ← DISK_DATA (R)  → control chan: returns cmd error code or result
+//                           data chan: returns next byte from 256B read buffer
+//   CPU ← DISK_ERROR (R) → control chan: cmd error flag (bit 7) | I/O error
+//                           data chan: per-channel I/O error latch
+//   CPU → DISK_CTRL (W)  → edge-triggered: device reset / parser reset / close
+//   CPU ← DISK_STATUS (R)→ buffer fill (bits 0-3), EOF, CTS, Busy flags
+//
+// Firmware protocol: select channel via CHAN, then read/write DATA.
+// Commands are sent as ASCII opcodes + args to the control channel (0x0F),
+// terminated by null byte. Binary-payload opcodes (SK, CL) use the parser's
+// payload mode to avoid null-terminator ambiguity.
 void storage_decode(uint64_t& pins, uint8_t reg) {
     bool is_read = (pins & M6502_RW);
     uint8_t val = is_read ? 0 : M6502_GET_DATA(pins);
@@ -401,7 +419,7 @@ static void decode_data_write(uint8_t val) {
 // binary opcode is detected, the parser switches to payload mode and counts
 // bytes instead of scanning for null.
 // Currently SK and CL have binary payloads.
-// SK: <chan_id>,<type>,<lo><hi> = 6 bytes after first comma.
+// SK: ,<chan_id>,<type>,<lo><hi> = 6 bytes after the opcode prefix comma.
 // CL: <chan_id> = 1 byte after first comma.
 // Extend this function when adding future binary-payload commands.
 static void parser_check_binary_opcode() {
@@ -588,23 +606,29 @@ static bool storage_resolve_path(const char* guest_path, char* out, size_t out_s
 }
 
 // Refill the 256-byte read-ahead buffer for a channel.
-// File channels: read from host FILE* via fread().
-// Response channels: copy from the in-memory response buffer.
-// Sets ch.eof when the backing source is exhausted.
-// Called eagerly after each DISK_DATA read to keep bytes_avail accurate.
+//
+// Hardware data flow:
+//   DISK_DATA read → decode_data_read() consumes buf[buf_pos++], decrements buf_count
+//   → when buf_count hits 0, this function refills from the backing source
+//   → DISK_STATUS reports buf_count in bits 0-3 (saturates at 15)
+//
+// Two backing sources:
+//   CHAN_FILE:     host FILE* — fread() up to 256 bytes. Short read sets EOF.
+//   CHAN_RESPONSE: in-memory buffer (LIST/PWDIR result) — memcpy next chunk.
+//
+// Called eagerly after each DISK_DATA read so STATUS.avail stays accurate.
+// Also called after SEEK to prime the buffer at the new file position.
 static void storage_refill_buffer(int chan_id) {
     channel_t& ch = channels[chan_id];
     if (ch.eof) return;
 
     if (ch.type == CHAN_FILE) {
-        // Read up to 256 bytes from host file
         size_t n = fread(ch.read_buf, 1, STORAGE_READ_BUF_SIZE, ch.fp);
         ch.buf_pos = 0;
         ch.buf_count = (int)n;
         if ((int)n < STORAGE_READ_BUF_SIZE)
             ch.eof = true;  // short read = end of file
     } else if (ch.type == CHAN_RESPONSE) {
-        // Copy next chunk from in-memory response (LIST/PWDIR result)
         int remaining = ch.response_len - ch.response_pos;
         int to_copy = (remaining < STORAGE_READ_BUF_SIZE) ? remaining : STORAGE_READ_BUF_SIZE;
         memcpy(ch.read_buf, ch.response_data + ch.response_pos, to_copy);
@@ -923,9 +947,9 @@ static void cmd_close(const char* args) {
 // ============================================================
 
 static void cmd_seek(const char* args) {
-    // "SK,<chan_id>,<type>,<lo><hi>" — binary payload (5 bytes after first comma)
-    // args[0] = ',', args[1] = chan_id, args[2] = ',', args[3] = type,
-    // args[4] = ',', args[5] = lo, args[6] = hi
+    // "SK,<chan_id>,<type>,<lo><hi>" — binary payload (6 bytes after first comma)
+    // Parser collects: S K , [chan_id , type , lo hi] — 3 text + 6 payload = 9 in cmd_buf
+    // args = &cmd_buf[2], so args[0..6] = , chan_id , type , lo hi
     if (args[0] != ',' || args[2] != ',' || args[4] != ',') {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
@@ -976,7 +1000,8 @@ static void cmd_seek(const char* args) {
         ch.eof = false;
         storage_refill_buffer(target_chan);
     } else {
-        // Write channel — no buffer offset issue
+        // Write channel — flush libc buffer so ftell/fseek are accurate
+        fflush(ch.fp);
         if (type == 'A')      { fseek(ch.fp, offset, SEEK_SET); }
         else if (type == '+') { fseek(ch.fp, offset, SEEK_CUR); }
         else if (type == '-') { fseek(ch.fp, -offset, SEEK_CUR); }
@@ -1003,11 +1028,6 @@ static bool parse_path_arg(const char* args, char* out, size_t out_size) {
     if (path[0] == '\0') {
         cmd_error_flag = true;
         cmd_error_code = N8_DISK_CE_BAD_SYNTAX;
-        return false;
-    }
-    if (strlen(path) > STORAGE_FILENAME_MAX) {
-        cmd_error_flag = true;
-        cmd_error_code = N8_DISK_CE_NAME_TOO_LONG;
         return false;
     }
     if (!storage_resolve_path(path, out, out_size)) {
@@ -1127,7 +1147,7 @@ static void cmd_remove(const char* args) {
             cmd_error_code = N8_DISK_CE_FILE_NOT_FOUND;
         } else if (errno == EISDIR) {
             cmd_error_flag = true;
-            cmd_error_code = N8_DISK_CE_NOT_A_DIR;
+            cmd_error_code = N8_DISK_CE_IS_A_DIR;
         } else {
             cmd_error_flag = true;
             cmd_error_code = N8_DISK_CE_PERMISSION;

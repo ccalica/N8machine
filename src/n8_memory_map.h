@@ -166,6 +166,7 @@
 #define N8_DISK_CE_CHAN_NOT_OPEN   0x04
 #define N8_DISK_CE_NO_FREE_CHAN    0x05
 #define N8_DISK_CE_DISK_FULL       0x06
+#define N8_DISK_CE_IS_A_DIR        0x07
 #define N8_DISK_CE_PERMISSION      0x08
 #define N8_DISK_CE_BAD_SYNTAX      0x09
 #define N8_DISK_CE_BAD_ARG         0x0A
