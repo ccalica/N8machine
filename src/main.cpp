@@ -38,6 +38,7 @@ using namespace std;
 #include "emu_video.h"
 #include "emu_kbd.h"
 #include "emu_display.h"
+#include "emu_storage.h"
 
 const char* glsl_version;
 SDL_WindowFlags window_flags;
@@ -190,8 +191,15 @@ int SDL_GL_Init() {
     return 0;
 }
 // Main code
-int main(int, char**)
+int main(int argc, char** argv)
 {
+    // Parse CLI args before init
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--storage") == 0 && i + 1 < argc) {
+            storage_set_root_path(argv[++i]);
+        }
+    }
+
     int rtn;
     if((rtn = SDL_GL_Init()) != 0) {
         return rtn;

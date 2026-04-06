@@ -6,6 +6,7 @@
 #include "emu_tty.h"
 #include "emu_video.h"
 #include "emu_kbd.h"
+#include "emu_storage.h"
 
 #include <cstring>
 
@@ -64,6 +65,17 @@ static uint8_t gdb_read_mem(uint16_t addr) {
             case N8_VID_DATA:   return 0x00;  // side-effect register, don't trigger via GDB
             case N8_VID_STATUS: return video_get_status();
             default:            return 0x00;
+        }
+    }
+    // Storage registers live in emu_storage.cpp statics, not mem[]
+    if (addr >= N8_STORAGE_BASE && addr < N8_STORAGE_BASE + N8_DISK_REG_COUNT) {
+        switch (addr - N8_STORAGE_BASE) {
+            case N8_DISK_CHAN:   return storage_get_chan();
+            case N8_DISK_DATA:   return 0x00;   // side-effect, don't trigger
+            case N8_DISK_ERROR:  return storage_get_error();
+            case N8_DISK_CTRL:   return 0x00;   // write-only
+            case N8_DISK_STATUS: return storage_get_status();
+            default:             return 0x00;
         }
     }
     return mem[addr];
@@ -149,6 +161,7 @@ static void gdb_reset(void) {
     tty_reset();
     video_reset();
     kbd_reset();
+    storage_reset();
     memset(frame_buffer, 0, N8_FB_SIZE);
     fb_dirty = true;
 }

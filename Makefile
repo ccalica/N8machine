@@ -19,6 +19,7 @@ IMGUI_DIR = imgui
 SRC_DIR = src
 BUILD_DIR = build
 SOURCES = $(SRC_DIR)/main.cpp $(SRC_DIR)/emulator.cpp $(SRC_DIR)/gdb_bridge.cpp $(SRC_DIR)/emu_tty.cpp $(SRC_DIR)/emu_video.cpp $(SRC_DIR)/emu_kbd.cpp $(SRC_DIR)/emu_dis6502.cpp $(SRC_DIR)/emu_display.cpp
+SOURCES += $(SRC_DIR)/emu_storage.cpp
 SOURCES +=$(SRC_DIR)/emu_labels.cpp $(SRC_DIR)/gui_console.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/gdb_stub.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl2.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
@@ -117,7 +118,7 @@ TEST_EXE = n8_test
 # Production source objects reused by test binary (gdb_stub.o compiled separately with test flags)
 TEST_SRC_OBJS = $(BUILD_DIR)/emulator.o $(TEST_BUILD_DIR)/gdb_bridge.o \
                 $(BUILD_DIR)/emu_tty.o \
-                $(BUILD_DIR)/emu_video.o $(BUILD_DIR)/emu_kbd.o \
+                $(BUILD_DIR)/emu_video.o $(BUILD_DIR)/emu_kbd.o $(BUILD_DIR)/emu_storage.o \
                 $(BUILD_DIR)/emu_dis6502.o $(BUILD_DIR)/emu_labels.o \
                 $(BUILD_DIR)/utils.o $(TEST_BUILD_DIR)/gdb_stub.o
 

@@ -1,11 +1,9 @@
 ; -------------------------------------------------------
-; interrupt.s
+; interrupt.s -- IRQ/NMI/BRK handlers
 ; -------------------------------------------------------
-;
-; Interrupt handler.
 
 .export     _irq_int, _nmi_int, brken, irq
-.import     _tty_putc, tty_recv
+.import     tty_recv
 
 .include    "devices.inc"
 
@@ -14,40 +12,38 @@
 ; -------------------------------------------------------
 ; NMI routine
 
-_nmi_int:   RTI                      ; Return from all NMI interrupts
+_nmi_int:   RTI
 
 ; -------------------------------------------------------
 ; Maskable interrupt (IRQ) service routine
 
-_irq_int:   PHA                 ; Push A
-            TXA                 ; Save X to stack
+_irq_int:   PHA
+            TXA
             PHA
-            TYA                 ; Save Y to stack
+            TYA
             PHA
-            TSX                 ; Transfer stack pointer to X
-            LDA $0104,X         ; Load prev status (STACK PAGE + 4)
-            AND #$10            ; Get just B bit
-            BNE brken           ; BRK op executed
+            TSX
+            LDA $0104,X         ; saved P register on stack
+            AND #$10            ; B flag set?
+            BNE brken           ; yes — BRK instruction
 
 ; -------------------------------------------------------
-; Handle interrupts here
-irq:        LDA N8_TTY_IN_STATUS     ; check for tty char
-            STA N8_FB_BASE+1
+; Drain TTY receive FIFO into firmware ring buffer
+irq:        LDA N8_TTY_IN_STATUS
             AND #$01
-            BEQ irq_rtn
-            LDA N8_TTY_IN_DATA     ; load the char
+            BEQ irq_rtn         ; no more chars
+            LDA N8_TTY_IN_DATA
             JSR tty_recv
-            STA N8_FB_BASE+2
             JMP irq
 
-irq_rtn:    PLA                 ; Load Y from stack
+irq_rtn:    PLA
             TAY
-            PLA                 ; Load X from stack
+            PLA
             TAX
-            PLA                 ; Pop A
-            RTI                 ; Return
+            PLA
+            RTI
 
-; ---------------------------------------------------------------------------
-; BRK oops
+; -------------------------------------------------------
+; BRK — spin forever (unrecoverable)
 
-brken:      JMP brken           ; So very very very broken
+brken:      JMP brken
