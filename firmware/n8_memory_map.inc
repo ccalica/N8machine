@@ -104,6 +104,20 @@
 .define N8_KEY_F1          $80
 .define N8_KEY_F12         $8B
 
+; --- Storage (slot 4) ---
+.define N8_DISK_CHAN          $D880
+.define N8_DISK_DATA          $D881
+.define N8_DISK_ERROR         $D882
+.define N8_DISK_CTRL          $D883
+.define N8_DISK_STATUS        $D884
+
+.define N8_DISK_CONTROL_CHAN  $0F
+.define N8_DISK_CHAN_ACTIVE   $20
+.define N8_DISK_ERR_CMD       $80
+.define N8_DISK_STAT_AVAIL    $0F
+.define N8_DISK_STAT_EOF      $20
+.define N8_DISK_STAT_BUSY     $80
+
 ; --- Frame Buffer ---
 .define N8_FB_BASE        $C000
 .define N8_FB_SIZE        $1000
