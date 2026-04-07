@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>N8Machine Color Compare: 332 vs 233 vs 232+1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'SF Mono', 'Consolas', monospace; background: #1a1a1a; color: #ccc; padding: 20px; }
+  h1 { font-size: 1.4em; margin-bottom: 8px; color: #fff; }
+  h2 { font-size: 1.1em; margin: 24px 0 6px; color: #fff; }
+  h3 { font-size: 0.95em; margin: 16px 0 4px; color: #ddd; }
+  .info { font-size: 0.8em; color: #888; margin-bottom: 12px; }
+  .stats { font-size: 0.85em; color: #aaa; margin: 8px 0 12px; padding: 8px 12px; background: #252525; display: inline-block; }
+  .tabs { display: flex; gap: 2px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab { padding: 8px 16px; background: #333; color: #aaa; cursor: pointer; border: none; font-family: inherit; font-size: 0.9em; }
+  .tab.active { background: #555; color: #fff; }
+  .palette { display: none; }
+  .palette.active { display: block; }
+  .grid { display: flex; flex-wrap: wrap; gap: 1px; margin-bottom: 8px; }
+  .swatch {
+    width: 28px; height: 28px;
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: crosshair;
+    position: relative;
+  }
+  .swatch:hover { outline: 2px solid #fff; z-index: 1; }
+  .section { margin-bottom: 16px; }
+  .section-label { font-size: 0.85em; color: #aaa; margin-bottom: 4px; }
+  #tooltip {
+    display: none; position: fixed; background: #222; border: 1px solid #555;
+    padding: 8px 12px; font-size: 0.8em; pointer-events: none; z-index: 100;
+    line-height: 1.5; max-width: 350px;
+  }
+  #tooltip .preview { width: 40px; height: 40px; display: inline-block; vertical-align: middle; margin-right: 8px; border: 1px solid #555; }
+  .ramp-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .ramp-label { width: 80px; font-size: 0.75em; color: #888; text-align: right; flex-shrink: 0; }
+  .ramp-swatches { display: flex; gap: 1px; }
+  .scale-bar {
+    position: relative; height: 32px;
+    background: linear-gradient(to right, #000, #fff);
+    margin: 8px 0 28px; border: 1px solid #444;
+    width: 100%; max-width: 600px;
+  }
+  .scale-marker {
+    position: absolute; top: 0; width: 2px; height: 100%;
+  }
+  .scale-label {
+    position: absolute; top: 34px; transform: translateX(-50%);
+    font-size: 0.6em; color: #aaa; white-space: nowrap;
+  }
+  .compare-block { margin-bottom: 32px; }
+  .grid-table { border-collapse: collapse; margin: 4px 0 16px; }
+  .grid-table td { padding: 0; }
+  .grid-table .swatch { border-radius: 0; }
+  .grid-table .empty-cell { width: 18px; height: 18px; background: #111; border: 1px solid #222; }
+  .grid-table .row-label { font-size: 0.6em; color: #666; padding: 0 4px; text-align: right; vertical-align: middle; }
+  .grid-table .col-label { font-size: 0.55em; color: #555; text-align: center; padding: 1px 0; vertical-align: bottom; }
+  .grid-table .col-header-r { color: #a66; }
+  .grid-table .col-header-b { color: #66a; }
+  .grid-table .col-header-i { color: #6a6; }
+  .triple-cell { display: flex; flex-direction: column; gap: 0; }
+  .triple-cell .swatch { width: 20px !important; height: 6px !important; border-radius: 0; }
+  .triple-cell .empty-mini { width: 20px; height: 6px; background: #111; border: 1px solid #1a1a1a; }
+  .hue-header { width: 20px; height: 12px; border: none; }
+  .g-select { margin: 4px 0 8px; font-size: 0.8em; }
+</style>
+</head>
+<body>
+
+<h1>N8Machine: 332 vs 233 vs 232+Bright vs 222+2Lum</h1>
+
+<div style="margin-bottom:12px; font-size:0.9em;">
+  <strong style="color:#aaa;">View:</strong>
+  <label style="cursor:pointer; margin-left:8px;"><input type="radio" name="viewMode" value="hueval" checked onchange="setViewMode(this.value)"> Hue × Bright</label>
+  <label style="cursor:pointer; margin-left:8px;"><input type="radio" name="viewMode" value="triple" onchange="setViewMode(this.value)"> Triple Compare</label>
+  <label style="cursor:pointer; margin-left:8px;"><input type="radio" name="viewMode" value="flat" onchange="setViewMode(this.value)"> Flat</label>
+  <label style="cursor:pointer; margin-left:8px;"><input type="radio" name="viewMode" value="bitgrid" onchange="setViewMode(this.value)"> Bit Grid</label>
+  <label style="cursor:pointer; margin-left:8px;"><input type="radio" name="viewMode" value="rbout" onchange="setViewMode(this.value)"> R×B Output</label>
+  <span id="viewModeInfo" style="font-size:0.8em; color:#666; margin-left:12px;"></span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('tabAll')">All 256 by Luminance</button>
+  <button class="tab" onclick="showTab('tabRamps')">Color Ramps</button>
+  <button class="tab" onclick="showTab('tabGrays')">Grayscale</button>
+  <button class="tab" onclick="showTab('tabChannels')">Channel Levels</button>
+  <button class="tab" onclick="showTab('tabSkin')">Warm / Skin</button>
+  <button class="tab" onclick="showTab('tabCool')">Cool / Sky</button>
+  <button class="tab" onclick="showTab('tabEarth')">Earth</button>
+  <button class="tab" onclick="showTab('tabForest')">Forest / Grass</button>
+  <button class="tab" onclick="showTab('tabFire')">Fire / Lava</button>
+  <button class="tab" onclick="showTab('tabWater')">Water / Ice</button>
+  <button class="tab" onclick="showTab('tabMetal')">Metal / Stone</button>
+  <button class="tab" onclick="showTab('tabNeon')">Neon / Saturated</button>
+  <button class="tab" onclick="showTab('tabPastel')">Pastel / Muted</button>
+  <button class="tab" onclick="showTab('tabHue')">Hue Wheel</button>
+  <button class="tab" onclick="showTab('tabStats')">Stats</button>
+</div>
+
+<div id="tooltip"><span class="preview"></span><span class="text"></span></div>
+
+<div id="tabAll" class="palette active"></div>
+<div id="tabRamps" class="palette"></div>
+<div id="tabGrays" class="palette"></div>
+<div id="tabChannels" class="palette"></div>
+<div id="tabSkin" class="palette"></div>
+<div id="tabCool" class="palette"></div>
+<div id="tabEarth" class="palette"></div>
+<div id="tabForest" class="palette"></div>
+<div id="tabFire" class="palette"></div>
+<div id="tabWater" class="palette"></div>
+<div id="tabMetal" class="palette"></div>
+<div id="tabNeon" class="palette"></div>
+<div id="tabPastel" class="palette"></div>
+<div id="tabHue" class="palette"></div>
+<div id="tabStats" class="palette"></div>
+
+<script>
+// --- Schemes ---
+
+const schemes = {
+  '332': {
+    name: 'RRR-GGG-BB (332)',
+    bits: '7-5: R(8) | 4-2: G(8) | 1-0: B(4)',
+    color: function(byte) {
+      const r = (byte >> 5) & 7, g = (byte >> 2) & 7, b = byte & 3;
+      return {
+        r: Math.round(r * 255 / 7),
+        g: Math.round(g * 255 / 7),
+        b: Math.round(b * 255 / 3),
+        rv: r, gv: g, bv: b, byte,
+        label: `$${byte.toString(16).toUpperCase().padStart(2,'0')} R=${r}/7 G=${g}/7 B=${b}/3`
+      };
+    },
+    rLevels: 8, gLevels: 8, bLevels: 4,
+    rBits: 3, gBits: 3, bBits: 2,
+    count: 256
+  },
+  '233': {
+    name: 'RR-GGG-BBB (233)',
+    bits: '7-6: R(4) | 5-3: G(8) | 2-0: B(8)',
+    color: function(byte) {
+      const r = (byte >> 6) & 3, g = (byte >> 3) & 7, b = byte & 7;
+      return {
+        r: Math.round(r * 255 / 3),
+        g: Math.round(g * 255 / 7),
+        b: Math.round(b * 255 / 7),
+        rv: r, gv: g, bv: b, byte,
+        label: `$${byte.toString(16).toUpperCase().padStart(2,'0')} R=${r}/3 G=${g}/7 B=${b}/7`
+      };
+    },
+    rLevels: 4, gLevels: 8, bLevels: 8,
+    rBits: 2, gBits: 3, bBits: 3,
+    count: 256
+  },
+  '232b': {
+    name: 'I-RR-GGG-BB (232+Bright)',
+    bits: '7: Bright | 6-5: R(4) | 4-2: G(8) | 1-0: B(4)',
+    color: function(byte) {
+      const bright = (byte >> 7) & 1;
+      const r = (byte >> 5) & 3, g = (byte >> 2) & 7, b = byte & 3;
+      const scale = bright ? 1.0 : 0.6;
+      return {
+        r: Math.round(r * 255 / 3 * scale),
+        g: Math.round(g * 255 / 7 * scale),
+        b: Math.round(b * 255 / 3 * scale),
+        rv: r, gv: g, bv: b, bright, byte,
+        label: `$${byte.toString(16).toUpperCase().padStart(2,'0')} ${bright?'B':'N'} R=${r}/3 G=${g}/7 B=${b}/3`
+      };
+    },
+    rLevels: 4, gLevels: 8, bLevels: 4,
+    rBits: 2, gBits: 3, bBits: 2,
+    count: 256,
+    hasBright: true
+  },
+  '222_2': {
+    name: 'II-RR-GG-BB (222+2Lum)',
+    bits: '7-6: Intensity(4) | 5-4: R(4) | 3-2: G(4) | 1-0: B(4)',
+    color: function(byte) {
+      const i = (byte >> 6) & 3;
+      const r = (byte >> 4) & 3, g = (byte >> 2) & 3, b = byte & 3;
+      const scale = (i + 1) / 4;
+      return {
+        r: Math.round(r * 85 * scale),
+        g: Math.round(g * 85 * scale),
+        b: Math.round(b * 85 * scale),
+        rv: r, gv: g, bv: b, iv: i, byte,
+        label: `$${byte.toString(16).toUpperCase().padStart(2,'0')} I=${i} R=${r}/3 G=${g}/3 B=${b}/3`
+      };
+    },
+    rLevels: 4, gLevels: 4, bLevels: 4,
+    rBits: 2, gBits: 2, bBits: 2,
+    count: 256
+  }
+};
+
+const schemeKeys = ['332', '233', '232b', '222_2'];
+const schemeColors = { '332': '#6af', '233': '#fa6', '232b': '#6f6', '222_2': '#fa0' };
+
+function rgbKey(c) { return `${c.r},${c.g},${c.b}`; }
+function rgbStr(c) { return `rgb(${c.r},${c.g},${c.b})`; }
+function luminance(c) { return 0.299*c.r + 0.587*c.g + 0.114*c.b; }
+
+function getAllColors(key) {
+  const s = schemes[key];
+  const colors = [];
+  for (let i = 0; i < s.count; i++) colors.push(s.color(i));
+  return colors;
+}
+
+function getUniqueColors(key) {
+  const all = getAllColors(key);
+  const seen = new Set();
+  const unique = [];
+  for (const c of all) {
+    const k = `${c.r},${c.g},${c.b}`;
+    if (!seen.has(k)) { seen.add(k); unique.push(c); }
+  }
+  return unique;
+}
+
+// --- Swatch ---
+
+function makeSwatch(c, size) {
+  const div = document.createElement('div');
+  div.className = 'swatch';
+  div.style.backgroundColor = rgbStr(c);
+  if (size) { div.style.width = size + 'px'; div.style.height = size + 'px'; }
+  const tip = c.label + `\nRGB(${c.r}, ${c.g}, ${c.b})\nLum: ${Math.round(luminance(c))}`;
+  div.addEventListener('mouseenter', e => showTooltip(e, c, tip));
+  div.addEventListener('mousemove', e => moveTooltip(e));
+  div.addEventListener('mouseleave', hideTooltip);
+  return div;
+}
+
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, c, text) {
+  tooltip.querySelector('.preview').style.backgroundColor = rgbStr(c);
+  tooltip.querySelector('.text').innerHTML = text.replace(/\n/g, '<br>');
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  tooltip.style.left = (e.clientX + 16) + 'px';
+  tooltip.style.top = (e.clientY + 16) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+function makeSection(label) {
+  const div = document.createElement('div');
+  div.className = 'section';
+  const lbl = document.createElement('div');
+  lbl.className = 'section-label';
+  lbl.textContent = label;
+  div.appendChild(lbl);
+  return div;
+}
+
+// --- Tab: All by luminance ---
+
+function buildAll() {
+  const container = document.getElementById('tabAll');
+  for (const key of schemeKeys) {
+    const s = schemes[key];
+    const unique = getUniqueColors(key);
+    unique.sort((a, b) => luminance(a) - luminance(b));
+
+    const section = makeSection(`${s.name} — ${unique.length} unique colors`);
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    for (const c of unique) grid.appendChild(makeSwatch(c));
+    section.appendChild(grid);
+    container.appendChild(section);
+  }
+}
+
+// --- Tab: Color ramps ---
+
+function buildRamps() {
+  const container = document.getElementById('tabRamps');
+  container.innerHTML = '<h2>Pure Color Ramps</h2><div class="info">Each primary and secondary, all available levels</div>';
+
+  const rampDefs = [
+    { name: 'Red',     filter: c => c.g === 0 && c.b === 0 },
+    { name: 'Green',   filter: c => c.r === 0 && c.b === 0 },
+    { name: 'Blue',    filter: c => c.r === 0 && c.g === 0 },
+    { name: 'Yellow',  filter: c => c.r === c.g && c.b === 0 && c.r > 0 },
+    { name: 'Cyan',    filter: c => c.r === 0 && c.g === c.b && c.g > 0 },
+    { name: 'Magenta', filter: c => c.g === 0 && c.r === c.b && c.r > 0 },
+    { name: 'Gray',    filter: c => c.r === c.g && c.g === c.b },
+  ];
+
+  for (const ramp of rampDefs) {
+    const h3 = document.createElement('h3');
+    h3.textContent = ramp.name;
+    container.appendChild(h3);
+
+    for (const key of schemeKeys) {
+      const s = schemes[key];
+      const unique = getUniqueColors(key);
+      let matched = unique.filter(ramp.filter);
+      // For non-exact matches (yellow/cyan/magenta), also find near-matches
+      if (ramp.name === 'Yellow') {
+        matched = unique.filter(c => c.b === 0 && c.r > 0 && c.g > 0 && Math.abs(c.r - c.g) <= 20);
+      } else if (ramp.name === 'Cyan') {
+        matched = unique.filter(c => c.r === 0 && c.g > 0 && c.b > 0 && Math.abs(c.g - c.b) <= 20);
+      } else if (ramp.name === 'Magenta') {
+        matched = unique.filter(c => c.g === 0 && c.r > 0 && c.b > 0 && Math.abs(c.r - c.b) <= 20);
+      }
+      matched.sort((a, b) => luminance(a) - luminance(b));
+
+      const row = document.createElement('div');
+      row.className = 'ramp-row';
+      const lbl = document.createElement('div');
+      lbl.className = 'ramp-label';
+      lbl.textContent = `${s.name.split(' ')[0]} (${matched.length})`;
+      row.appendChild(lbl);
+      const swatches = document.createElement('div');
+      swatches.className = 'ramp-swatches';
+      for (const c of matched) swatches.appendChild(makeSwatch(c, 24));
+      row.appendChild(swatches);
+      container.appendChild(row);
+    }
+  }
+}
+
+// --- Tab: Grayscale ---
+
+function buildGrays() {
+  const container = document.getElementById('tabGrays');
+  container.innerHTML = '<h2>Grayscale Ramps</h2><div class="info">Exact grays (R=G=B) and near-grays (max channel diff &le; 10)</div>';
+
+  for (const key of schemeKeys) {
+    const s = schemes[key];
+    const unique = getUniqueColors(key);
+
+    // Exact grays
+    const exact = unique.filter(c => c.r === c.g && c.g === c.b);
+    exact.sort((a, b) => a.r - b.r);
+
+    // Near grays
+    const near = unique.filter(c => {
+      const mx = Math.max(c.r, c.g, c.b), mn = Math.min(c.r, c.g, c.b);
+      return mx - mn <= 10 && mx - mn > 0;
+    });
+    near.sort((a, b) => luminance(a) - luminance(b));
+
+    const h3 = document.createElement('h3');
+    h3.textContent = s.name;
+    container.appendChild(h3);
+
+    const row1 = document.createElement('div');
+    row1.className = 'ramp-row';
+    const lbl1 = document.createElement('div');
+    lbl1.className = 'ramp-label';
+    lbl1.textContent = `Exact (${exact.length})`;
+    row1.appendChild(lbl1);
+    const sw1 = document.createElement('div');
+    sw1.className = 'ramp-swatches';
+    for (const c of exact) sw1.appendChild(makeSwatch(c, 32));
+    row1.appendChild(sw1);
+    container.appendChild(row1);
+
+    if (near.length > 0) {
+      const row2 = document.createElement('div');
+      row2.className = 'ramp-row';
+      const lbl2 = document.createElement('div');
+      lbl2.className = 'ramp-label';
+      lbl2.textContent = `Near (${near.length})`;
+      row2.appendChild(lbl2);
+      const sw2 = document.createElement('div');
+      sw2.className = 'ramp-swatches';
+      for (const c of near) sw2.appendChild(makeSwatch(c, 32));
+      row2.appendChild(sw2);
+      container.appendChild(row2);
+    }
+  }
+}
+
+// --- Tab: Channel levels ---
+
+function buildChannels() {
+  const container = document.getElementById('tabChannels');
+  container.innerHTML = '<h2>Per-Channel Output Levels</h2><div class="info">Where each scheme places its channel values on the 0-255 scale. Green markers on gradient.</div>';
+
+  for (const key of schemeKeys) {
+    const s = schemes[key];
+    const h3 = document.createElement('h3');
+    h3.textContent = s.name;
+    container.appendChild(h3);
+
+    for (const [ch, chName, maxVal] of [['r','Red',s.rLevels], ['g','Green',s.gLevels], ['b','Blue',s.bLevels]]) {
+      const levels = new Set();
+      const all = getAllColors(key);
+      for (const c of all) levels.add(c[ch]);
+      const sorted = [...levels].sort((a, b) => a - b);
+
+      const row = document.createElement('div');
+      row.style.marginBottom = '4px';
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'display:inline-block; width:50px; font-size:0.75em; color:#888;';
+      lbl.textContent = chName;
+      row.appendChild(lbl);
+
+      const bar = document.createElement('div');
+      bar.className = 'scale-bar';
+      bar.style.display = 'inline-block';
+      bar.style.width = '500px';
+      bar.style.verticalAlign = 'middle';
+      bar.style.marginBottom = '24px';
+
+      const barColor = ch === 'r' ? '#f44' : ch === 'g' ? '#4f4' : '#44f';
+      for (const val of sorted) {
+        const pct = (val / 255) * 100;
+        const marker = document.createElement('div');
+        marker.className = 'scale-marker';
+        marker.style.left = pct + '%';
+        marker.style.background = barColor;
+        bar.appendChild(marker);
+        const mlbl = document.createElement('div');
+        mlbl.className = 'scale-label';
+        mlbl.style.left = pct + '%';
+        mlbl.textContent = val;
+        bar.appendChild(mlbl);
+      }
+      row.appendChild(bar);
+
+      const count = document.createElement('span');
+      count.style.cssText = 'font-size:0.75em; color:#888; margin-left:8px;';
+      count.textContent = `${sorted.length} levels`;
+      row.appendChild(count);
+
+      container.appendChild(row);
+    }
+  }
+}
+
+// --- Tab: Stats ---
+
+function buildStats() {
+  const container = document.getElementById('tabStats');
+  container.innerHTML = '<h2>Palette Statistics</h2>';
+
+  const rows = [];
+
+  for (const key of schemeKeys) {
+    const s = schemes[key];
+    const unique = getUniqueColors(key);
+    const all = getAllColors(key);
+
+    // Unique per channel
+    const rVals = new Set(), gVals = new Set(), bVals = new Set();
+    for (const c of all) { rVals.add(c.r); gVals.add(c.g); bVals.add(c.b); }
+
+    // Grays
+    const exactGrays = unique.filter(c => c.r === c.g && c.g === c.b).length;
+
+    // Warm R>G>B
+    const warm = unique.filter(c => c.r > c.g && c.g >= c.b && c.r > 30).length;
+
+    // Cool B>=R, B>=G
+    const cool = unique.filter(c => c.b >= c.r && c.b >= c.g && c.b > 30).length;
+
+    // Luminance distribution
+    const lums = unique.map(c => luminance(c)).sort((a,b) => a - b);
+    const lumGaps = [];
+    for (let i = 1; i < lums.length; i++) lumGaps.push(lums[i] - lums[i-1]);
+    const avgGap = lumGaps.length ? (lumGaps.reduce((a,b)=>a+b,0)/lumGaps.length).toFixed(1) : 0;
+    const maxGap = lumGaps.length ? Math.max(...lumGaps).toFixed(1) : 0;
+
+    // Pure reds/greens/blues
+    const pureR = unique.filter(c => c.g === 0 && c.b === 0 && c.r > 0).length;
+    const pureG = unique.filter(c => c.r === 0 && c.b === 0 && c.g > 0).length;
+    const pureB = unique.filter(c => c.r === 0 && c.g === 0 && c.b > 0).length;
+
+    rows.push({
+      name: s.name.split('(')[1]?.replace(')','') || s.name,
+      unique: unique.length,
+      dupes: 256 - unique.length,
+      rLevels: rVals.size,
+      gLevels: gVals.size,
+      bLevels: bVals.size,
+      grays: exactGrays,
+      warm, cool,
+      pureR, pureG, pureB,
+      avgGap, maxGap
+    });
+  }
+
+  let html = '<table class="stats-table" style="border-collapse:collapse; font-size:0.85em; margin:12px 0;">';
+  html += '<tr style="background:#333;color:#ddd;">';
+  html += '<th style="padding:6px 12px;border:1px solid #444;text-align:left;">Metric</th>';
+  for (const r of rows) html += `<th style="padding:6px 12px;border:1px solid #444;">${r.name}</th>`;
+  html += '</tr>';
+
+  const metrics = [
+    ['Unique colors', 'unique'],
+    ['Wasted (dupes)', 'dupes'],
+    ['R levels', 'rLevels'],
+    ['G levels', 'gLevels'],
+    ['B levels', 'bLevels'],
+    ['Exact grays', 'grays'],
+    ['Pure reds', 'pureR'],
+    ['Pure greens', 'pureG'],
+    ['Pure blues', 'pureB'],
+    ['Warm tones (R>G>B)', 'warm'],
+    ['Cool tones (B dom)', 'cool'],
+    ['Avg lum gap', 'avgGap'],
+    ['Max lum gap', 'maxGap'],
+  ];
+
+  for (const [label, key] of metrics) {
+    html += '<tr>';
+    html += `<td style="padding:4px 12px;border:1px solid #444;color:#aaa;">${label}</td>`;
+    // Find best value for highlighting
+    const vals = rows.map(r => parseFloat(r[key]));
+    const isLowerBetter = key === 'dupes' || key === 'maxGap' || key === 'avgGap';
+    const best = isLowerBetter ? Math.min(...vals) : Math.max(...vals);
+    for (const r of rows) {
+      const val = r[key];
+      const isBest = parseFloat(val) === best && vals.filter(v => v === best).length < rows.length;
+      html += `<td style="padding:4px 12px;border:1px solid #444;text-align:center;${isBest ? 'color:#6f6;font-weight:bold;' : 'color:#ccc;'}">${val}</td>`;
+    }
+    html += '</tr>';
+  }
+
+  html += '</table>';
+  html += '<div class="info" style="margin-top:8px;">Green = best in row (lower is better for dupes/gaps)</div>';
+  container.innerHTML += html;
+}
+
+
+// --- Tab: Hue Wheel ---
+
+function buildHueWheel() {
+  const container = document.getElementById('tabHue');
+  container.innerHTML = '<h2>Colors by Hue</h2><div class="info">All non-gray colors grouped into 12 hue buckets (30&deg; each), sorted by luminance within each bucket.</div>';
+
+  const hueNames = ['Red','Red-Yel','Yellow','Yel-Grn','Green','Grn-Cyn',
+                     'Cyan','Cyn-Blu','Blue','Blu-Mag','Magenta','Mag-Red'];
+
+  for (const key of schemeKeys) {
+    const s = schemes[key];
+    const unique = getUniqueColors(key);
+    const h3 = document.createElement('h3');
+    h3.textContent = s.name;
+    container.appendChild(h3);
+
+    // Bucket colors by hue
+    const buckets = Array.from({length: 12}, () => []);
+
+    for (const c of unique) {
+      const mx = Math.max(c.r,c.g,c.b), mn = Math.min(c.r,c.g,c.b);
+      if (mx - mn < 10) continue; // skip grays
+
+      let h;
+      if (mx === mn) h = 0;
+      else if (mx === c.r) h = 60 * (((c.g - c.b) / (mx - mn)) % 6);
+      else if (mx === c.g) h = 60 * ((c.b - c.r) / (mx - mn) + 2);
+      else h = 60 * ((c.r - c.g) / (mx - mn) + 4);
+      if (h < 0) h += 360;
+
+      const bucket = Math.floor(h / 30) % 12;
+      buckets[bucket].push(c);
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:grid; grid-template-columns:70px 1fr; gap:2px 8px; margin-bottom:16px;';
+
+    for (let i = 0; i < 12; i++) {
+      const lbl = document.createElement('div');
+      lbl.style.cssText = 'font-size:0.7em; color:#888; text-align:right; padding-top:4px;';
+      lbl.textContent = `${hueNames[i]} (${buckets[i].length})`;
+      wrapper.appendChild(lbl);
+
+      const row = document.createElement('div');
+      row.className = 'ramp-swatches';
+      buckets[i].sort((a, b) => luminance(a) - luminance(b));
+      for (const c of buckets[i]) row.appendChild(makeSwatch(c, 22));
+      wrapper.appendChild(row);
+    }
+    container.appendChild(wrapper);
+  }
+}
+
+// --- Grid mode ---
+
+let viewMode = 'hueval'; // hueval, triple, flat, bitgrid, rbout
+// compat shim
+Object.defineProperty(window, 'gridMode', { get() { return viewMode === 'bitgrid'; } });
+
+// For a scheme, get every color with its grid position, sorted for smooth column ordering.
+// Returns { gLevels, colCount, colOrder: [...col indices], colorAt: (g, colIdx) => color }
+function getGridLayout(key) {
+  const s = schemes[key];
+  // 222_2 uses I(4)×G(4) = 16 rows; others use G(8)
+  const gLevels = key === '222_2' ? 16 : s.gLevels;
+
+  // Enumerate all (non-G) dimension combos as columns
+  // Each column is identified by its component values
+  let colDefs;
+  if (key === '332') {
+    // 8R × 4B = 32 cols
+    colDefs = [];
+    for (let r = 0; r < 8; r++)
+      for (let b = 0; b < 4; b++)
+        colDefs.push({ r, b });
+  } else if (key === '233') {
+    // 4R × 8B = 32 cols
+    colDefs = [];
+    for (let r = 0; r < 4; r++)
+      for (let b = 0; b < 8; b++)
+        colDefs.push({ r, b });
+  } else if (key === '232b') {
+    // 232b: 2bright × 4R × 4B = 32 cols
+    // Interleave normal+bright for same hue: pair (N,r,b) next to (B,r,b)
+    colDefs = [];
+    for (let r = 0; r < 4; r++)
+      for (let b = 0; b < 4; b++)
+        for (let bright = 0; bright < 2; bright++)
+          colDefs.push({ r, b, bright });
+  } else {
+    // 222_2: 4I × 4R × 4B, use rows=I×G(16), cols=R×B(16)
+    colDefs = [];
+    for (let r = 0; r < 4; r++)
+      for (let b = 0; b < 4; b++)
+        colDefs.push({ r, b });
+  }
+
+  // Compute hue sort key for each column using its color at G=0
+  for (const col of colDefs) {
+    const c = colorForCol(key, 0, col);
+    const rn = c.r / 255, bn = c.b / 255;
+    if (rn === 0 && bn === 0) {
+      col.sortKey = -9999;
+      col.sortKey2 = (col.bright || 0);
+    } else {
+      col.sortKey = Math.atan2(rn, bn); // 0=pure blue end, PI/2=pure red end
+      col.sortKey2 = c.r + c.b; // brightness tiebreak
+    }
+  }
+
+  colDefs.sort((a, b) => {
+    if (Math.abs(a.sortKey - b.sortKey) > 0.0001) return a.sortKey - b.sortKey;
+    return a.sortKey2 - b.sortKey2;
+  });
+
+  return { gLevels, colDefs, colorForCol: (g, col) => colorForCol(key, g, col) };
+}
+
+function colorForCol(key, g, col) {
+  const s = schemes[key];
+  let byte;
+  if (key === '332') {
+    byte = (col.r << 5) | (g << 2) | col.b;
+  } else if (key === '233') {
+    byte = (col.r << 6) | (g << 3) | col.b;
+  } else if (key === '232b') {
+    byte = ((col.bright || 0) << 7) | (col.r << 5) | (g << 2) | col.b;
+  } else {
+    // 222_2: g encodes both intensity and green: g = i*4 + gv
+    const i = Math.floor(g / 4), gv = g % 4;
+    byte = (i << 6) | (col.r << 4) | (gv << 2) | col.b;
+  }
+  return s.color(byte);
+}
+
+// Build a grid table for a scheme, with optional filter set of rgb keys
+function buildGridTable(key, filterSet) {
+  const layout = getGridLayout(key);
+  const table = document.createElement('table');
+  table.className = 'grid-table';
+
+  for (let g = 0; g < layout.gLevels; g++) {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.className = 'row-label';
+    if (key === '222_2') {
+      const i = Math.floor(g / 4), gv = g % 4;
+      tdLabel.textContent = `I${i}G${gv}`;
+    } else {
+      tdLabel.textContent = `G${g}`;
+    }
+    tr.appendChild(tdLabel);
+
+    for (const col of layout.colDefs) {
+      const td = document.createElement('td');
+      const c = layout.colorForCol(g, col);
+      if (!filterSet || filterSet.has(rgbKey(c))) {
+        const sw = makeSwatch(c, 18);
+        sw.style.width = '18px';
+        sw.style.height = '18px';
+        td.appendChild(sw);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'empty-cell';
+        td.appendChild(empty);
+      }
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  return table;
+}
+
+// Render a section for one scheme
+function buildSchemeSection(container, key, filterFn, showAll) {
+  try {
+    const s = schemes[key];
+    const unique = getUniqueColors(key);
+    const matched = showAll ? unique : unique.filter(filterFn);
+    const filterSet = showAll ? null : new Set(matched.map(c => rgbKey(c)));
+
+    const section = makeSection(`${s.name} — ${matched.length} colors`);
+
+    if (viewMode === 'bitgrid') {
+      section.appendChild(buildGridTable(key, filterSet));
+    } else if (viewMode === 'hueval') {
+      section.appendChild(buildHueValGrid(key, filterSet));
+    } else if (viewMode === 'rbout') {
+      // Show 3 G slices
+      for (const gLvl of [0, 3, 7]) {
+        const lbl = document.createElement('div');
+        lbl.style.cssText = 'font-size:0.75em; color:#888; margin:4px 0 2px;';
+        lbl.textContent = `G=${gLvl}`;
+        section.appendChild(lbl);
+        section.appendChild(buildRBGrid(key, gLvl, filterSet));
+      }
+    } else {
+      // flat
+      matched.sort((a, b) => luminance(a) - luminance(b));
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      for (const c of matched) grid.appendChild(makeSwatch(c));
+      section.appendChild(grid);
+    }
+
+    container.appendChild(section);
+  } catch (e) {
+    console.error(`buildSchemeSection failed for ${key}:`, e);
+    const err = document.createElement('div');
+    err.style.color = '#f66';
+    err.textContent = `Error building ${key}: ${e.message}`;
+    container.appendChild(err);
+  }
+}
+
+// All tone/filter views defined in one place
+const toneViews = [
+  ['tabAll', 'Full Palette', 'All colors', null, true],
+  ['tabSkin', 'Warm / Skin Tones', 'R &gt; G &gt; B, muted warmth',
+    c => c.r > c.g && c.g >= c.b && c.r > 30],
+  ['tabCool', 'Cool / Sky Tones', 'B &ge; R and B &ge; G',
+    c => c.b >= c.r && c.b >= c.g && c.b > 30],
+  ['tabEarth', 'Earth / Brown Tones', 'R &gt; G &gt; B, low blue, muted',
+    c => { const sat = Math.max(c.r,c.g,c.b)-Math.min(c.r,c.g,c.b); return c.r>c.g&&c.g>c.b&&c.b<100&&c.r>30&&c.r<220&&sat<180; }],
+  ['tabForest', 'Forest / Grass Tones', 'G dominant',
+    c => c.g>c.r&&c.g>c.b&&c.g>30],
+  ['tabFire', 'Fire / Lava Tones', 'R dominant, high sat, B low',
+    c => c.r>60&&c.r>=c.g*1.5&&c.b<c.r*0.4&&c.g<c.r],
+  ['tabWater', 'Water / Ice Tones', 'B &ge; G, R low',
+    c => c.b>=c.g&&c.b>c.r&&c.r<c.b*0.7&&c.b>30],
+  ['tabMetal', 'Metal / Stone Tones', 'Low saturation, not pure gray',
+    c => { const mx=Math.max(c.r,c.g,c.b),mn=Math.min(c.r,c.g,c.b),sat=mx-mn; return sat>5&&sat<50&&mx>20&&mx<240; }],
+  ['tabNeon', 'Neon / High Saturation', 'One channel high, one low',
+    c => { const mx=Math.max(c.r,c.g,c.b),mn=Math.min(c.r,c.g,c.b); return mx>=170&&mn<=40&&(mx-mn)>=150; }],
+  ['tabPastel', 'Pastel / Muted Tones', 'All channels moderate, low contrast',
+    c => { const mx=Math.max(c.r,c.g,c.b),mn=Math.min(c.r,c.g,c.b); return mn>=60&&mx>=100&&(mx-mn)>10&&(mx-mn)<100; }],
+];
+
+// Rebuild all tabs
+function rebuildAll() {
+  const allTabIds = ['tabAll','tabRamps','tabGrays','tabChannels','tabSkin','tabCool',
+    'tabEarth','tabForest','tabFire','tabWater','tabMetal','tabNeon','tabPastel','tabHue','tabStats'];
+  for (const id of allTabIds) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  }
+
+  const modeLabels = {
+    flat: 'sorted by luminance', bitgrid: 'Bit Grid: rows=G, cols=R×B',
+    hueval: 'Hue × Brightness: 24 hue cols, 8 brightness rows',
+    triple: 'Triple Compare: all 3 schemes per cell',
+    rbout: 'R×B Output: density in output color space'
+  };
+
+  // Tone/filter views (includes tabAll)
+  for (const view of toneViews) {
+    const [tabId, title, desc, filterFn, showAll] = view;
+    const container = document.getElementById(tabId);
+    if (!container) { console.warn('Missing tab:', tabId); continue; }
+    container.innerHTML = `<h2>${title}</h2><div class="info">${desc} (${modeLabels[viewMode]})</div>`;
+
+    if (viewMode === 'triple') {
+      container.appendChild(buildTripleGrid(filterFn, !!showAll));
+    } else {
+      for (const key of schemeKeys) buildSchemeSection(container, key, filterFn, !!showAll);
+    }
+  }
+
+  // Ramps
+  const rampDefs = [
+    { name: 'Red',     filter: c => c.g === 0 && c.b === 0 && c.r > 0 },
+    { name: 'Green',   filter: c => c.r === 0 && c.b === 0 && c.g > 0 },
+    { name: 'Blue',    filter: c => c.r === 0 && c.g === 0 && c.b > 0 },
+    { name: 'Yellow',  filter: c => c.b === 0 && c.r > 0 && c.g > 0 && Math.abs(c.r-c.g)<=20 },
+    { name: 'Cyan',    filter: c => c.r === 0 && c.g > 0 && c.b > 0 && Math.abs(c.g-c.b)<=20 },
+    { name: 'Magenta', filter: c => c.g === 0 && c.r > 0 && c.b > 0 && Math.abs(c.r-c.b)<=20 },
+    { name: 'Gray',    filter: c => c.r === c.g && c.g === c.b },
+  ];
+  if (viewMode !== 'flat') {
+    const container = document.getElementById('tabRamps');
+    container.innerHTML = `<h2>Pure Color Ramps</h2><div class="info">${modeLabels[viewMode]}</div>`;
+    for (const ramp of rampDefs) {
+      const h3 = document.createElement('h3');
+      h3.textContent = ramp.name;
+      container.appendChild(h3);
+      if (viewMode === 'triple') {
+        container.appendChild(buildTripleGrid(ramp.filter, false));
+      } else {
+        for (const key of schemeKeys) buildSchemeSection(container, key, ramp.filter, false);
+      }
+    }
+  } else {
+    buildRamps();
+  }
+
+  buildGrays();
+  buildChannels();
+  buildHueWheel();
+  buildStats();
+}
+
+// --- HSV helpers ---
+
+function rgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0, s = mx === 0 ? 0 : d / mx, v = mx;
+  if (d > 0) {
+    if (mx === r) h = 60 * (((g - b) / d) % 6);
+    else if (mx === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+    if (h < 0) h += 360;
+  }
+  return { h, s, v };
+}
+
+// --- Hue × Brightness grid (Option A) ---
+
+const HUE_COLS = 36;        // 10° per bin
+const BRIGHT_ROWS = 10;
+const GRAY_COL = HUE_COLS;  // extra column for grays
+
+function hueValBucket(c) {
+  const hsv = rgbToHsv(c.r, c.g, c.b);
+  if (hsv.v < 0.02) return null; // true black — skip
+  const brightRow = Math.min(BRIGHT_ROWS - 1, Math.floor(hsv.v * BRIGHT_ROWS));
+  if (hsv.s < 0.12) {
+    return { col: GRAY_COL, row: brightRow }; // gray column
+  }
+  const hueCol = Math.floor(hsv.h / (360 / HUE_COLS)) % HUE_COLS;
+  return { col: hueCol, row: brightRow };
+}
+
+function buildHueValGrid(key, filterSet) {
+  const all = getAllColors(key);
+  const totalCols = HUE_COLS + 1; // +1 for gray column
+
+  // Bucket: [row][col] = array of colors
+  const grid = Array.from({length: BRIGHT_ROWS}, () =>
+    Array.from({length: totalCols}, () => [])
+  );
+
+  const seen = new Set();
+  let placed = 0;
+  for (const c of all) {
+    if (filterSet && !filterSet.has(rgbKey(c))) continue;
+    const rk = rgbKey(c);
+    if (seen.has(rk)) continue; // deduplicate
+    seen.add(rk);
+    const bucket = hueValBucket(c);
+    if (!bucket) continue;
+    grid[bucket.row][bucket.col].push(c);
+    placed++;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'grid-table';
+
+  // Hue header row
+  const trH = document.createElement('tr');
+  trH.appendChild(document.createElement('td'));
+  for (let h = 0; h < HUE_COLS; h++) {
+    const td = document.createElement('td');
+    const hue = h * (360 / HUE_COLS);
+    const marker = document.createElement('div');
+    marker.className = 'hue-header';
+    marker.style.background = `hsl(${hue}, 100%, 50%)`;
+    marker.style.width = '16px';
+    td.appendChild(marker);
+    trH.appendChild(td);
+  }
+  // Gray header
+  const tdGray = document.createElement('td');
+  tdGray.style.cssText = 'font-size:0.55em; color:#888; text-align:center; padding-left:4px;';
+  tdGray.textContent = 'Gray';
+  trH.appendChild(tdGray);
+  table.appendChild(trH);
+
+  // Data rows — bright at top, dark at bottom
+  for (let row = BRIGHT_ROWS - 1; row >= 0; row--) {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.className = 'row-label';
+    tdLabel.textContent = `${Math.round((row + 0.5) / BRIGHT_ROWS * 100)}%`;
+    tr.appendChild(tdLabel);
+
+    for (let col = 0; col < totalCols; col++) {
+      const td = document.createElement('td');
+      const colors = grid[row][col];
+      if (colors.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-cell';
+        empty.style.width = '16px';
+        empty.style.height = '16px';
+        td.appendChild(empty);
+      } else if (colors.length === 1) {
+        const sw = makeSwatch(colors[0], 16);
+        sw.style.width = '16px';
+        sw.style.height = '16px';
+        td.appendChild(sw);
+      } else {
+        // Multiple colors in cell — stack them
+        const stack = document.createElement('div');
+        stack.style.cssText = 'display:flex; flex-direction:column; gap:0;';
+        const h = Math.max(4, Math.floor(16 / colors.length));
+        for (const c of colors) {
+          const sw = makeSwatch(c, h);
+          sw.style.width = '16px';
+          sw.style.height = h + 'px';
+          stack.appendChild(sw);
+        }
+        td.appendChild(stack);
+      }
+      if (col === GRAY_COL) td.style.paddingLeft = '4px';
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  // Show count
+  const info = document.createElement('div');
+  info.style.cssText = 'font-size:0.7em; color:#666; margin-top:2px;';
+  info.textContent = `${placed} unique colors placed (cells with stacked colors = multiple colors share that hue/brightness)`;
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(table);
+  wrapper.appendChild(info);
+  return wrapper;
+}
+
+// --- Triple Compare grid (Option C) ---
+
+function buildTripleGrid(filterFn, showAll) {
+  const totalCols = HUE_COLS + 1; // +1 for gray
+
+  // Build per-scheme grids: [row][col] = best color (most saturated)
+  const grids = {};
+  for (const key of schemeKeys) {
+    const unique = getUniqueColors(key);
+    const matched = showAll ? unique : unique.filter(filterFn);
+    const filterSet = new Set(matched.map(c => rgbKey(c)));
+
+    grids[key] = Array.from({length: BRIGHT_ROWS}, () => Array(totalCols).fill(null));
+    const seen = new Set();
+    for (const c of getAllColors(key)) {
+      if (!filterSet.has(rgbKey(c))) continue;
+      const rk = rgbKey(c);
+      if (seen.has(rk)) continue;
+      seen.add(rk);
+      const bucket = hueValBucket(c);
+      if (!bucket) continue;
+      const existing = grids[key][bucket.row][bucket.col];
+      if (!existing) {
+        grids[key][bucket.row][bucket.col] = c;
+      } else {
+        const hsv1 = rgbToHsv(existing.r, existing.g, existing.b);
+        const hsv2 = rgbToHsv(c.r, c.g, c.b);
+        if (hsv2.s > hsv1.s) grids[key][bucket.row][bucket.col] = c;
+      }
+    }
+  }
+
+  const table = document.createElement('table');
+  table.className = 'grid-table';
+
+  // Hue header
+  const trH = document.createElement('tr');
+  trH.appendChild(document.createElement('td'));
+  for (let h = 0; h < HUE_COLS; h++) {
+    const td = document.createElement('td');
+    const hue = h * (360 / HUE_COLS);
+    const marker = document.createElement('div');
+    marker.className = 'hue-header';
+    marker.style.background = `hsl(${hue}, 100%, 50%)`;
+    marker.style.width = '16px';
+    td.appendChild(marker);
+    trH.appendChild(td);
+  }
+  const tdGH = document.createElement('td');
+  tdGH.style.cssText = 'font-size:0.5em; color:#888; padding-left:4px;';
+  tdGH.textContent = 'Gray';
+  trH.appendChild(tdGH);
+  table.appendChild(trH);
+
+  for (let row = BRIGHT_ROWS - 1; row >= 0; row--) {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.className = 'row-label';
+    tdLabel.textContent = `${Math.round((row + 0.5) / BRIGHT_ROWS * 100)}%`;
+    tr.appendChild(tdLabel);
+
+    for (let col = 0; col < totalCols; col++) {
+      const td = document.createElement('td');
+      const cell = document.createElement('div');
+      cell.className = 'triple-cell';
+
+      for (const key of schemeKeys) {
+        const c = grids[key][row][col];
+        if (c) {
+          const sw = makeSwatch(c, 6);
+          sw.style.width = '16px';
+          sw.style.height = '6px';
+          cell.appendChild(sw);
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'empty-mini';
+          empty.style.width = '16px';
+          cell.appendChild(empty);
+        }
+      }
+      td.appendChild(cell);
+      if (col === GRAY_COL) td.style.paddingLeft = '4px';
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  return table;
+}
+
+// --- R×B Output grid (Option B) ---
+
+const RB_STEPS = 12;
+
+function buildRBGrid(key, gLevel, filterSet) {
+  const s = schemes[key];
+  const all = getAllColors(key);
+
+  // Grid: [bStep][rStep] = nearest color
+  const grid = Array.from({length: RB_STEPS}, () => Array(RB_STEPS).fill(null));
+  const gridDist = Array.from({length: RB_STEPS}, () => Array(RB_STEPS).fill(Infinity));
+
+  for (const c of all) {
+    if (filterSet && !filterSet.has(rgbKey(c))) continue;
+    // Only show colors near the target G level
+    const targetG = Math.round(gLevel * 255 / 7);
+    if (Math.abs(c.g - targetG) > 25) continue;
+
+    const rStep = Math.min(RB_STEPS - 1, Math.floor(c.r / 255 * RB_STEPS));
+    const bStep = Math.min(RB_STEPS - 1, Math.floor(c.b / 255 * RB_STEPS));
+    const rTarget = (rStep + 0.5) * 255 / RB_STEPS;
+    const bTarget = (bStep + 0.5) * 255 / RB_STEPS;
+    const dist = Math.abs(c.r - rTarget) + Math.abs(c.b - bTarget);
+
+    if (dist < gridDist[bStep][rStep]) {
+      gridDist[bStep][rStep] = dist;
+      grid[bStep][rStep] = c;
+    }
+  }
+
+  const table = document.createElement('table');
+  table.className = 'grid-table';
+
+  // R header
+  const trR = document.createElement('tr');
+  const corner = document.createElement('td');
+  corner.className = 'row-label';
+  corner.textContent = 'B\\R';
+  trR.appendChild(corner);
+  for (let r = 0; r < RB_STEPS; r++) {
+    const td = document.createElement('td');
+    td.className = 'col-label col-header-r';
+    td.textContent = Math.round((r + 0.5) * 255 / RB_STEPS);
+    trR.appendChild(td);
+  }
+  table.appendChild(trR);
+
+  // Rows: B from high (top) to low (bottom)
+  for (let b = RB_STEPS - 1; b >= 0; b--) {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.className = 'row-label';
+    tdLabel.textContent = Math.round((b + 0.5) * 255 / RB_STEPS);
+    tr.appendChild(tdLabel);
+
+    for (let r = 0; r < RB_STEPS; r++) {
+      const td = document.createElement('td');
+      const c = grid[b][r];
+      if (c) {
+        const sw = makeSwatch(c, 20);
+        sw.style.width = '20px';
+        sw.style.height = '20px';
+        td.appendChild(sw);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'empty-cell';
+        empty.style.width = '20px';
+        empty.style.height = '20px';
+        td.appendChild(empty);
+      }
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  return table;
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  const info = {
+    flat: '',
+    bitgrid: 'Rows=G channel, Cols=R×B per scheme bit layout.',
+    hueval: 'Common grid: 24 hue columns × 8 brightness rows. Gaps = missing coverage.',
+    triple: 'All 3 schemes in each cell (top=332, mid=233, bot=232b). Gaps visible per-scheme.',
+    rbout: 'R output × B output at fixed G. Shows density in output color space.',
+  };
+  document.getElementById('viewModeInfo').textContent = info[mode] || '';
+  rebuildAll();
+}
+
+// --- Tab switching ---
+
+function showTab(id) {
+  document.querySelectorAll('.palette').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// --- Init ---
+rebuildAll();
+</script>
+</body>
+</html>
